@@ -1,19 +1,17 @@
 import type {
   Aspect,
-  CompareMode,
   Level,
   ReportPayload,
-  ScopeSelection,
-  Theme,
   View,
 } from './types'
 import { ENTITY_KINDS } from './types'
 
 const LEVELS = new Set<Level>(['systems', 'top-containers', 'containers', 'components'])
-const COMPARE_MODES = new Set<CompareMode>(['off', 'base', 'position'])
 const ASPECTS = new Set<Aspect>(['ownership', 'call-direction', 'data-flow'])
-const THEMES = new Set<Theme>(['light', 'dark'])
-const FORBIDDEN_FRAGMENT_KEYS = new Set(['mode', 'x', 'y', 'zoom', 'width', 'height', 'side-size', 'table-size'])
+const RETIRED_FRAGMENT_KEYS = new Set([
+  'mode', 'scope', 'hops', 'compare', 'compare-at', 'theme',
+  'x', 'y', 'zoom', 'width', 'height', 'side-size', 'table-size',
+])
 
 function integer(value: string | null, fallback: number, maximum: number): number {
   const parsed = Number(value)
@@ -24,30 +22,16 @@ function oneOf<T extends string>(value: string | null, values: Set<T>, fallback:
   return value !== null && values.has(value as T) ? value as T : fallback
 }
 
-export type ViewDecodeResult = { diagnostics: string[]; view: View }
+export type ViewDecodeResult = { diagnostics: string[]; select: string | null; view: View }
 
 export function decodeView(payload: ReportPayload, fragment = ''): ViewDecodeResult {
   const params = new URLSearchParams(fragment.replace(/^#/, ''))
   const diagnostics: string[] = []
   for (const key of params.keys()) {
-    if (FORBIDDEN_FRAGMENT_KEYS.has(key)) diagnostics.push(`view.fragment.${key}: ignored retired or local-only key`)
+    if (RETIRED_FRAGMENT_KEYS.has(key)) diagnostics.push(`view.fragment.${key}: ignored retired or local-only key`)
   }
   const timeline = integer(params.get('timeline'), 0, payload.timelines.length - 1)
   const maximum = payload.timelines[timeline]?.milestones.length ?? 0
-  const scopeValue = params.get('scope')
-  const knownSystems = new Set(payload.rows.systems.map((row) => row.id))
-  const requestedSystems = scopeValue && scopeValue !== 'all' ? scopeValue.split(',').filter(Boolean) : []
-  const systems = requestedSystems.filter((id) => {
-    if (knownSystems.has(id)) return true
-    diagnostics.push(`view.fragment.scope.${id}: unknown system id ignored`)
-    return false
-  })
-  const scope: ScopeSelection = scopeValue && scopeValue !== 'all'
-    ? {
-        systems,
-        hops: integer(params.get('hops'), 1, 20),
-      }
-    : null
   const entityIds = new Set(ENTITY_KINDS.flatMap((kind) => payload.rows[kind].map((row) => `${kind}:${row.id}`)))
   const entityKey = (key: 'drill' | 'deps'): string | null => {
     const value = params.get(key)
@@ -56,24 +40,31 @@ export function decodeView(payload: ReportPayload, fragment = ''): ViewDecodeRes
     diagnostics.push(`view.fragment.${key}.${value}: unknown entity id ignored`)
     return null
   }
+  const selectableIds = new Set([
+    ...entityIds,
+    ...payload.rows.interfaces.map((row) => `interfaces:${row.id}`),
+  ])
+  const selectValue = params.get('select')
+  const select = selectValue && selectableIds.has(selectValue) ? selectValue : null
+  if (selectValue && !select) diagnostics.push(`view.fragment.select.${selectValue}: unknown row id ignored`)
   const knownTags = new Set(ENTITY_KINDS.flatMap((kind) => payload.rows[kind].flatMap((row) => row.tags ?? [])))
   const lens = (params.get('lens')?.split(',').filter(Boolean) ?? []).filter((tag) => {
     if (knownTags.has(tag)) return true
     diagnostics.push(`view.fragment.lens.${tag}: unknown tag ignored`)
     return false
   })
-  return { diagnostics, view: {
+  return { diagnostics, select, view: {
     timeline,
     position: integer(params.get('time'), 0, maximum),
     level: oneOf(params.get('level'), LEVELS, 'systems'),
-    scope,
-    compare: oneOf(params.get('compare'), COMPARE_MODES, 'off'),
-    comparePosition: integer(params.get('compare-at'), 0, maximum),
-    aspect: oneOf(params.get('aspect'), ASPECTS, 'ownership'),
+    scope: null,
+    compare: 'off',
+    comparePosition: 0,
+    aspect: oneOf(params.get('aspect'), ASPECTS, 'call-direction'),
     deps: entityKey('deps'),
     drill: entityKey('drill'),
     lens,
-    theme: oneOf(params.get('theme'), THEMES, 'light'),
+    theme: 'light',
   } }
 }
 
@@ -83,33 +74,29 @@ export function defaultView(payload: ReportPayload): View {
   return view
 }
 
-export function encodeView(view: View): string {
+export function encodeView(view: View, select: string | null = null): string {
   const params = new URLSearchParams()
-  params.set('scope', view.scope?.systems.join(',') || 'all')
-  params.set('hops', String(view.scope?.hops ?? 1))
   params.set('level', view.level)
   params.set('timeline', String(view.timeline))
   params.set('time', String(view.position))
-  params.set('compare', view.compare)
-  params.set('compare-at', String(view.comparePosition))
   params.set('aspect', view.aspect)
   if (view.deps) params.set('deps', view.deps)
   if (view.drill) params.set('drill', view.drill)
   if (view.lens.length) params.set('lens', view.lens.join(','))
-  params.set('theme', view.theme)
+  if (select) params.set('select', select)
   return params.toString()
 }
 
-export function persistView(view: View, push = false): void {
-  const fragment = encodeView(view)
+export function persistView(view: View, push = false, select: string | null = null): void {
+  const fragment = encodeView(view, select)
   if (globalThis.location?.hash.slice(1) !== fragment) {
     history[push ? 'pushState' : 'replaceState'](null, '', `#${fragment}`)
   }
 }
 
-export async function copyViewLink(view: View): Promise<string> {
+export async function copyViewLink(view: View, select: string | null = null): Promise<string> {
   const url = new URL(globalThis.location.href)
-  url.hash = encodeView(view)
+  url.hash = encodeView(view, select)
   const text = url.toString()
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text)

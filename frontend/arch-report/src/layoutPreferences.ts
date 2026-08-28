@@ -1,44 +1,49 @@
 import type { ColumnState } from 'ag-grid-community'
 
-export const LAYOUT_KEY = 'onetool-arch-report-layout:v1'
-export const PANEL_DEFAULTS = {
-  bottom: { collapsed: true, size: 280 },
-  legend: { collapsed: false, size: 250 },
-  side: { collapsed: false, size: 360 },
+export const LAYOUT_KEY = 'onetool-arch-report-layout:v2'
+export const DOCK_DEFAULTS = {
+  data: { collapsed: true, size: 280 },
+  info: { collapsed: true, size: 360 },
+  view: { collapsed: false, size: 280 },
+} as const
+export const DOCK_LIMITS = {
+  data: [180, 640],
+  info: [280, 720],
+  view: [220, 480],
 } as const
 
 export type Density = 'comfortable' | 'compact'
-export type PanelName = keyof typeof PANEL_DEFAULTS
-export type PanelLayout = { collapsed: boolean; size: number }
+export type DockName = keyof typeof DOCK_DEFAULTS
+export type DockLayout = { collapsed: boolean; size: number }
 export type LayoutPreferences = {
-  schemaVersion: 1
+  schemaVersion: 2
   density: Density
-  panels: Record<PanelName, PanelLayout>
+  docks: Record<DockName, DockLayout>
   tableLayouts: Record<string, ColumnState[]>
 }
 
 export function defaultLayout(): LayoutPreferences {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     density: 'comfortable',
-    panels: {
-      bottom: { ...PANEL_DEFAULTS.bottom },
-      legend: { ...PANEL_DEFAULTS.legend },
-      side: { ...PANEL_DEFAULTS.side },
+    docks: {
+      data: { ...DOCK_DEFAULTS.data },
+      info: { ...DOCK_DEFAULTS.info },
+      view: { ...DOCK_DEFAULTS.view },
     },
     tableLayouts: {},
   }
 }
 
-function validPanel(value: unknown, name: PanelName): value is PanelLayout {
+function validDock(value: unknown, name: DockName): value is DockLayout {
   if (!value || typeof value !== 'object') return false
-  const panel = value as Partial<PanelLayout>
-  const limits = name === 'side' ? [280, 720] : name === 'legend' ? [180, 400] : [180, 640]
-  return typeof panel.collapsed === 'boolean'
-    && typeof panel.size === 'number'
-    && Number.isFinite(panel.size)
-    && panel.size >= limits[0]
-    && panel.size <= limits[1]
+  const dock = value as Partial<DockLayout>
+  const limits = DOCK_LIMITS[name]
+  return typeof dock.collapsed === 'boolean'
+    && typeof dock.size === 'number'
+    && Number.isFinite(dock.size)
+    && dock.size >= limits[0]
+    && dock.size <= limits[1]
 }
 
 export function validateLayout(
@@ -47,8 +52,11 @@ export function validateLayout(
 ): LayoutPreferences | null {
   if (!value || typeof value !== 'object') return null
   const layout = value as Partial<LayoutPreferences>
-  if (layout.schemaVersion !== 1 || !['comfortable', 'compact'].includes(layout.density ?? '')) return null
-  if (!layout.panels || !validPanel(layout.panels.side, 'side') || !validPanel(layout.panels.bottom, 'bottom') || !validPanel(layout.panels.legend, 'legend')) return null
+  if (layout.schemaVersion !== 2 || !['comfortable', 'compact'].includes(layout.density ?? '')) return null
+  if (!layout.docks
+    || !validDock(layout.docks.view, 'view')
+    || !validDock(layout.docks.info, 'info')
+    || !validDock(layout.docks.data, 'data')) return null
   if (!layout.tableLayouts || typeof layout.tableLayouts !== 'object' || Array.isArray(layout.tableLayouts)) return null
   for (const [table, columns] of Object.entries(layout.tableLayouts)) {
     if (!Array.isArray(columns)) return null

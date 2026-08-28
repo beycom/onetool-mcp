@@ -18,9 +18,11 @@ Object.defineProperty(window, 'localStorage', { configurable: true, value: stora
 
 beforeEach(() => window.localStorage.clear())
 
-test('panel and table layout persistence survives a save and reload', () => {
+test('dock size and collapse state survive a localStorage round-trip', () => {
   const layout = defaultLayout()
-  layout.panels.side = { collapsed: true, size: 444 }
+  layout.docks.view = { collapsed: true, size: 444 }
+  layout.docks.info = { collapsed: false, size: 512 }
+  layout.docks.data = { collapsed: false, size: 320 }
   layout.tableLayouts.entities = [{ colId: 'id', hide: true, width: 190 }]
   expect(saveLayout(window.localStorage, layout)).toBe(true)
   expect(loadLayout(window.localStorage, { entities: new Set(['id']) })).toEqual(layout)

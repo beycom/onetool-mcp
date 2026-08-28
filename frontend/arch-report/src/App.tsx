@@ -15,9 +15,11 @@ import {
 } from '@xyflow/react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
+import { FitIcon, MapIcon, SearchIcon } from './Icons'
 import { applyPositions, NODE_HEIGHT, NODE_WIDTH, unionLayout, type Positions } from './layout'
-import { loadLayout, saveLayout, type LayoutPreferences, type PanelName } from './layoutPreferences'
+import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
 import { readPayload } from './payload'
 import { diffStates, legendEntries, projectState, unionGraph } from './projection'
 import { ResizablePanel } from './ResizablePanel'
@@ -36,7 +38,8 @@ import {
   type StateDiff,
   type View,
 } from './types'
-import { copyViewLink, defaultView, persistView } from './view'
+import { copyViewLink, decodeView, persistView } from './view'
+import { ViewDock } from './ViewDock'
 import { readingDepth } from './zoom'
 
 type DiffStatus = 'added' | 'removed' | 'changed'
@@ -279,101 +282,6 @@ function SidePanel({
   )
 }
 
-function PositionControls({ payload, setView, view }: {
-  payload: ReportPayload
-  setView: (change: Partial<View>) => void
-  view: View
-}) {
-  const timeline = payload.timelines[view.timeline]
-  const milestones = timeline.milestones
-  if (!milestones.length) return null
-  const milestoneById = new Map(payload.milestones.map((milestone) => [milestone.id, milestone]))
-  const label = view.position === 0
-    ? 'Base'
-    : milestoneById.get(milestones[view.position - 1])?.name ?? milestones[view.position - 1]
-  return (
-    <div className="time-controls control-group">
-      <label>
-        <span>Time</span>
-        <input
-          aria-label="Architecture position"
-          max={milestones.length}
-          min="0"
-          onChange={(event) => setView({ position: Number(event.target.value) })}
-          step="1"
-          type="range"
-          value={view.position}
-        />
-      </label>
-      <output aria-live="polite">{view.position}. {label}</output>
-      <label>
-        <span>Compare</span>
-        <select aria-label="Diff comparison" onChange={(event) => setView({ compare: event.target.value as View['compare'] })} value={view.compare}>
-          <option value="off">Off</option>
-          <option value="base">vs base</option>
-          <option value="position">vs position</option>
-        </select>
-      </label>
-      {view.compare === 'position' ? (
-        <label>
-          <span>Position</span>
-          <input
-            aria-label="Comparison position"
-            max={milestones.length}
-            min="0"
-            onChange={(event) => setView({ comparePosition: Number(event.target.value) })}
-            type="number"
-            value={view.comparePosition}
-          />
-        </label>
-      ) : null}
-    </div>
-  )
-}
-
-function ScopeControl({ disabled, payload, setView, view }: {
-  disabled?: boolean
-  payload: ReportPayload
-  setView: (change: Partial<View>) => void
-  view: View
-}) {
-  const systems = [...new Map(payload.rows.systems.map((row) => [row.id, row])).values()]
-  const selected = new Set(view.scope?.systems ?? [])
-  const toggle = (id: string) => {
-    const next = new Set(selected)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setView({ scope: next.size ? { systems: [...next], hops: view.scope?.hops ?? 1 } : null })
-  }
-  return (
-    <details aria-disabled={disabled} className="scope-control control-group" onClick={(event) => { if (disabled) event.preventDefault() }}>
-      <summary>Scope: {disabled ? 'disabled while drilled' : view.scope ? `${view.scope.systems.length} selected` : 'all'}</summary>
-      <div className="scope-menu">
-        <button onClick={() => setView({ scope: null })} type="button">All architecture</button>
-        <label>
-          <span>System hops</span>
-          <input
-            aria-label="System hops"
-            max="20"
-            min="0"
-            onChange={(event) => setView({
-              scope: { systems: view.scope?.systems ?? [systems[0]?.id].filter(Boolean), hops: Number(event.target.value) },
-            })}
-            type="number"
-            value={view.scope?.hops ?? 1}
-          />
-        </label>
-        <div className="scope-systems">{systems.map((system) => (
-          <label key={system.id}>
-            <input checked={selected.has(system.id)} onChange={() => toggle(system.id)} type="checkbox" />
-            <span>{system.name ?? system.id}</span>
-          </label>
-        ))}</div>
-      </div>
-    </details>
-  )
-}
-
 function statusesForNode(node: GraphNode, diff: StateDiff | null): DiffStatus[] {
   if (!diff) return []
   const keys = new Set([node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)])
@@ -528,63 +436,55 @@ function DependencyView({
   )
 }
 
-function LegendPanel({ entries, lens, onLens }: {
-  entries: Array<{ tag: string; count: number }>
-  lens: string[]
-  onLens: (tags: string[]) => void
-}) {
-  const selected = new Set(lens)
-  const toggle = (tag: string) => {
-    const next = new Set(selected)
-    if (next.has(tag)) next.delete(tag)
-    else next.add(tag)
-    onLens(next.size === entries.length ? [] : [...next].sort())
-  }
-  return <div className="legend-content"><header><span>Tags</span>{lens.length ? <button onClick={() => onLens([])} type="button">Clear</button> : null}</header><div>{entries.map(({ tag, count }) => <button aria-pressed={selected.has(tag)} key={tag} onClick={() => toggle(tag)} type="button"><i aria-hidden="true" /><span>{tag}</span><b>{count}</b></button>)}</div></div>
-}
-
-function ControlCluster({ children, className, summary }: { children: React.ReactNode; className: string; summary: string }) {
-  const [open, setOpen] = useState(() => window.innerWidth >= 761)
-  useEffect(() => {
-    const resize = () => setOpen(window.innerWidth >= 761)
-    window.addEventListener('resize', resize)
-    return () => window.removeEventListener('resize', resize)
-  }, [])
-  return <details className={`floating-cluster ${className}`} onToggle={(event) => setOpen(event.currentTarget.open)} open={open}><summary>{summary}</summary><div className="cluster-content">{children}</div></details>
-}
-
 const EMPTY_POSITIONS: Positions = new Map()
 
 export default function App() {
-  const [view, setViewState] = useState<View>(() => defaultView(payload))
+  const [initial] = useState(() => decodeView(payload, globalThis.location?.hash ?? ''))
+  const [view, setViewState] = useState<View>(initial.view)
   const [selected, setSelected] = useState<Selection | null>(null)
+  const [restoreSelect, setRestoreSelect] = useState<string | null>(initial.select)
   const [layoutResult, setLayoutResult] = useState<{ key: string; positions: Positions }>({ key: '', positions: new Map() })
   const [flow, setFlow] = useState<ReactFlowInstance<CanvasNode, SemanticFlowEdge> | null>(null)
   const [layout, setLayout] = useState<LayoutPreferences>(() => loadLayout(window.localStorage))
   const [copyStatus, setCopyStatus] = useState('')
   const [diagnostic, setDiagnostic] = useState('')
   const [zoom, setZoom] = useState(1)
-  const [fullscreen, setFullscreen] = useState(false)
+  const [mapOpen, setMapOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [autoViewCollapsed, setAutoViewCollapsed] = useState(false)
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
-  const appRef = useRef<HTMLDivElement>(null)
-  const fullscreenInvoker = useRef<HTMLElement | null>(null)
-  const nativeFullscreen = useRef(false)
-  const timeline = payload.timelines[view.timeline]
+  const searchTrigger = useRef<HTMLButtonElement>(null)
   const setView = useCallback((change: Partial<View>, push = false) => setViewState((current) => {
     const next = { ...current, ...change }
     if (push) persistView(next, true)
     return next
   }), [])
+  const revealInfo = useCallback((selection: Selection) => {
+    setSelected(selection)
+    if (window.innerWidth <= 1024 && !layout.docks.view.collapsed) setAutoViewCollapsed(true)
+    setLayout((current) => ({
+        ...current,
+        docks: {
+          ...current.docks,
+          info: { ...current.docks.info, collapsed: false },
+        },
+      }))
+  }, [layout.docks.view.collapsed])
+  const closeInfo = useCallback(() => {
+    setSelected(null)
+    setAutoViewCollapsed(false)
+    setLayout((current) => ({ ...current, docks: { ...current.docks, info: { ...current.docks.info, collapsed: true } } }))
+  }, [])
   const depth = readingDepth(zoom)
 
   const projected = useMemo(() => projectState(payload, view), [view])
-  const compareFrom = view.compare === 'off' ? null : view.compare === 'base' ? 0 : view.comparePosition
-  const diff = useMemo(() => compareFrom === null
+  const previousPosition = view.position > 0 ? view.position - 1 : null
+  const diff = useMemo(() => previousPosition === null
     ? null
-    : diffStates(payload, view.timeline, compareFrom, view.position), [compareFrom, view.position, view.timeline])
-  const compared = useMemo(() => compareFrom === null
+    : diffStates(payload, view.timeline, previousPosition, view.position), [previousPosition, view.position, view.timeline])
+  const compared = useMemo(() => previousPosition === null
     ? null
-    : projectState(payload, { ...view, compare: 'off', position: compareFrom }), [compareFrom, view])
+    : projectState(payload, { ...view, position: previousPosition }), [previousPosition, view])
   const union = useMemo(() => unionGraph(payload, view.timeline, view.level, view.drill), [view.drill, view.level, view.timeline])
   const layoutKey = `${view.timeline}:${view.level}:${view.drill ?? 'map'}`
   // A layout computed for a different projection must never apply
@@ -593,13 +493,28 @@ export default function App() {
   const positions = layoutResult.key === layoutKey ? layoutResult.positions : EMPTY_POSITIONS
   const legend = useMemo(() => legendEntries(projected), [projected])
 
-  useEffect(() => persistView(view), [view])
+  const selectedKey = selected?.type === 'row' ? `${selected.kind}:${selected.row.id}` : null
   useEffect(() => {
-    const restore = () => setViewState(defaultView(payload))
+    for (const message of initial.diagnostics) console.warn(message)
+  }, [initial])
+  useEffect(() => persistView(view, false, selectedKey), [selectedKey, view])
+  useEffect(() => {
+    const restore = () => {
+      const decoded = decodeView(payload, globalThis.location?.hash ?? '')
+      for (const message of decoded.diagnostics) console.warn(message)
+      setViewState(decoded.view)
+      setRestoreSelect(decoded.select)
+      if (!decoded.select) closeInfo()
+    }
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
-  }, [])
+  }, [closeInfo])
   useEffect(() => { saveLayout(window.localStorage, layout) }, [layout])
+  useEffect(() => {
+    if (!flow) return
+    const frame = requestAnimationFrame(() => { void flow.fitView({ duration: 180, padding: 0.2 }) })
+    return () => cancelAnimationFrame(frame)
+  }, [flow, layout.docks.data.collapsed, layout.docks.data.size, layout.docks.info.collapsed, layout.docks.info.size, layout.docks.view.collapsed, layout.docks.view.size])
   useEffect(() => {
     let active = true
     void unionLayout(union, layoutKey)
@@ -610,21 +525,7 @@ export default function App() {
   useEffect(() => {
     if (flow && positions.size) void flow.fitView({ duration: 250, padding: 0.2 })
   }, [flow, positions])
-  useEffect(() => {
-    const sync = () => {
-      const active = document.fullscreenElement === appRef.current
-      if (active) nativeFullscreen.current = true
-      if (active || nativeFullscreen.current) setFullscreen(active)
-      if (!active && nativeFullscreen.current) {
-        nativeFullscreen.current = false
-        fullscreenInvoker.current?.focus()
-      }
-    }
-    document.addEventListener('fullscreenchange', sync)
-    return () => document.removeEventListener('fullscreenchange', sync)
-  }, [])
 
-  const selectedKey = selected?.type === 'row' ? `${selected.kind}:${selected.row.id}` : null
   const graphNodes = useMemo(() => {
     const merged = new Map(projected.nodes.map((node) => [node.key, { node, ghost: false }]))
     for (const node of compared?.nodes ?? []) {
@@ -736,49 +637,77 @@ export default function App() {
       view.aspect,
       ghost ? ['removed'] : statusesForEdge(edge, diff),
       edgeEmphasis(edge),
-      () => { setSelected({ type: 'edge', edge }); setPanel('side', { ...layout.panels.side, collapsed: false }) },
+      () => revealInfo({ type: 'edge', edge }),
     ))
-  }, [diff, graphEdges, hoveredKey, layout.panels.side, projected.nodes, selectedKey, view.aspect, view.lens])
+  }, [diff, graphEdges, hoveredKey, projected.nodes, revealInfo, selectedKey, view.aspect, view.lens])
 
-  const systemRows = [...new Map(payload.rows.systems.map((row) => [row.id, row])).values()]
-  const timelineLabel = timeline.id ?? 'implicit timeline'
-  const currentPositionLabel = view.position === 0
-    ? 'Base'
-    : payload.milestones.find((item) => item.id === timeline.milestones[view.position - 1])?.name ?? `Position ${view.position}`
-
-  const chooseTimeline = (value: number) => {
-    const maximum = payload.timelines[value].milestones.length
-    setView({
-      timeline: value,
-      position: Math.min(view.position, maximum),
-      comparePosition: Math.min(view.comparePosition, maximum),
-    })
+  const setDock = (name: DockName, dock: LayoutPreferences['docks'][DockName]) => {
+    setLayout((current) => ({ ...current, docks: { ...current.docks, [name]: dock } }))
   }
-
+  const selectRow = useCallback((kind: RowKind, row: ReportRow, members: RowRef[] = []) => {
+    revealInfo({ type: 'row', kind, members, row })
+  }, [revealInfo])
+  const centerKeys = useCallback((keys: string[]) => {
+    if (!flow || !keys.length) return
+    const points = keys.flatMap((key) => {
+      const position = positions.get(key)
+      return position ? [{ x: position.x + NODE_WIDTH / 2, y: position.y + NODE_HEIGHT / 2 }] : []
+    })
+    if (!points.length) return
+    const center = points.reduce((total, point) => ({ x: total.x + point.x, y: total.y + point.y }), { x: 0, y: 0 })
+    void flow.setCenter(center.x / points.length, center.y / points.length, { duration: 220, zoom: Math.max(zoom, 0.8) })
+  }, [flow, positions, zoom])
+  const selectById = useCallback((kind: RowKind, id: string, center = false) => {
+    const row = projected.rawState.rows[kind].find((item) => item.id === id)
+      ?? payload.rows[kind].find((item) => item.id === id)
+    if (!row) return
+    const canonicalKey = `${kind}:${id}`
+    const node = projected.nodes.find((item) => [item.key, ...item.members.map((member) => `${member.kind}:${member.row.id}`)].includes(canonicalKey))
+    selectRow(kind, row, node?.members)
+    if (center) {
+      const edge = kind === 'interfaces' ? projected.edges.find((item) => item.interfaces.includes(id)) : undefined
+      requestAnimationFrame(() => centerKeys(node ? [node.key] : edge ? [edge.a, edge.b] : []))
+    }
+  }, [centerKeys, projected, selectRow])
+  useEffect(() => {
+    if (!restoreSelect) return
+    const [kind, ...id] = restoreSelect.split(':')
+    selectById(kind as RowKind, id.join(':'))
+    setRestoreSelect(null)
+  }, [restoreSelect, selectById])
+  useEffect(() => {
+    setSelected((current) => {
+      if (current?.type !== 'row') return current
+      const row = projected.rawState.rows[current.kind].find((item) => item.id === current.row.id)
+        ?? projected.rawState.clips[current.kind].get(current.row.id)?.row
+      return row && row !== current.row ? { ...current, row } : current
+    })
+  }, [projected.rawState])
+  const searchResults = useMemo<SearchResult[]>(() => {
+    const diagrams: SearchResult[] = [{ id: 'canvas', kind: 'diagram', label: 'Canvas', meta: 'Architecture', onChoose: () => { setView({ deps: null }); requestAnimationFrame(() => { if (flow) void flow.fitView({ duration: 180, padding: 0.2 }) }) } }]
+    const rows = (['systems', 'containers', 'components', 'code', 'users', 'interfaces'] as RowKind[])
+      .flatMap((kind) => projected.rawState.rows[kind].map((row) => ({
+        id: row.id,
+        kind,
+        label: rowLabel(row),
+        meta: KIND_LABEL[kind],
+        onChoose: () => selectById(kind, row.id, true),
+      })))
+    return [...diagrams, ...rows]
+  }, [flow, projected.rawState.rows, selectById, setView])
   const copyLink = async () => {
     try {
-      await copyViewLink(view)
+      await copyViewLink(view, selectedKey)
       setCopyStatus('Link copied')
     } catch {
       setCopyStatus('Copy unavailable')
     }
   }
-
-  const setPanel = (name: PanelName, panel: LayoutPreferences['panels'][PanelName]) => {
-    setLayout((current) => ({ ...current, panels: { ...current.panels, [name]: panel } }))
-  }
-  const selectRow = useCallback((kind: RowKind, row: ReportRow, members: RowRef[] = []) => {
-    setSelected({ type: 'row', kind, members, row })
-    setLayout((current) => ({ ...current, panels: { ...current.panels, side: { ...current.panels.side, collapsed: false } } }))
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    requestAnimationFrame(() => searchTrigger.current?.focus())
   }, [])
-  const selectById = (kind: RowKind, id: string) => {
-    const row = projected.rawState.rows[kind].find((item) => item.id === id)
-      ?? payload.rows[kind].find((item) => item.id === id)
-    if (row) {
-      const node = projected.nodes.find((item) => item.kind === kind && item.row.id === id)
-      selectRow(kind, row, node?.members)
-    }
-  }
+
   const openDependencies = (key: string) => {
     const displayKey = projected.nodes.find((node) => [node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)].includes(key))?.key ?? key
     setView({ deps: displayKey, drill: null }, true)
@@ -793,33 +722,25 @@ export default function App() {
     }
     return null
   }
-  const toggleFullscreen = useCallback(async (invoker?: HTMLElement) => {
-    if (fullscreen) {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      setFullscreen(false)
-      fullscreenInvoker.current?.focus()
-    } else {
-      fullscreenInvoker.current = invoker ?? document.activeElement as HTMLElement | null
-      setFullscreen(true)
-      try { await appRef.current?.requestFullscreen?.() } catch { /* file:// uses the full-window fallback. */ }
-    }
-    requestAnimationFrame(() => { if (flow) void flow.fitView({ padding: 0.2 }) })
-  }, [flow, fullscreen])
-
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       const target = event.target
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setSearchOpen(true)
+        return
+      }
       if (target instanceof HTMLElement && target.matches('input, textarea, select, [contenteditable="true"]')) return
       if (event.key === 'Escape') {
         event.preventDefault()
-        const menu = document.querySelector<HTMLDetailsElement>('details[open]')
-        if (menu) menu.open = false
-        else if (selected) setSelected(null)
-        else if (view.lens.length || view.drill || view.deps) setView({ deps: null, drill: null, lens: [] })
-        else if (fullscreen) void toggleFullscreen()
+        if (searchOpen) closeSearch()
+        else {
+          const menu = document.querySelector<HTMLDetailsElement>('.table-menu[open], .change-popover[open]')
+          if (menu) menu.open = false
+          else if (selected) closeInfo()
+        }
         return
       }
-      if (event.key.toLowerCase() === 'f') { event.preventDefault(); void toggleFullscreen(document.activeElement as HTMLElement | undefined); return }
       if (!(event.ctrlKey || event.metaKey) || !flow) return
       if (event.key === '+' || event.key === '=') { event.preventDefault(); void flow.zoomIn({ duration: 120 }) }
       if (event.key === '-') { event.preventDefault(); void flow.zoomOut({ duration: 120 }) }
@@ -827,10 +748,8 @@ export default function App() {
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
-  }, [flow, fullscreen, selected, setView, toggleFullscreen, view.deps, view.drill, view.lens.length])
+  }, [closeInfo, closeSearch, flow, searchOpen, selected])
 
-  const drillRow = view.drill ? projected.boundaries.find((boundary) => boundary.nodeKey === view.drill)?.row
-    ?? payload.rows[view.drill.split(':')[0] as RowKind]?.find((row) => row.id === view.drill!.split(':').slice(1).join(':')) : null
   const drillPath: string[] = []
   let drillCursor = view.drill
   while (drillCursor) {
@@ -840,40 +759,21 @@ export default function App() {
     drillCursor = parentKey(drillCursor)
   }
   return (
-    <div className={`app${fullscreen ? ' is-fullscreen' : ''}`} data-hover={hoveredKey ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selectedKey ? 'active' : 'off'} data-theme={view.theme} ref={appRef}>
+    <div className="app" data-hover={hoveredKey ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selectedKey ? 'active' : 'off'}>
       <header className="app-header">
-        <div className="brand-lockup"><span className="brand-mark">⌘</span><div><span>ONETOOL ARCHITECTURE</span><strong>{payload.source}</strong></div></div>
-        <span className="state-badge">{view.drill && drillRow ? <><button aria-label="Up one architecture level" onClick={() => setView({ drill: parentKey(view.drill!), deps: null }, true)} type="button">↑ Up</button><b>{drillPath.join(' / ')}</b></> : <>{currentPositionLabel} · {view.level}</>}</span>
-        <div className="header-actions">
-          <button aria-label="Copy view link" className="icon-button" onClick={() => void copyLink()} title="Copy view link" type="button">⌁</button>
-          <button aria-label={`Use ${view.theme === 'light' ? 'dark' : 'light'} theme`} className="icon-button" onClick={() => setView({ theme: view.theme === 'light' ? 'dark' : 'light' })} type="button">{view.theme === 'light' ? '◐' : '○'}</button>
-          <button aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} className="icon-button" onClick={(event) => void toggleFullscreen(event.currentTarget)} type="button">{fullscreen ? '↙' : '↗'}</button>
-          <span aria-live="polite" className="copy-status">{copyStatus}</span>
-        </div>
+        <div className="brand-lockup"><span className="brand-mark">OT</span><div><span>OneTool Architecture</span><strong>{payload.source}</strong></div></div>
+        <button className="search-trigger" onClick={() => setSearchOpen(true)} ref={searchTrigger} type="button"><SearchIcon /><span>Search</span><kbd>⌘K</kbd></button>
       </header>
 
-      <main className="workspace" data-inspector={selected ? 'true' : 'false'}>
-        <div className="canvas-row">
-            <div className={`canvas-root depth-${depth}`} data-reading-depth={depth}>
-            {!view.deps ? <><ControlCluster className="time-cluster" summary={`Time · ${currentPositionLabel}`}>
-                {payload.timelines.length > 1 ? <label className="control-group"><span>Timeline</span><select aria-label="Timeline" onChange={(event) => chooseTimeline(Number(event.target.value))} value={view.timeline}>{payload.timelines.map((item, index) => <option key={item.id ?? 'implicit'} value={index}>{item.id ?? 'Default'}</option>)}</select></label> : null}
-                <PositionControls payload={payload} setView={setView} view={view} />
-            </ControlCluster>
-            <ControlCluster className="projection-cluster" summary={`Projection · ${view.level}`}>
-                <div className="segmented control-group" role="group" aria-label="Architecture level">{([
-                  ['systems', 'System'],
-                  ['top-containers', 'Container'],
-                  ['containers', 'Child Containers'],
-                  ['components', 'Component'],
-                ] as Array<[Level, string]>).map(([level, label]) => <button aria-pressed={view.level === level} key={level} onClick={() => setView({ level })} type="button">{label}</button>)}</div>
-                <ScopeControl disabled={Boolean(view.drill)} payload={payload} setView={setView} view={view} />
-                <label className="control-group"><span>Aspect</span><select aria-label="Edge aspect" onChange={(event) => setView({ aspect: event.target.value as Aspect })} value={view.aspect}><option value="ownership">Ownership</option><option value="call-direction">Call direction</option><option value="data-flow">Data flow</option></select></label>
-                {selectedKey ? <button onClick={() => openDependencies(selectedKey)} type="button">Dependencies</button> : null}
-                {(view.lens.length || view.drill || view.deps) ? <button onClick={() => setView({ deps: null, drill: null, lens: [] })} type="button">Reset view</button> : null}
-            </ControlCluster></> : null}
+      <main className="workspace">
+        <div className="dock-row">
+          <ResizablePanel className="view-dock" label="View dock" layout={autoViewCollapsed ? { ...layout.docks.view, collapsed: true } : layout.docks.view} name="view" onChange={(dock) => { setAutoViewCollapsed(false); setDock('view', dock) }}>
+            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} drillPath={drillPath} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onUp={() => setView({ drill: parentKey(view.drill!), deps: null }, true)} onView={setView} payload={payload} view={view} />
+          </ResizablePanel>
 
-            {view.deps ? <DependencyView aspect={view.aspect} focusKey={view.deps} onClose={() => setView({ deps: null }, true)} onFocus={(key) => setView({ deps: key }, true)} onSelect={selectRow} projected={projected} /> : !projected.nodes.length ? <div className="empty-state"><p>No entities match the current projection.</p><button onClick={() => setView({ deps: null, drill: null, lens: [], scope: null })} type="button">Show the full architecture</button></div> : <ReactFlow
-              colorMode={view.theme}
+          <div className={`canvas-root depth-${depth}`} data-reading-depth={depth}>
+            {view.deps ? <DependencyView aspect={view.aspect} focusKey={view.deps} onClose={() => setView({ deps: null }, true)} onFocus={(key) => setView({ deps: key }, true)} onSelect={selectRow} projected={projected} /> : !projected.nodes.length ? <div className="empty-state"><p>No entities match the current projection.</p><button onClick={() => setView({ deps: null, drill: null, lens: [] })} type="button">Show the full architecture</button></div> : <ReactFlow
+              colorMode="light"
               edges={edges}
               edgeTypes={edgeTypes}
               fitView
@@ -885,7 +785,7 @@ export default function App() {
               nodeTypes={nodeTypes}
               onEdgeClick={(_event, edge) => {
                 const graphEdge = (edge.data as SemanticData | undefined)?.edge
-                if (graphEdge) { setSelected({ type: 'edge', edge: graphEdge }); setPanel('side', { ...layout.panels.side, collapsed: false }) }
+                if (graphEdge) revealInfo({ type: 'edge', edge: graphEdge })
               }}
               onInit={(instance) => { setFlow(instance); setZoom(instance.getZoom()) }}
               onNodeClick={(_event, node) => {
@@ -902,24 +802,28 @@ export default function App() {
               onViewportChange={(viewport) => setZoom(viewport.zoom)}
               proOptions={{ hideAttribution: true }}
             >
-              <MiniMap className="semantic-radar" pannable zoomable />
+              {mapOpen ? <MiniMap className="semantic-radar" pannable zoomable /> : null}
             </ReactFlow>}
 
-            {!view.deps && legend.length ? <ResizablePanel className="legend-panel" label="Legend panel" layout={layout.panels.legend} name="legend" onChange={(panel) => setPanel('legend', panel)}><LegendPanel entries={legend} lens={view.lens} onLens={(lens) => setView({ lens })} /></ResizablePanel> : null}
-
-            <div aria-label="Canvas zoom" className="zoom-rail" role="group">
-              <button aria-label="Fit canvas" onClick={() => { if (flow) void flow.fitView({ duration: 150, padding: 0.2 }) }} title="Fit" type="button">Fit</button>
-              <button aria-label="Zoom out" onClick={() => { if (flow) void flow.zoomOut({ duration: 120 }) }} title="Zoom out" type="button">−</button>
-              <output aria-live="polite"><strong>{Math.round(zoom * 100)}%</strong><span>{depth.toUpperCase()}</span></output>
-              <button aria-label="Zoom in" onClick={() => { if (flow) void flow.zoomIn({ duration: 120 }) }} title="Zoom in" type="button">+</button>
-              <button aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'} onClick={(event) => void toggleFullscreen(event.currentTarget)} title="Fullscreen" type="button">{fullscreen ? '↙' : '↗'}</button>
+            <div className="map-cluster-wrap">
+              {mapOpen ? <span className="map-label">Map</span> : null}
+              <div aria-label="Map, fit, and zoom" className="map-cluster" role="group">
+                <button aria-label="Toggle map" aria-pressed={mapOpen} onClick={() => setMapOpen((open) => !open)} title="Map" type="button"><MapIcon /><span>Map</span></button>
+                <button aria-label="Fit canvas" onClick={() => { if (flow) void flow.fitView({ duration: 150, padding: 0.2 }) }} title="Fit" type="button"><FitIcon /><span>Fit</span></button>
+                <button aria-label="Zoom out" onClick={() => { if (flow) void flow.zoomOut({ duration: 120 }) }} title="Zoom out" type="button">−</button>
+                <output aria-live="polite"><strong>{Math.round(zoom * 100)}%</strong><span>{depth}</span></output>
+                <button aria-label="Zoom in" onClick={() => { if (flow) void flow.zoomIn({ duration: 120 }) }} title="Zoom in" type="button">+</button>
+              </div>
+              {!positions.size ? <span className="layout-indicator">Laying out</span> : null}
             </div>
           </div>
 
-          {selected ? <ResizablePanel className="side-panel" label="Details panel" layout={layout.panels.side} name="side" onChange={(panel) => setPanel('side', panel)}><SidePanel aspect={view.aspect} onClose={() => setSelected(null)} onDependencyView={openDependencies} onSelect={selectRow} projected={projected} selection={selected} /></ResizablePanel> : null}
+          <ResizablePanel className="info-dock" label="Info dock" layout={layout.docks.info} name="info" onChange={(dock) => { if (dock.collapsed) closeInfo(); else setDock('info', dock) }}>
+            {selected ? <SidePanel aspect={view.aspect} onClose={closeInfo} onDependencyView={openDependencies} onSelect={selectRow} projected={projected} selection={selected} /> : <div className="info-empty"><span>Info</span><p>Select an item on Canvas or in Data.</p></div>}
+          </ResizablePanel>
         </div>
 
-        <ResizablePanel className="table-panel" label="Tables panel" layout={layout.panels.bottom} name="bottom" onChange={(panel) => setPanel('bottom', panel)}>
+        <ResizablePanel className="data-dock" label="Data dock" layout={layout.docks.data} name="data" onChange={(dock) => setDock('data', dock)}>
           <GridPanel
             density={layout.density}
             diff={diff}
@@ -935,7 +839,12 @@ export default function App() {
           />
         </ResizablePanel>
       </main>
-      <footer><span><b data-testid="rendered-node-count">{projected.nodes.length}</b> nodes · {edges.length} connections · {view.scope ? `${view.scope.systems.length} scoped systems + ${view.scope.hops} hops` : 'all systems'}</span><span data-testid="rendered-node-ids">{projected.nodes.map((node) => node.key).join(',')}</span><span>{positions.size ? 'ELK union layout' : 'laying out'} · offline · position {view.position} · {timelineLabel} · {systemRows.length} authored systems</span></footer>
+
+      <div className="visually-hidden" aria-live="polite">
+        <span><b data-testid="rendered-node-count">{projected.nodes.length}</b> nodes, {edges.length} connections</span>
+      </div>
+      <span aria-hidden="true" className="visually-hidden" data-testid="rendered-node-ids">{projected.nodes.map((node) => node.key).join(',')}</span>
+      {searchOpen ? <GlobalSearch onClose={closeSearch} results={searchResults} /> : null}
       {diagnostic ? <div aria-live="polite" className="diagnostic"><span>{diagnostic}</span><button aria-label="Dismiss diagnostic" onClick={() => setDiagnostic('')} type="button">×</button></div> : null}
     </div>
   )

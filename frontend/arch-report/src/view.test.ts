@@ -8,14 +8,27 @@ import { decodeView, encodeView } from './view'
 
 const payload = payloadFixture as unknown as ReportPayload
 
-test('view fragments omit retired mode and local layout coordinates', () => {
-  const view = decodeView(payload, '#mode=PATH&x=12&width=480').view
-  const fragment = encodeView(view)
-  expect(fragment).not.toMatch(/(?:mode|x|y|zoom|width|height|size)=/)
+test('select fragment round-trips and ignores an invalid id', () => {
+  const entityKey = `systems:${payload.rows.systems[0].id}`
+  const interfaceKey = `interfaces:${payload.rows.interfaces[0].id}`
+  const entityResult = decodeView(payload, `#select=${entityKey}`)
+  const interfaceResult = decodeView(payload, `#${encodeView(entityResult.view, interfaceKey)}`)
+
+  expect(entityResult.select).toBe(entityKey)
+  expect(interfaceResult.select).toBe(interfaceKey)
+
+  const invalidResult = decodeView(payload, '#select=systems:missing')
+  expect(invalidResult.select).toBeNull()
+  expect(invalidResult.diagnostics).toContain('view.fragment.select.systems:missing: unknown row id ignored')
 })
 
-test('unknown fragment ids follow the diagnostic path without crashing', () => {
-  const result = decodeView(payload, '#scope=missing-system')
-  expect(result.view.scope?.systems).toEqual([])
-  expect(result.diagnostics).toContain('view.fragment.scope.missing-system: unknown system id ignored')
+test('removed fragment keys are ignored with a diagnostic', () => {
+  const result = decodeView(payload, '#scope=system-a&hops=3&compare=base&compare-at=2&theme=dark')
+  const fragment = encodeView(result.view, result.select)
+
+  expect(result.view).toMatchObject({ compare: 'off', comparePosition: 0, scope: null, theme: 'light' })
+  expect(fragment).not.toMatch(/(?:scope|hops|compare|compare-at|theme)=/)
+  for (const key of ['scope', 'hops', 'compare', 'compare-at', 'theme']) {
+    expect(result.diagnostics).toContain(`view.fragment.${key}: ignored retired or local-only key`)
+  }
 })

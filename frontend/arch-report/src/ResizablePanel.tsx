@@ -1,6 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 
-import { PANEL_DEFAULTS, type PanelLayout, type PanelName } from './layoutPreferences'
+import { DOCK_DEFAULTS, DOCK_LIMITS, type DockLayout, type DockName } from './layoutPreferences'
 
 export function ResizablePanel({
   children,
@@ -13,27 +13,29 @@ export function ResizablePanel({
   children: ReactNode
   className: string
   label: string
-  layout: PanelLayout
-  name: PanelName
-  onChange: (layout: PanelLayout) => void
+  layout: DockLayout
+  name: DockName
+  onChange: (layout: DockLayout) => void
 }) {
-  const vertical = name !== 'bottom'
+  const vertical = name !== 'data'
   const resize = (event: ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault()
     const start = vertical ? event.clientX : event.clientY
     const startSize = layout.size
     event.currentTarget.setPointerCapture(event.pointerId)
     const move = (next: PointerEvent) => {
-      const delta = vertical ? start - next.clientX : start - next.clientY
-      const limits = name === 'side' ? [280, 720] : name === 'legend' ? [180, 400] : [180, 640]
+      const delta = name === 'view' ? next.clientX - start : vertical ? start - next.clientX : start - next.clientY
+      const limits = DOCK_LIMITS[name]
       onChange({ collapsed: false, size: Math.max(limits[0], Math.min(limits[1], startSize + delta)) })
     }
     const finish = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
   }
   const style = { [vertical ? 'width' : 'height']: layout.collapsed ? 34 : layout.size }
   return (
@@ -41,7 +43,7 @@ export function ResizablePanel({
       <button
         aria-label={`Resize ${label.toLowerCase()}`}
         className="panel-resize-handle"
-        onDoubleClick={() => onChange({ collapsed: layout.collapsed, size: PANEL_DEFAULTS[name].size })}
+        onDoubleClick={() => onChange({ collapsed: layout.collapsed, size: DOCK_DEFAULTS[name].size })}
         onPointerDown={resize}
         title="Drag to resize; double-click to reset"
         type="button"

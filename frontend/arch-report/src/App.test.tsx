@@ -27,15 +27,18 @@ vi.mock('./layout', () => ({
 }))
 
 import App from './App'
+import payload from './fixture-payload.json'
 
 afterEach(cleanup)
 
-test('scrubbing the acme timeline changes the rendered node set', async () => {
+test('the Stage dropdown has every position and changes the projected state', async () => {
   render(<App />)
   const nodeIds = screen.getByTestId('rendered-node-ids')
   const initial = nodeIds.textContent
+  const stage = screen.getByLabelText('Stage') as HTMLSelectElement
 
-  fireEvent.change(screen.getByLabelText('Architecture position'), { target: { value: '1' } })
+  expect(stage.options).toHaveLength(payload.timelines[0].milestones.length + 1)
+  fireEvent.change(stage, { target: { value: '1' } })
 
   await waitFor(() => expect(nodeIds.textContent).not.toBe(initial))
   expect(nodeIds.textContent).toContain('systems:commerce-platform')
