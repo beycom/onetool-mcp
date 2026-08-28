@@ -105,19 +105,28 @@ whatever chrome remains.
    switches it strands content right-of-center with a dead left third.
    Expected: fit centers the graph with even margins at a zoom where names
    are readable (small graphs land at READ depth).
+   — CLOSED (D13b, 2026-08-28: cold framing caps at Read and centers;
+   79% Read cold load verified at 1440×900 and 1024×720).
 9. **Fit ignores overlays.** With legend or tables open, Fit uses the full
    canvas rect, so fitted content hides behind panels; opening the tables
    panel (65% height) or details panel (50% width) never re-fits.
    Expected: fit and re-fit against the *visible* canvas whenever an overlay
    opens, closes, or the viewport resizes.
+   — CLOSED (D13b, 2026-08-28: fit rect is the flex cell between the docks;
+   dock open/close/resize and viewport resize preserve zoom with minimal pan).
 10. **Node cards waste their space.** Uniform 171×115 cards are ~80% empty
     yet still truncate names ("Legacy Commerce Platfo…") — at every zoom.
     Expected: size from content per depth; a name never truncates while its
     box has empty rows.
+    — CLOSED (D13b, 2026-08-28: per-level tier widths with content-driven
+    height; names wrap to two lines before truncating).
 11. **Container level is unreadable.** 42 nodes at 21% with near-invisible
     group borders and 6px labels. Expected: per-level sizing/threshold so the
     default view of any level is readable, and boundary containers visually
     distinct (fill tint + label) from edge routes.
+    — CLOSED (D13b, 2026-08-28: Container default framing lands at Read
+    with readable names; boundary tint/header visual polish continues in
+    D13c).
 
 ## 3. Interaction (D13b/D13c for canvas, D13d for panels)
 
@@ -126,6 +135,9 @@ whatever chrome remains.
     panel or offscreen. Same for edges: no visible highlight remains in view.
     Expected: on select, pan/zoom the selection into the remaining visible
     canvas and highlight it; on edge select, highlight the full route.
+    — CLOSED for camera (D13b, 2026-08-28: selection stays inside the
+    visible canvas via minimal pan / neighborhood fit). Edge route
+    highlight remains D13c.
 13. **Escape doesn't close the details panel.** Only the small ✕ does.
     Expected standard keys: Escape closes topmost overlay / clears selection.
 14. **Legend state is unstable.** Collapsed legend re-expands by itself when
@@ -143,6 +155,8 @@ whatever chrome remains.
     entire time pill (slider + compare) disappeared and only a full reload
     restored it. Expected: persistent chrome never disappears as a side
     effect.
+    — CLOSED (D13b walkthrough re-check, 2026-08-28: no persistent chrome
+    vanishes; structural since the D13a docked shell).
 16. **Contextual controls jump into unrelated groups.** A "Dependencies"
     button appears inside the level-tabs bar only while a node is selected.
     Expected: selection-scoped actions live with the selection, not
@@ -156,6 +170,9 @@ whatever chrome remains.
     position label changes width ("0. Base" → "4. Transaction Core"),
     moving the compare dropdown; the COMPARE label is crammed against it.
     Expected: fixed-width slots so nothing jumps while scrubbing.
+    — CLOSED (D13b walkthrough re-check, 2026-08-28: the time pill is
+    gone — Stage is a fixed-width View-dock dropdown; nothing shifts on
+    switch).
 
 ## 4. Overlapping chrome (D13a/D13b)
 

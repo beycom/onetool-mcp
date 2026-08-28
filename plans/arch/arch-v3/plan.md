@@ -243,10 +243,9 @@ tagged to it; the exit gate checks the list is empty.
       1024 × 720 floor with View auto-collapse when Info opens at
       1024 px. Closes the shell-superseded issues (#14, #16 chrome,
       #18, #19, #23; #24 deferred with dark theme).
-- [ ] **Pass 2 — canvas composition: layout, fit, camera.** `→ D13b`
-      (spec: report.md "Polish contract — pass 2: canvas composition",
-      authored 2026-08-28; prompt READY in delegation.md; budget 1,400
-      changed source lines proposed — confirm before running.)
+- [x] **Pass 2 — canvas composition: layout, fit, camera.** `→ D13b`
+      (DONE, gate PASSED 2026-08-28; spec: report.md "Polish contract —
+      pass 2: canvas composition"; 407/1,400 changed source lines.)
       Per-level content-sized cards (names never truncate before the
       box does — #10); ELK tuning — tighter spacing, aspect-ratio
       hint, proportional boundary padding; fit against the *visible*
@@ -264,9 +263,9 @@ tagged to it; the exit gate checks the list is empty.
       tests must stay green. Highest-risk pass.
 - [ ] **Pass 3 — graph elements: cards, splines, selection.** `→ D13c`
       (spec: report.md "Polish contract — pass 3: graph elements",
-      authored 2026-08-28; prompt READY in delegation.md, runs only
-      after the D13b gate; budget 1,600 changed source lines
-      proposed — confirm before running.)
+      authored 2026-08-28; prompt READY in delegation.md, D13b gate
+      passed; budget 1,600 changed source lines proposed — confirm
+      before running.)
       Larger text-led cards per the direction's card anatomy — one
       rounded shape for every kind, no entity icons or logos, kind
       and fact pills, two-line name wrap; persistent drill affordance
@@ -403,6 +402,63 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-28** — D13b architect gate PASSED; tree committed. Independently
+  re-verified: 28 frontend tests including exactly the six prescribed D13b
+  cases (cardSize wrap-and-grow, initialViewport small/large, shiftViewport
+  inside/outside, layout-key + ELK-input stability across stage/relationship/
+  lens, edgeless grid packing non-overlap, derived readingDepth boundaries),
+  `just lint`, 77 arch py tests, `just build-arch-report` reproduces the
+  tree's template byte-for-byte (shasum match), budget confirmed at 407/1,400
+  changed source lines (296 tracked + 111 new modules). Code review of
+  cardSize.ts (tier widths 280/260/240, injectable measurer, two-line clamp),
+  camera.ts (fit/initial/shift pure functions, Read cap + center), layout.ts
+  (aspect clamp [1.2,2], spacing 40/72, proportional boundary padding,
+  deterministic grid pack with boundary nesting, applyPositions parentId
+  guard), and the App.tsx camera wiring (initial framing per layout key,
+  selection neighborhood fit as the sole zoom change, ResizeObserver minimal
+  pan, D13a refit effect removed) conforms to the pass-2 contract; the
+  explicit Fit button still fits the whole graph uncapped. Screenshots
+  confirm 41% Far dead-space → 79% Read cold framing with full names at both
+  resolutions, Container level readable at default, selection visible beside
+  the open Info dock. Minor noted, not gate-blocking: the zoom pill can read
+  "79% Far" right at the Read threshold after a neighborhood fit (display
+  rounding); revisit only if it shows up in the exit-gate walkthrough.
+  ui-polish.md annotated: #8, #9, #10, #11, #15, #17 CLOSED; #12 CLOSED for
+  camera (edge-route highlight stays D13c). D13c prompt re-checked against
+  the post-D13b tree — its anchors (getSmoothStepPath, entityIcon,
+  hash-mod-3 handles) are intact, prompt unchanged and READY. Next action:
+  user confirms the D13c budget (1,600 changed source lines proposed) and
+  passes the delegation.md D13c prompt to the executor; the architect gates
+  the result, then runs the #21 payload precheck and authors D13d.
+
+- **2026-08-28** — D13b canvas composition complete; worktree left dirty for
+  architect review. Per-level cards now use uniform widths and measured
+  content heights with two-line names; ELK consumes those sizes with the
+  specified aspect, spacing, boundary padding, and deterministic edgeless-grid
+  path. Cold framing caps at Read, explicit Fit remains whole-graph, and dock,
+  selection, and resize camera changes use minimal pan with selection-neighborhood
+  fit as the sole automatic zoom change. Source budget: 407/1,400 changed
+  TS/TSX/CSS lines (additions plus deletions, tests and generated bundle
+  excluded). Tests: exactly 6 prescribed D13b cases added; frontend 28 passed,
+  TypeScript/single-file build clean, `just lint` clean, smoke 27 passed / 3,208
+  deselected, arch Python 77 passed / 540 deselected. The bundle and acme report
+  were regenerated. Rule-9 Playwright passed at 1440 x 900 and 1024 x 720 over
+  `file://`: zero console warnings/errors, only the local HTML request, cold
+  System and Container framing at Read, 13 live Container cards visible,
+  stage/relationship switches moved no common nodes or viewport, dock
+  open/close/resize and viewport resize preserved zoom and selection visibility,
+  and the edgeless observability drill rendered its deterministic grid path.
+  Screenshots: `wip/test-results/d13b/1440-before.png`, `1440-after.png`,
+  `1024-cold.png`, `info-selection-visible.png`, `container-default.png`.
+  Assumptions recorded: the execution request confirms the proposed 1,400-line
+  budget; the explicit "Do not commit" instruction controls over the earlier
+  "including commit" wording; ELK samples the visible-cell aspect ratio when a
+  `(timeline, level, drill)` key is first laid out so dock changes cannot move
+  cards; cold whole-graph framing means the current live graph, so a
+  stage-removed diff ghost does not displace the initial camera while explicit
+  Fit still includes every rendered node. Open questions: none. Next action:
+  architect gate review, then run the already-authored D13c prompt.
 
 - **2026-08-28** — D13c authored ahead of the D13b run (user-directed;
   the prompt still waits for the D13b gate). Normative spec "Polish
@@ -585,64 +641,5 @@ inclusive `end_in` (Q7, 2026-08-24).
   screenshots stay (cited by 3P specs). `git worktree prune` cleared
   the dead arch-v2 entry. Next action: unchanged — user confirms the
   D13a budget and runs it.
-
-- **2026-08-25** — Phase-3 re-gate user half folded into the 3P exit
-  gate (user decision); the wave-2 checkboxes are closed on that
-  basis. D13a authored: normative spec added to report.md ("Polish
-  contract — pass 1: visual foundation" — tokens, mono-for-data
-  typography split, one shared card recipe, inline-SVG chrome icons,
-  dark/light contrast targets, humanised footer with visually-hidden
-  node-id dump, docked tables bar; pure presentation, npm test must
-  pass unchanged) and the D13a prompt registered READY in
-  delegation.md with a proposed budget of 700 changed source lines
-  (confirm before running). D13b–D13d remain GATED pending their
-  specs. Next actions: user confirms the D13a budget and runs it;
-  architect gates D13a with before/after screenshots, then authors
-  D13b (canvas composition — the highest-risk pass).
-
-- **2026-08-25** — Phase 3P (UI polish) planned, user-directed: the
-  wave-2 UI works but is clunky, so D11, D12 (both halves; the issued
-  D12a prompt is ON HOLD), and D8 are delayed until polish completes.
-  Architect critique captured from fresh acme-report screenshots
-  (dead-space fit at 37%, 80%-empty 250×168 nodes that still truncate
-  names, rectangular edge detours reading as phantom boundaries,
-  content hidden behind the legend, meaningless single-color legend
-  swatches, dev-tool chrome, MAP→READ threshold mismatched to layout
-  scale). Four passes registered as D13a–D13d: (1) tokens / type /
-  chrome, (2) canvas composition — layout, fit, density (highest
-  risk), (3) graph elements — nodes / edges / boundaries, (4) panels,
-  overlays, empty states + motion sweep; exit gate re-runs the
-  phase-3 story test with a "looks deliberate" bar. Next actions:
-  architect authors the D13a spec (report.md amendment) + prompt with
-  a budget agreed with the user; the phase-3 re-gate user half can run
-  on the current build or fold into the 3P exit gate at the user's
-  choice.
-
-- **2026-08-25** — Gate findings fixed (architect, user-directed), left
-  uncommitted with the D10 tree. (1) Drill root carve-out: `drillAt`
-  now keeps the drilled entity as a leaf endpoint inside its own
-  boundary when a connection is authored on the entity itself (same
-  carve-out as `withBoundaries`); drilling Commerce Monolith shows
-  24 nodes / 12 connections instead of 11 / 0. Regression test added
-  (22 frontend tests). (2) The finding-2 "legend overlap" was
-  re-diagnosed: no geometric overlap existed (the measurement had
-  caught scrolled-out legend rows); the real defect was the
-  Dependencies / Reset view cluster buttons missing the themed control
-  styling (raw light-grey in dark theme) — fixed by adding
-  `.cluster-content > button` to the control selector. (3) NEW, found
-  while verifying: a cross-state layout race (pre-existing D10b, INT-
-  STATE-06 violation) — on drill/level/timeline transitions the new
-  projection rendered against the previous layout's positions,
-  giving React Flow parentIds for boundaries absent from the new
-  graph (114 buffered "Parent node … not found" console warnings,
-  reproducible via drill → Back → level switch). Fixed by keying the
-  layout result (`layoutResult {key, positions}`) and applying
-  positions only when the key matches the current
-  timeline/level/drill; the transition sequence is now console-clean.
-  Checks: 22 frontend tests, tsc clean, `just lint`, 77 arch py tests,
-  bundle rebuilt, acme-report.html regenerated and browser-verified
-  (fresh tab: zero console messages, zero external requests; note
-  file:// caches aggressively — hard-reload when eyeballing).
-  Next action: user half of the phase-3 re-gate.
 
 - **(older entries)** — see [log-archive.md](log-archive.md).

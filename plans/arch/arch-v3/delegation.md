@@ -20,8 +20,8 @@ below is the template it will be issued from.
 | D9a, D9b | Phase 3R wave 1: schema/model + Excel/payload rework | DONE, gate PASSED 2026-08-25 | — |
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
 | D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
-| D13b | Phase 3P pass 2: canvas composition | READY (spec in report.md; budget 1,400 proposed) | now, once the budget is confirmed |
-| D13c | Phase 3P pass 3: graph elements | READY (spec in report.md; budget 1,600 proposed) | D13b gate |
+| D13b | Phase 3P pass 2: canvas composition | DONE (gate PASSED 2026-08-28) | — |
+| D13c | Phase 3P pass 3: graph elements | READY (spec in report.md; budget 1,600 proposed) | now, once the budget is confirmed |
 | D13d | Phase 3P pass 4 | GATED on its spec + the #21 payload precheck | D13c gate |
 | D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
 | D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
@@ -207,70 +207,16 @@ fragment; 974/1,800 changed source lines. Gate review 2026-08-28.
 (Prompt text in git history; the 2026-08-25 "visual foundation"
 predecessor was superseded pre-run.)
 
-## D13b — Phase 3P pass 2: canvas composition (READY, authored 2026-08-28)
+## D13b — Phase 3P pass 2: canvas composition (DONE 2026-08-28, gate PASSED)
 
-```text
-[standard rules + UI rule 9]
+Content-sized cards (per-level tier widths, injectable-measurer
+cardSize), ELK tuning + edgeless grid packing, initialViewport framing
+capped at Read, thresholds derived from the type scale (79% Read /
+110% Full), shiftViewport minimal-pan camera replacing the D13a refit
+effect; 407/1,400 changed source lines. Gate review 2026-08-28.
+(Prompt text in git history.)
 
-Prereq: the D13a app-shell commit is the baseline (docked View/Info/
-Data shell, dropdown controls, lower-left Map/Fit/Zoom row).
-Authoritative contract — READ IN FULL, in this order:
-1. plans/arch/arch-v3/ui-polish-direction.md (the product direction);
-2. plans/arch/arch-v3/report.md, sections "Confirmed UI direction
-   (2026-08-27)" and "Polish contract — pass 2: canvas composition
-   (D13b)" — the pass contract scopes exactly what this pass
-   implements versus defers.
-Do NOT read issue, research, or ui-polish files. The pass contract
-wins on scope; the direction wins on behavior; any other ambiguity is
-a rule-1 stop.
-
-This pass owns card GEOMETRY, ELK tuning, framing, semantic-zoom
-thresholds, and all camera movement. It does NOT touch card anatomy/
-visuals, edge rendering, selection emphasis (pass 3), dock content
-(pass 4), or projection semantics: projection.ts is READ-ONLY.
-Expected surface: layout.ts, zoom.ts, App.tsx (camera + node sizing
-wiring), styles.css, plus new modules for card sizing and viewport
-math (suggested: cardSize.ts, camera.ts) and their test files.
-
-Budget: 1,400 changed source lines (excluding tests). Python changes:
-none. No new npm dependencies.
-
-Scope — implement the pass contract exactly:
-1. Card geometry: per-Detail-level uniform widths, content-driven
-   height via the injectable-measurer cardSize function; two-line
-   name wrap; layout.ts consumes per-node sizes.
-2. ELK tuning: aspect-ratio hint, tightened spacing, proportional
-   boundary padding; grid packing for edgeless drill sets; layout
-   input stays a function of (timeline, level, drill) only.
-3. Framing: initialViewport pure function — whole-graph fit only when
-   it lands at/above Read, else cap at Read and center; the Fit
-   button always fits the whole graph; fit rect is the visible canvas
-   cell.
-4. Thresholds: re-derive Read/Full from the type scale (name line
-   >= 11 screen px at Read, body text >= 11 px at Full), documented
-   in zoom.ts.
-5. Camera: shiftViewport pure function; apply on dock open/close/
-   resize (REMOVE the D13a fitView-on-dock-change effect), on
-   selection/Info opening (one-hop-neighborhood fit is the only
-   sanctioned zoom change), and on viewport resize. Zoom is otherwise
-   never changed by the app.
-
-Tests: exactly the six cases listed in the pass contract's
-Verification section, plus mechanical updates to existing tests that
-assert the old fixed card size or thresholds. The projection/vector
-suites must pass untouched.
-
-Finish: `just build-arch-report`, regenerate the acme report via the
-CLI, verify per rule 9 from file:// at 1440x900 AND 1024x720 (light):
-clean console, zero external requests, cold-load framing centered and
-readable, dock changes preserve zoom and keep the selection visible,
-Stage/Relationship switches move nothing, Container level readable.
-Capture the five screenshots listed in the pass contract. Definition
-of done: rules 5-8 (report npm test output; pytest run unchanged by
-this chunk), then STOP — D13c is a separate prompt.
-```
-
-## D13c — Phase 3P pass 3: graph elements (READY, authored 2026-08-28; run after the D13b gate)
+## D13c — Phase 3P pass 3: graph elements (READY, authored 2026-08-28; D13b gate passed — run once the budget is confirmed)
 
 ```text
 [standard rules + UI rule 9]

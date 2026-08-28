@@ -4,6 +4,65 @@ Older progress-log entries moved out of plan.md (reorg 2026-08-25).
 Same append-only content, newest first; plan.md keeps only recent
 entries. Continue archiving from plan.md as its log grows.
 
+- **2026-08-25** — Phase-3 re-gate user half folded into the 3P exit
+  gate (user decision); the wave-2 checkboxes are closed on that
+  basis. D13a authored: normative spec added to report.md ("Polish
+  contract — pass 1: visual foundation" — tokens, mono-for-data
+  typography split, one shared card recipe, inline-SVG chrome icons,
+  dark/light contrast targets, humanised footer with visually-hidden
+  node-id dump, docked tables bar; pure presentation, npm test must
+  pass unchanged) and the D13a prompt registered READY in
+  delegation.md with a proposed budget of 700 changed source lines
+  (confirm before running). D13b–D13d remain GATED pending their
+  specs. Next actions: user confirms the D13a budget and runs it;
+  architect gates D13a with before/after screenshots, then authors
+  D13b (canvas composition — the highest-risk pass).
+
+- **2026-08-25** — Phase 3P (UI polish) planned, user-directed: the
+  wave-2 UI works but is clunky, so D11, D12 (both halves; the issued
+  D12a prompt is ON HOLD), and D8 are delayed until polish completes.
+  Architect critique captured from fresh acme-report screenshots
+  (dead-space fit at 37%, 80%-empty 250×168 nodes that still truncate
+  names, rectangular edge detours reading as phantom boundaries,
+  content hidden behind the legend, meaningless single-color legend
+  swatches, dev-tool chrome, MAP→READ threshold mismatched to layout
+  scale). Four passes registered as D13a–D13d: (1) tokens / type /
+  chrome, (2) canvas composition — layout, fit, density (highest
+  risk), (3) graph elements — nodes / edges / boundaries, (4) panels,
+  overlays, empty states + motion sweep; exit gate re-runs the
+  phase-3 story test with a "looks deliberate" bar. Next actions:
+  architect authors the D13a spec (report.md amendment) + prompt with
+  a budget agreed with the user; the phase-3 re-gate user half can run
+  on the current build or fold into the 3P exit gate at the user's
+  choice.
+
+- **2026-08-25** — Gate findings fixed (architect, user-directed), left
+  uncommitted with the D10 tree. (1) Drill root carve-out: `drillAt`
+  now keeps the drilled entity as a leaf endpoint inside its own
+  boundary when a connection is authored on the entity itself (same
+  carve-out as `withBoundaries`); drilling Commerce Monolith shows
+  24 nodes / 12 connections instead of 11 / 0. Regression test added
+  (22 frontend tests). (2) The finding-2 "legend overlap" was
+  re-diagnosed: no geometric overlap existed (the measurement had
+  caught scrolled-out legend rows); the real defect was the
+  Dependencies / Reset view cluster buttons missing the themed control
+  styling (raw light-grey in dark theme) — fixed by adding
+  `.cluster-content > button` to the control selector. (3) NEW, found
+  while verifying: a cross-state layout race (pre-existing D10b, INT-
+  STATE-06 violation) — on drill/level/timeline transitions the new
+  projection rendered against the previous layout's positions,
+  giving React Flow parentIds for boundaries absent from the new
+  graph (114 buffered "Parent node … not found" console warnings,
+  reproducible via drill → Back → level switch). Fixed by keying the
+  layout result (`layoutResult {key, positions}`) and applying
+  positions only when the key matches the current
+  timeline/level/drill; the transition sequence is now console-clean.
+  Checks: 22 frontend tests, tsc clean, `just lint`, 77 arch py tests,
+  bundle rebuilt, acme-report.html regenerated and browser-verified
+  (fresh tab: zero console messages, zero external requests; note
+  file:// caches aggressively — hard-reload when eyeballing).
+  Next action: user half of the phase-3 re-gate.
+
 - **2026-08-25** — Architect half of the phase-3 re-gate run on the
   uncommitted D10a+D10b tree. Re-verified independently: 21 frontend
   tests, `just lint`, 77 arch py tests, `just build-arch-report`
