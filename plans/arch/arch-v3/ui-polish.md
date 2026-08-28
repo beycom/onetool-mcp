@@ -156,6 +156,8 @@ whatever chrome remains.
     weight, halo, and its label pill at every depth).
 13. **Escape doesn't close the details panel.** Only the small ✕ does.
     Expected standard keys: Escape closes topmost overlay / clears selection.
+    — CLOSED (D13d, 2026-08-29: one keydown handler — search → open
+    menus → selection + Info; the card change-popover is gone).
 14. **Legend state is unstable.** Collapsed legend re-expands by itself when
     a node is selected; expanded, it floats over the diagram; collapsed, it
     renders as a full-height strip mid-canvas that covers nodes and the
@@ -181,7 +183,9 @@ whatever chrome remains.
     — Dependencies opens contextually from the Info dock's "View
     dependencies" action (direction).* — CLOSED for chrome (D13a,
     2026-08-28: the level bar is gone; Dependencies opens from Info).
-    Info content itself remains pass 4 (#20/#21).
+    Info content itself remains pass 4 (#20/#21). — CLOSED in full
+    (D13d, 2026-08-29: "View dependencies" is a persistent Details
+    entry; Info content per #20/#21).
 17. **Controls shift as values change.** The time pill re-flows when the
     position label changes width ("0. Base" → "4. Transaction Core"),
     moving the compare dropdown; the COMPARE label is crammed against it.
@@ -216,17 +220,28 @@ whatever chrome remains.
     "Contains: 1" is a bare count with no link to what it contains.
     Expected: kv grid that never overlaps, one label style, counts as
     links/chips to the contained items.
+    — CLOSED (D13d, 2026-08-29: two-column details grid with humanized
+    labels for built-ins and properties alike; Contains renders
+    kind-coloured clickable chips capped at 8 + "and N more").
 21. **Connection details are near-empty.** An edge's Details tab repeats the
     title plus the raw id and nothing else, and the panel offers a
     "Connections" tab for a connection. Expected: show endpoints (linked),
     direction, interface, aspect values, lifecycle interval; tabs that make
     sense for the entity kind.
+    — CLOSED (D13d, 2026-08-29: connection Details show linked
+    endpoints, direction under the active Relationship, humanized
+    values, and the lifecycle interval from payload intervals; the
+    Connections tab renders only for entities).
 22. **Tables panel column sizing.** id/name/status columns truncate while
     six empty columns (data class, lifecycle, availability, criticality,
     group, ownership) consume width and force a horizontal scrollbar;
     header labels themselves truncate ("data clas…", "availabili…").
     Expected: auto-size to content, hide or collapse all-empty columns,
     headers never truncate.
+    — CLOSED (D13d, 2026-08-29: populated columns auto-size on first
+    render, all-empty columns hide by default (column menu re-enables),
+    headers are humanized with a length-derived minWidth; persisted
+    layouts still win).
 23. **Debug-pill affordances.** "Open Tables panel" / "Collapse Tables
     panel" / "Collapse Legend panel" are unstyled default-button pills stuck
     to edges. Expected: the docked-bar affordance already specified in
@@ -257,6 +272,9 @@ polish pass.
     100% of the viewport width and height at any window size at or above
     the 1024 × 720 floor — header, docks, and canvas flex to fit with no
     outer page scroll and no dead band.
+    — CLOSED (D13d, 2026-08-29: html/body/#root fill 100% with the
+    1024 × 720 clamp; verified pixel-exact at 1440 × 900, 1024 × 720,
+    and 1920 × 1080 over `file://`).
 26. **Dock chrome is non-standard and ugly.** The collapse/expand
     affordances are floating text pills and raw strips: "Collapse View
     dock" is a bordered text pill overlapping the View header, "Open Info
@@ -269,11 +287,16 @@ polish pass.
     become slim icon rails, not text gutters; dock content rows (diagram
     list, Copy view link) styled as compact list items consistent with the
     rest of the dock; no floating labeled pills anywhere.
+    — CLOSED (D13d, 2026-08-29: every dock has a slim title row with an
+    icon-only chevron; collapsed docks are icon rails; the diagram entry
+    and Copy view link are compact list rows; no floating pills remain).
 27. **Tags list is unbounded.** The View dock's Tags list renders every
     tag as a full-height list that pushes the dock into a long scroll
     (dominated by count-1 tags). Expected: show at most 5 tag rows, then
     the list scrolls internally within a fixed max height; the rest of the
     View stack stays visible.
+    — CLOSED (D13d, 2026-08-29: the tag list max-height is five control
+    rows with internal scroll; Clear tags stays outside the scroller).
 
 ## Fixed-baseline notes
 

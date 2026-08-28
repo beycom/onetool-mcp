@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { ReactNode } from 'react'
+import { createElement, type ComponentType, type ReactNode } from 'react'
 import { afterEach, expect, test, vi } from 'vitest'
 
 vi.mock('@xyflow/react', () => ({
@@ -12,8 +12,15 @@ vi.mock('@xyflow/react', () => ({
   Handle: () => null,
   MiniMap: () => null,
   Position: { Bottom: 'bottom', Left: 'left', Right: 'right', Top: 'top' },
-  ReactFlow: ({ nodes }: { nodes: Array<{ id: string }> }) => (
-    <div aria-label="Architecture canvas">{nodes.map((node) => <span key={node.id}>{node.id}</span>)}</div>
+  ReactFlow: ({ nodeTypes, nodes, onNodeClick }: {
+    nodeTypes: Record<string, ComponentType<Record<string, unknown>>>
+    nodes: Array<{ data: Record<string, unknown>; id: string; selected?: boolean; type: string }>
+    onNodeClick: (event: unknown, node: unknown) => void
+  }) => (
+    <div aria-label="Architecture canvas">{nodes.map((node) => <div key={node.id}>
+      <button aria-label={`Select ${String(node.data.label ?? node.id)}`} onClick={() => onNodeClick({}, node)} type="button">Select</button>
+      {createElement(nodeTypes[node.type], { data: node.data, id: node.id, selected: node.selected ?? false })}
+    </div>)}</div>
   ),
   getBezierPath: () => ['', 0, 0],
 }))
@@ -47,4 +54,32 @@ test('the Stage dropdown has every position and changes the projected state', as
 
   await waitFor(() => expect(nodeIds.textContent).not.toBe(initial))
   expect(nodeIds.textContent).toContain('systems:commerce-platform')
+})
+
+test('stage changes move changed fields into Info and remove the card popover', async () => {
+  const { container } = render(<App />)
+  fireEvent.change(screen.getByLabelText('Detail'), { target: { value: 'containers' } })
+  fireEvent.change(screen.getByLabelText('Stage'), { target: { value: '1' } })
+
+  const select = await screen.findByLabelText('Select Commerce Monolith')
+  fireEvent.click(select)
+
+  expect(await screen.findByText('Changes at this stage')).toBeTruthy()
+  expect(screen.getByText('Changed')).toBeTruthy()
+  expect(screen.getAllByText('→').length).toBeGreaterThan(0)
+  expect(container.querySelector('.change-popover')).toBeNull()
+})
+
+test('Escape closes search before clearing the selection and Info', async () => {
+  render(<App />)
+  fireEvent.click(await screen.findByLabelText('Select Legacy Commerce Platform'))
+  expect(screen.getByLabelText('Close details')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: /Search/ }))
+
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Global search' })).toBeNull())
+  expect(screen.getByLabelText('Close details')).toBeTruthy()
+
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await waitFor(() => expect(screen.queryByLabelText('Close details')).toBeNull())
 })

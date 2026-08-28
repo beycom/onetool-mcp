@@ -15,6 +15,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProper
 
 import { fitViewport, initialViewport, shiftViewport, type Rect } from './camera'
 import { cardSize, measureCardText } from './cardSize'
+import { KIND_LABEL, levelForKind, rowLabel } from './display'
 import { edgeAnchors, type EdgeAnchorPair, type EdgeRect } from './edgeAnchors'
 import {
   classifyEmphasis,
@@ -28,6 +29,7 @@ import {
 } from './edgePresentation'
 import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
+import { InfoPanel, selectionKey, type Selection } from './InfoPanel'
 import { FitIcon, MapIcon, SearchIcon } from './Icons'
 import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, unionLayout, type Positions } from './layout'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
@@ -37,7 +39,6 @@ import { ResizablePanel } from './ResizablePanel'
 import { splinePath, type SplinePath } from './splinePath'
 import {
   type Aspect,
-  type FieldChange,
   type GraphEdge,
   type GraphBoundary,
   type GraphNode,
@@ -57,7 +58,6 @@ import { READING_DEPTH, readingDepth } from './zoom'
 type DiffStatus = 'added' | 'removed' | 'changed'
 type ArchitectureData = {
   boundary: boolean
-  changes: FieldChange[]
   childCount: number
   connectionCount: number
   context: string
@@ -71,7 +71,6 @@ type ArchitectureData = {
   onDrill: () => void
   row: ReportRow
   statuses: DiffStatus[]
-  tags: string[]
 }
 type ArchitectureNode = Node<ArchitectureData, 'architecture'>
 type BoundaryData = { boundary: GraphBoundary; label: string; onDrill: () => void }
@@ -96,33 +95,9 @@ type SemanticData = {
   zoom: number
 }
 type SemanticFlowEdge = Edge<SemanticData, 'semantic'>
-type Selection =
-  | { type: 'row'; kind: RowKind; members: RowRef[]; row: ReportRow }
-  | { type: 'edge'; direction: SplineDirection; edge: GraphEdge }
-
 const payload = readPayload()
 const STATUS_ORDER: DiffStatus[] = ['added', 'removed', 'changed']
 const STATUS_ICON: Record<DiffStatus, string> = { added: '+', removed: '−', changed: 'Δ' }
-const KIND_LABEL: Record<RowKind, string> = {
-  systems: 'System',
-  subsystems: 'Subsystem',
-  containers: 'Container',
-  components: 'Component',
-  code: 'Code',
-  users: 'User',
-  interfaces: 'Interface',
-  relationships: 'Relationship',
-}
-
-function rowLabel(row: ReportRow): string {
-  return row.name ?? row.action ?? row.id
-}
-
-function connectionLabel(row: ReportRow, aspect: Aspect): string {
-  const direction = aspect === 'data-flow' ? row.data_flow_direction ?? 'provider_to_consumer' : row.call_direction ?? 'consumer_to_provider'
-  if (direction === 'bidirectional') return `${row.provider} ↔ ${row.consumer}`
-  return direction === 'provider_to_consumer' ? `${row.provider} → ${row.consumer}` : `${row.consumer} → ${row.provider}`
-}
 
 function DrillIcon() {
   return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 3h5v2H5v6h6V8h2v5H3z" /><path d="M8 3h5v5h-2V6.4l-4.3 4.3-1.4-1.4L9.6 5H8z" /></svg>
@@ -152,17 +127,6 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
         <span aria-label={`Changes: ${data.statuses.join(', ')}`} className="diff-badges">
           {data.statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
         </span>
-      ) : null}
-      {data.changes.length ? (
-        <details className="change-popover">
-          <summary aria-label={`Show ${data.label} field changes`}>Δ</summary>
-          <ul>{data.changes.map((change, index) => (
-            <li key={`${change.field}:${index}`}>
-              <strong>{change.field}</strong>
-              <span>{JSON.stringify(change.old)} → {JSON.stringify(change.new)}</span>
-            </li>
-          ))}</ul>
-        </details>
       ) : null}
       <Handle position={Position.Left} type="target" />
       <Handle position={Position.Right} type="source" />
@@ -227,87 +191,6 @@ function SemanticEdge({
 const nodeTypes = { architecture: memo(ArchitectureNodeView), boundary: memo(BoundaryNodeView) }
 const edgeTypes = { semantic: memo(SemanticEdge) }
 
-function SidePanel({
-  aspect,
-  onClose,
-  onDependencyView,
-  onSelect,
-  projected,
-  selection,
-}: {
-  aspect: Aspect
-  onClose: () => void
-  onDependencyView: (key: string) => void
-  onSelect: (kind: RowKind, row: ReportRow) => void
-  projected: ReturnType<typeof projectState>
-  selection: Selection
-}) {
-  const [tab, setTab] = useState<'details' | 'connections'>('details')
-  const rowsById = useMemo(() => new Map(Object.entries(projected.rawState.rows).flatMap(([kind, rows]) => rows.map((row) => [row.id, { kind: kind as RowKind, row }] as const))), [projected])
-  const edge = selection.type === 'edge' ? selection.edge : null
-  const row = selection.type === 'row' ? selection.row : null
-  const kind = selection.type === 'row' ? selection.kind : null
-  const targetIds = edge
-    ? new Set([edge.a.split(':').slice(1).join(':'), edge.b.split(':').slice(1).join(':')])
-    : new Set(kind === 'interfaces' ? [row?.provider, row?.consumer] : kind === 'relationships' ? [row?.source, row?.target] : [row?.id, ...(selection.type === 'row' ? selection.members.map((member) => member.row.id) : [])])
-  const selectedNodeKey = selection.type === 'row' && selection.kind !== 'interfaces' && selection.kind !== 'relationships'
-    ? `${selection.kind}:${selection.row.id}` : null
-  const selectedEdges = selectedNodeKey ? projected.edges.filter((item) => item.a === selectedNodeKey || item.b === selectedNodeKey) : []
-  const connections = [...new Map([
-    ...selectedEdges.flatMap((item) => item.interfaceRows),
-    ...projected.rawState.rows.interfaces.filter((item) => targetIds.has(item.provider) || targetIds.has(item.consumer)),
-  ].map((item) => [item.id, item])).values()]
-  const groupedConnections = { incoming: [] as ReportRow[], outgoing: [] as ReportRow[] }
-  if (selectedNodeKey) for (const item of selectedEdges) {
-    for (const spline of splitEdgeDirections(item, aspect)) {
-      const interfaces = spline.members.filter((member) => member.kind === 'interfaces').map((member) => member.row)
-      if (spline.target === selectedNodeKey) groupedConnections.incoming.push(...interfaces)
-      if (spline.source === selectedNodeKey) groupedConnections.outgoing.push(...interfaces)
-    }
-  } else if (row && kind !== 'interfaces' && kind !== 'relationships') for (const item of connections) {
-    const direction = aspect === 'data-flow' ? item.data_flow_direction ?? 'provider_to_consumer' : item.call_direction ?? 'consumer_to_provider'
-    const pairs = direction === 'provider_to_consumer' ? [[item.provider, item.consumer]]
-      : direction === 'bidirectional' ? [[item.provider, item.consumer], [item.consumer, item.provider]]
-        : [[item.consumer, item.provider]]
-    if (pairs.some(([, to]) => to === row.id)) groupedConnections.incoming.push(item)
-    if (pairs.some(([from]) => from === row.id)) groupedConnections.outgoing.push(item)
-  }
-  const members = edge ? [...edge.interfaceRows, ...edge.relationshipRows] : []
-  const parentId = row?.parent ?? row?.container ?? row?.component
-  const clip = kind && row ? projected.rawState.clips[kind].get(row.id) : undefined
-  const ordinaryFields = row ? Object.entries(row).filter(([key, value]) => (
-    !['id', 'name', 'action', 'description', 'tags', 'properties', 'intervals', 'parent', 'container', 'component'].includes(key) && value !== undefined
-  )) : []
-  const firstMember = members[0]
-  const title = row ? rowLabel(row) : firstMember
-    ? `${rowLabel(firstMember)}${members.length > 1 ? ` and ${members.length - 1} more` : ''}` : 'Connection'
-  return (
-    <div className="side-panel-body">
-      <header>
-        <div><span className="panel-kicker">{kind ? KIND_LABEL[kind].toUpperCase() : 'CONNECTION'}</span><h2>{title}</h2>{row ? <code>{row.id}</code> : null}</div>
-        <button aria-label="Close details" className="icon-button" onClick={onClose} type="button">×</button>
-      </header>
-      <nav aria-label="Selection details"><button aria-pressed={tab === 'details'} onClick={() => setTab('details')} type="button">Details</button><button aria-pressed={tab === 'connections'} onClick={() => setTab('connections')} type="button">Connections</button></nav>
-      {tab === 'details' ? <div className="side-panel-scroll">
-        {row?.description ? <p>{row.description}</p> : null}
-        {row ? <dl>
-          <div><dt>Status</dt><dd>{clip ? `Retired, clipped by ${clip.by}` : 'Live at this position'}</dd></div>
-          {parentId ? <div><dt>Belongs to</dt><dd><button onClick={() => { const parent = rowsById.get(parentId); if (parent) onSelect(parent.kind, parent.row) }} type="button">{rowsById.get(parentId)?.row.name ?? parentId}</button></dd></div> : null}
-          <div><dt>Contains</dt><dd>{[...rowsById.values()].filter((item) => [item.row.parent, item.row.container, item.row.component].includes(row.id)).length}</dd></div>
-          {ordinaryFields.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>)}
-          {Object.entries(row.properties ?? {}).map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{Array.isArray(value) ? value.join(', ') : value}</dd></div>)}
-        </dl> : <ul className="member-list">{members.map((member) => <li key={member.id}><button onClick={() => onSelect(edge?.interfaceRows.includes(member) ? 'interfaces' : 'relationships', member)} type="button">{rowLabel(member)} <code>{member.id}</code></button></li>)}</ul>}
-        {row?.tags?.length ? <div className="passport-chips">{row.tags.map((tag) => <span key={tag}>{tag}</span>)}</div> : null}
-      </div> : <div className="side-panel-scroll">
-        {edge ? <p>{edge.a} ↔ {edge.b} · {edge.interfaceRows.length} interfaces · {edge.relationshipRows.length} relationships</p> : null}
-        {(Object.entries(groupedConnections) as Array<['incoming' | 'outgoing', ReportRow[]]>).map(([direction, items]) => <div key={direction}><h3>{direction}</h3><ul className="connection-list">{items.map((item) => <li key={item.id}><button onClick={() => onSelect('interfaces', item)} type="button"><strong>{rowLabel(item)}</strong><span>{connectionLabel(item, aspect)}</span></button></li>)}</ul></div>)}
-        {members.length ? <><h3>Canonical members</h3><ul className="member-list">{members.map((member) => <li key={member.id}><button onClick={() => onSelect(edge?.interfaceRows.includes(member) ? 'interfaces' : 'relationships', member)} type="button">{rowLabel(member)}</button></li>)}</ul></> : null}
-        <button disabled={!selectedNodeKey} onClick={() => { if (selectedNodeKey) onDependencyView(selectedNodeKey) }} type="button">Open dependency view</button>{!selectedNodeKey ? <p>Choose an entity to open its dependency view.</p> : null}
-      </div>}
-    </div>
-  )
-}
-
 function statusesForNode(node: GraphNode, diff: StateDiff | null): DiffStatus[] {
   if (!diff) return []
   const keys = new Set([node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)])
@@ -316,12 +199,6 @@ function statusesForNode(node: GraphNode, diff: StateDiff | null): DiffStatus[] 
   if (diff.removed.some((item) => keys.has(`${item.kind}:${item.id}`))) found.add('removed')
   if (diff.changed.some((item) => keys.has(`${item.kind}:${item.id}`))) found.add('changed')
   return STATUS_ORDER.filter((status) => found.has(status))
-}
-
-function changesForNode(node: GraphNode, diff: StateDiff | null): FieldChange[] {
-  if (!diff) return []
-  const keys = new Set([node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)])
-  return diff.changed.filter((item) => keys.has(`${item.kind}:${item.id}`)).flatMap((item) => item.changes)
 }
 
 function statusesForMembers(members: DirectionalSpline['members'], diff: StateDiff | null): DiffStatus[] {
@@ -454,6 +331,7 @@ export default function App() {
   const [initial] = useState(() => decodeView(payload, globalThis.location?.hash ?? ''))
   const [view, setViewState] = useState<View>(initial.view)
   const [selected, setSelected] = useState<Selection | null>(null)
+  const [selectionHistory, setSelectionHistory] = useState<Selection[]>([])
   const [restoreSelect, setRestoreSelect] = useState<string | null>(initial.select)
   const [layoutResult, setLayoutResult] = useState<{ key: string; positions: Positions }>({ key: '', positions: new Map() })
   const [flow, setFlow] = useState<ReactFlowInstance<CanvasNode, SemanticFlowEdge> | null>(null)
@@ -470,12 +348,18 @@ export default function App() {
   const framedLayout = useRef('')
   const cameraFrame = useRef(0)
   const searchTrigger = useRef<HTMLButtonElement>(null)
+  const selectedRef = useRef<Selection | null>(null)
   const setView = useCallback((change: Partial<View>, push = false) => setViewState((current) => {
     const next = { ...current, ...change }
     if (push) persistView(next, true)
     return next
   }), [])
   const revealInfo = useCallback((selection: Selection) => {
+    const current = selectedRef.current
+    if (current && selectionKey(current) !== selectionKey(selection)) {
+      setSelectionHistory((history) => [...history, current].slice(-20))
+    }
+    selectedRef.current = selection
     setSelected(selection)
     if (window.innerWidth <= 1024 && !layout.docks.view.collapsed) setAutoViewCollapsed(true)
     setLayout((current) => ({
@@ -487,9 +371,20 @@ export default function App() {
       }))
   }, [layout.docks.view.collapsed])
   const closeInfo = useCallback(() => {
+    selectedRef.current = null
     setSelected(null)
+    setSelectionHistory([])
     setAutoViewCollapsed(false)
     setLayout((current) => ({ ...current, docks: { ...current.docks, info: { ...current.docks.info, collapsed: true } } }))
+  }, [])
+  const goBack = useCallback(() => {
+    setSelectionHistory((history) => {
+      const previous = history.at(-1)
+      if (!previous) return history
+      selectedRef.current = previous
+      setSelected(previous)
+      return history.slice(0, -1)
+    })
   }, [])
   const depth = readingDepth(zoom)
 
@@ -511,9 +406,24 @@ export default function App() {
   const legend = useMemo(() => legendEntries(projected), [projected])
 
   const selectedKey = selected?.type === 'row' ? `${selected.kind}:${selected.row.id}` : null
-  const selectedDisplayKey = useMemo(() => projected.nodes.find((node) => selectedKey
-    && [node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)].includes(selectedKey))?.key ?? null, [projected.nodes, selectedKey])
-  const selectedSplineId = selected?.type === 'edge' ? `${selected.edge.key}:${selected.direction}` : null
+  const selectedDisplayKey = useMemo(() => {
+    if (!selectedKey) return null
+    const exact = projected.nodes.find((node) => node.key === selectedKey)?.key
+    if (exact) return exact
+    if (selected?.type === 'row' && selected.kind === 'code' && view.level === 'components') {
+      return projected.nodes.find((node) => node.members.some((member) => `${member.kind}:${member.row.id}` === selectedKey))?.key ?? null
+    }
+    return null
+  }, [projected.nodes, selected, selectedKey, view.level])
+  const selectedSplineId = useMemo(() => {
+    if (selected?.type === 'edge') return `${selected.edge.key}:${selected.direction}`
+    if (selected?.type !== 'row' || !['interfaces', 'relationships'].includes(selected.kind)) return null
+    for (const edge of projected.edges) {
+      const spline = splitEdgeDirections(edge, view.aspect).find((item) => item.members.some((member) => member.kind === selected.kind && member.row.id === selected.row.id))
+      if (spline) return spline.id
+    }
+    return null
+  }, [projected.edges, selected, view.aspect])
   useEffect(() => {
     for (const message of initial.diagnostics) console.warn(message)
   }, [initial])
@@ -581,7 +491,6 @@ export default function App() {
       return {
         data: {
           boundary: node.boundary,
-          changes: changesForNode(node, diff),
           childCount,
           connectionCount,
           context: parent ? rowLabel(parent) : KIND_LABEL[node.kind],
@@ -598,7 +507,6 @@ export default function App() {
           onDrill: () => setView({ deps: null, drill: node.key }, true),
           row: node.row,
           statuses: ghost ? ['removed'] : statusesForNode(node, diff),
-          tags: nodeTags(node),
         },
         height: size.height,
         id: node.key,
@@ -765,7 +673,10 @@ export default function App() {
       if (current?.type !== 'row') return current
       const row = projected.rawState.rows[current.kind].find((item) => item.id === current.row.id)
         ?? projected.rawState.clips[current.kind].get(current.row.id)?.row
-      return row && row !== current.row ? { ...current, row } : current
+      if (!row || row === current.row) return current
+      const next = { ...current, row }
+      selectedRef.current = next
+      return next
     })
   }, [projected.rawState])
   const searchResults = useMemo<SearchResult[]>(() => {
@@ -820,7 +731,7 @@ export default function App() {
         event.preventDefault()
         if (searchOpen) closeSearch()
         else {
-          const menu = document.querySelector<HTMLDetailsElement>('.table-menu[open], .change-popover[open]')
+          const menu = document.querySelector<HTMLDetailsElement>('.table-menu[open]')
           if (menu) menu.open = false
           else if (selected) closeInfo()
         }
@@ -852,7 +763,7 @@ export default function App() {
 
       <main className="workspace">
         <div className="dock-row">
-          <ResizablePanel className="view-dock" label="View dock" layout={autoViewCollapsed ? { ...layout.docks.view, collapsed: true } : layout.docks.view} name="view" onChange={(dock) => { setAutoViewCollapsed(false); setDock('view', dock) }}>
+          <ResizablePanel className="view-dock" label="View" layout={autoViewCollapsed ? { ...layout.docks.view, collapsed: true } : layout.docks.view} name="view" onChange={(dock) => { setAutoViewCollapsed(false); setDock('view', dock) }}>
             <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} drillPath={drillPath} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onUp={() => setView({ drill: parentKey(view.drill!), deps: null }, true)} onView={setView} payload={payload} view={view} />
           </ResizablePanel>
 
@@ -903,12 +814,12 @@ export default function App() {
             </div>
           </div>
 
-          <ResizablePanel className="info-dock" label="Info dock" layout={layout.docks.info} name="info" onChange={(dock) => { if (dock.collapsed) closeInfo(); else setDock('info', dock) }}>
-            {selected ? <SidePanel aspect={view.aspect} onClose={closeInfo} onDependencyView={openDependencies} onSelect={selectRow} projected={projected} selection={selected} /> : <div className="info-empty"><span>Info</span><p>Select an item on Canvas or in Data.</p></div>}
+          <ResizablePanel className="info-dock" label="Info" layout={layout.docks.info} name="info" onChange={(dock) => setDock('info', dock)}>
+            {selected ? <InfoPanel aspect={view.aspect} diff={diff} hasBack={selectionHistory.length > 0} key={selectionKey(selected)} onBack={goBack} onClose={closeInfo} onDependencyView={openDependencies} onSelect={selectRow} payload={payload} projected={projected} selection={selected} timeline={view.timeline} /> : <div className="info-empty"><span>Nothing selected</span><p>Select an item on Canvas or in Data.</p></div>}
           </ResizablePanel>
         </div>
 
-        <ResizablePanel className="data-dock" label="Data dock" layout={layout.docks.data} name="data" onChange={(dock) => setDock('data', dock)}>
+        <ResizablePanel className="data-dock" label="Data" layout={layout.docks.data} name="data" onChange={(dock) => setDock('data', dock)}>
           <GridPanel
             density={layout.density}
             diff={diff}
@@ -917,9 +828,14 @@ export default function App() {
             onDiagnostic={setDiagnostic}
             onLayout={(table, tableLayout) => setLayout((current) => ({ ...current, tableLayouts: { ...current.tableLayouts, [table]: tableLayout } }))}
             onSelect={selectById}
+            onShowOnCanvas={(kind, id) => {
+              setView({ deps: null, drill: null, level: levelForKind(kind), scope: null }, true)
+              selectById(kind, id)
+            }}
             payload={payload}
             projected={projected}
             selectedKey={selectedKey}
+            selectedOnCanvas={selectedDisplayKey !== null}
             timeline={view.timeline}
           />
         </ResizablePanel>

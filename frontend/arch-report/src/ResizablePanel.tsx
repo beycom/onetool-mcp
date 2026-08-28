@@ -1,6 +1,9 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 
+import { ChevronIcon, DataIcon, InfoIcon, ViewIcon } from './Icons'
 import { DOCK_DEFAULTS, DOCK_LIMITS, type DockLayout, type DockName } from './layoutPreferences'
+
+const PANEL_ICON = { data: DataIcon, info: InfoIcon, view: ViewIcon }
 
 export function ResizablePanel({
   children,
@@ -37,26 +40,24 @@ export function ResizablePanel({
     window.addEventListener('pointerup', finish)
     window.addEventListener('pointercancel', finish)
   }
-  const style = { [vertical ? 'width' : 'height']: layout.collapsed ? 34 : layout.size }
+  const style = { [vertical ? 'width' : 'height']: layout.collapsed ? 36 : layout.size }
+  const PanelIcon = PANEL_ICON[name]
+  const dockLabel = `${label} dock`
+  const collapseDirection = name === 'view' ? 'left' : name === 'info' ? 'right' : 'down'
   return (
-    <section aria-label={label} className={`${className} resizable-panel`} data-collapsed={layout.collapsed} style={style}>
+    <section aria-label={dockLabel} className={`${className} resizable-panel`} data-collapsed={layout.collapsed} style={style}>
       <button
-        aria-label={`Resize ${label.toLowerCase()}`}
+        aria-label={`Resize ${dockLabel.toLowerCase()}`}
         className="panel-resize-handle"
         onDoubleClick={() => onChange({ collapsed: layout.collapsed, size: DOCK_DEFAULTS[name].size })}
         onPointerDown={resize}
         title="Drag to resize; double-click to reset"
         type="button"
       />
-      <button
-        aria-expanded={!layout.collapsed}
-        className="panel-collapse"
-        onClick={() => onChange({ ...layout, collapsed: !layout.collapsed })}
-        type="button"
-      >
-        {layout.collapsed ? `Open ${label}` : `Collapse ${label}`}
-      </button>
-      <div className="panel-content">{layout.collapsed ? null : children}</div>
+      {layout.collapsed ? <div className="panel-rail"><button aria-label={`Open ${dockLabel}`} aria-expanded="false" onClick={() => onChange({ ...layout, collapsed: false })} title={`Open ${dockLabel}`} type="button"><PanelIcon /></button></div> : <div className="panel-content">
+        <header className="panel-header"><strong>{label}</strong><button aria-label={`Collapse ${dockLabel}`} aria-expanded="true" className="panel-collapse" onClick={() => onChange({ ...layout, collapsed: true })} title={`Collapse ${dockLabel}`} type="button"><ChevronIcon direction={collapseDirection} /></button></header>
+        <div className="panel-body">{children}</div>
+      </div>}
     </section>
   )
 }

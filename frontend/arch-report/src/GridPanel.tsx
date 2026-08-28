@@ -10,12 +10,13 @@ import {
 } from 'ag-grid-community'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { humanizeField } from './display'
 import type { Density } from './layoutPreferences'
-import type { ProjectedView, ReportPayload, RowKind, StateDiff } from './types'
+import { ENTITY_KINDS, type EntityKind, type ProjectedView, type ReportPayload, type RowKind, type StateDiff } from './types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
-export type TableTab = 'entities' | 'subsystems' | 'interfaces' | 'milestones' | 'diff'
+export type TableTab = 'entities' | 'interfaces' | 'milestones' | 'diff'
 type GridRow = Record<string, unknown> & { _key: string; id: string; kind?: RowKind; status?: string }
 
 function selectedRowsAsTsv(rows: GridRow[], columns: string[]): string {
@@ -45,6 +46,7 @@ function Grid({
   onSelect,
   rows,
   selectedKey,
+  emptyLabel,
 }: {
   columns: ColDef<GridRow>[]
   density: Density
@@ -54,6 +56,7 @@ function Grid({
   onSelect: (row: GridRow) => void
   rows: GridRow[]
   selectedKey: string | null
+  emptyLabel: string
 }) {
   const element = useRef<HTMLDivElement>(null)
   const apiRef = useRef<GridApi<GridRow> | null>(null)
@@ -81,7 +84,7 @@ function Grid({
     if (!validLayout) callbacks.current.onDiagnostic('Stored table layout references an unknown column; defaults restored')
     const api = createGrid(element.current, {
       columnDefs: columns,
-      defaultColDef: { filter: true, flex: 1, minWidth: 120, resizable: true, sortable: true },
+      defaultColDef: { filter: true, minWidth: 80, resizable: true, sortable: true },
       doesExternalFilterPass: (node) => (
         (filters.current.kinds.length === 0 || filters.current.kinds.includes(String(node.data?.kind ?? '')))
         && (filters.current.statuses.length === 0 || filters.current.statuses.includes(String(node.data?.status ?? '')))
@@ -92,6 +95,11 @@ function Grid({
       onColumnPinned: persist,
       onColumnResized: (event) => { if (event.finished) persist() },
       onColumnVisible: persist,
+      onFirstDataRendered: (event) => {
+        if (!validLayout || !initialLayout?.length) {
+          event.api.autoSizeColumns(event.api.getAllDisplayedColumns(), false)
+        }
+      },
       onRowSelected: (event: RowSelectedEvent<GridRow>) => { if (event.node.isSelected() && event.data) callbacks.current.onSelect(event.data) },
       rowData: rows,
       rowHeight: density === 'compact' ? 31 : 40,
@@ -115,8 +123,12 @@ function Grid({
     const api = apiRef.current
     if (!api) return
     for (const node of api.getSelectedNodes()) node.setSelected(node.id === selectedKey)
-    if (selectedKey) api.getRowNode(selectedKey)?.setSelected(true)
-  }, [selectedKey])
+    if (selectedKey) {
+      const node = api.getRowNode(selectedKey)
+      node?.setSelected(true)
+      if (node) api.ensureNodeVisible(node, 'middle')
+    }
+  }, [rows, selectedKey])
 
   const availableKinds = [...new Set(rows.map((row) => String(row.kind ?? '')).filter(Boolean))].sort()
   const availableStatuses = [...new Set(rows.map((row) => String(row.status ?? '')).filter(Boolean))].sort()
@@ -153,7 +165,7 @@ function Grid({
         <button onClick={() => apiRef.current?.exportDataAsCsv({ allColumns: true, exportedRows: 'all' })} type="button">CSV all</button>
         <button onClick={() => { apiRef.current?.resetColumnState(); apiRef.current?.setFilterModel(null); setKindFilter([]); setStatusFilter([]); setQuery(''); persist() }} type="button">Reset table</button>
       </div>
-      <div aria-label="Architecture data grid" className="data-grid" ref={element} />
+      {rows.length ? <div aria-label="Architecture data grid" className="data-grid" ref={element} /> : <div className="table-empty" role="status"><strong>{emptyLabel}</strong><span>Choose another stage or table.</span></div>}
     </div>
   )
 }
@@ -166,9 +178,11 @@ export function GridPanel({
   onDiagnostic,
   onLayout,
   onSelect,
+  onShowOnCanvas,
   payload,
   projected,
   selectedKey,
+  selectedOnCanvas,
   timeline,
 }: {
   density: Density
@@ -178,27 +192,22 @@ export function GridPanel({
   onDiagnostic: (message: string) => void
   onLayout: (table: string, layout: ColumnState[]) => void
   onSelect: (kind: RowKind, id: string) => void
+  onShowOnCanvas: (kind: EntityKind, id: string) => void
   payload: ReportPayload
   projected: ProjectedView
   selectedKey: string | null
+  selectedOnCanvas: boolean
   timeline: number
 }) {
   const [tab, setTab] = useState<TableTab>('entities')
   const table = useMemo(() => {
     let rows: GridRow[]
     if (tab === 'entities') {
-      rows = projected.nodes.map((node) => ({
-        _key: `${node.kind}:${node.row.id}`, boundary: node.boundary ? 'yes' : '', id: node.row.id, kind: node.kind,
-        name: node.row.name ?? node.row.id, parent: node.row.parent ?? node.row.container ?? node.row.component ?? '',
-        status: statusFor(node.kind, node.row.id, diff),
-        ...Object.fromEntries(Object.entries(node.row.properties ?? {}).map(([key, value]) => [`property.${key}`, Array.isArray(value) ? value.join(', ') : value])),
-      }))
-    } else if (tab === 'subsystems') {
-      rows = projected.rawState.rows.subsystems.map((row) => ({
-        _key: `subsystems:${row.id}`, id: row.id, kind: 'subsystems', name: row.name ?? row.id,
-        parent: row.parent, status: statusFor('subsystems', row.id, diff),
+      rows = ENTITY_KINDS.flatMap((kind) => projected.rawState.rows[kind].map((row) => ({
+        _key: `${kind}:${row.id}`, id: row.id, kind, name: row.name ?? row.id,
+        parent: row.parent ?? row.container ?? row.component ?? '', status: statusFor(kind, row.id, diff),
         ...Object.fromEntries(Object.entries(row.properties ?? {}).map(([key, value]) => [`property.${key}`, Array.isArray(value) ? value.join(', ') : value])),
-      }))
+      })))
     } else if (tab === 'interfaces') {
       rows = projected.state.rows.interfaces.map((row) => ({
         _key: `interfaces:${row.id}`, call_direction: row.call_direction ?? 'consumer_to_provider', consumer: row.consumer,
@@ -219,16 +228,24 @@ export function GridPanel({
     const fields = Object.keys(rows[0] ?? {}).filter((field) => field !== '_key')
     const ordered = ['kind', 'id', 'name', 'status', ...fields.filter((field) => !['kind', 'id', 'name', 'status'].includes(field)), ...propertyFields(rows)]
     const unique = [...new Set(ordered)].filter((field) => rows.some((row) => field in row))
-    return { columns: [{ field: '_key', hide: true }, ...unique.map((field) => ({ field, headerName: field.replace(/^property\./, '').replaceAll('_', ' ') }))] as ColDef<GridRow>[], rows }
+    const empty = (field: string) => rows.every((row) => row[field] === undefined || row[field] === null || row[field] === '')
+    return { columns: [{ field: '_key', hide: true }, ...unique.map((field) => {
+      const headerName = humanizeField(field)
+      return { field, headerName, hide: empty(field), minWidth: Math.max(80, headerName.length * 7 + 36) }
+    })] as ColDef<GridRow>[], rows }
   }, [diff, payload, projected, tab, timeline])
+  const selectedEntity = selectedKey?.split(':', 1)[0] as EntityKind | undefined
+  const showOnCanvas = selectedKey && selectedEntity && (ENTITY_KINDS as readonly string[]).includes(selectedEntity) && !selectedOnCanvas
+  const emptyLabel = `No ${tab} at this stage`
 
   return (
     <div className="tables-content">
       <header>
-        <nav aria-label="Architecture table">{(['entities', 'subsystems', 'interfaces', 'milestones', 'diff'] as const).map((name) => <button aria-pressed={tab === name} key={name} onClick={() => setTab(name)} type="button">{name}</button>)}</nav>
+        <nav aria-label="Architecture table">{(['entities', 'interfaces', 'milestones', 'diff'] as const).map((name) => <button aria-pressed={tab === name} key={name} onClick={() => setTab(name)} type="button">{humanizeField(name)}</button>)}</nav>
         <label>Density<select aria-label="Table density" onChange={(event) => onDensity(event.target.value as Density)} value={density}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
       </header>
-      <Grid columns={table.columns} density={density} layout={layouts[tab]} onDiagnostic={onDiagnostic} onLayout={(layout) => onLayout(tab, layout)} onSelect={(row) => { if (row.kind) onSelect(row.kind, row.id) }} rows={table.rows} selectedKey={selectedKey} />
+      {showOnCanvas ? <div className="show-on-canvas"><span>The selected row is outside the current detail.</span><button onClick={() => onShowOnCanvas(selectedEntity, selectedKey.split(':').slice(1).join(':'))} type="button">Show on Canvas</button></div> : null}
+      <Grid columns={table.columns} density={density} emptyLabel={emptyLabel} layout={layouts[tab]} onDiagnostic={onDiagnostic} onLayout={(layout) => onLayout(tab, layout)} onSelect={(row) => { if (row.kind) onSelect(row.kind, row.id) }} rows={table.rows} selectedKey={selectedKey} />
     </div>
   )
 }
