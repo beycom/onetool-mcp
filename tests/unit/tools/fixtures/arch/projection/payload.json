@@ -110,11 +110,38 @@
         ]
       }
     ],
+    "subsystems": [
+      {
+        "id": "ssA",
+        "name": "Alpha Services",
+        "parent": "sysA",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          },
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
     "containers": [
       {
         "id": "subA",
         "name": "Alpha Core",
-        "parent": "sysA",
+        "parent": "ssA",
         "intervals": [
           {
             "live": [
@@ -253,7 +280,7 @@
         "properties": {
           "owner": "core"
         },
-        "parent": "sysA",
+        "parent": "ssA",
         "intervals": [
           {
             "live": [
@@ -283,7 +310,7 @@
           "owner": "platform"
         },
         "start_in": "m2",
-        "parent": "sysA",
+        "parent": "ssA",
         "intervals": [
           {
             "live": [

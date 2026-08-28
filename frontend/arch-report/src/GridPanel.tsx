@@ -15,7 +15,7 @@ import type { ProjectedView, ReportPayload, RowKind, StateDiff } from './types'
 
 ModuleRegistry.registerModules([AllCommunityModule])
 
-export type TableTab = 'entities' | 'interfaces' | 'milestones' | 'diff'
+export type TableTab = 'entities' | 'subsystems' | 'interfaces' | 'milestones' | 'diff'
 type GridRow = Record<string, unknown> & { _key: string; id: string; kind?: RowKind; status?: string }
 
 function selectedRowsAsTsv(rows: GridRow[], columns: string[]): string {
@@ -193,6 +193,12 @@ export function GridPanel({
         status: statusFor(node.kind, node.row.id, diff),
         ...Object.fromEntries(Object.entries(node.row.properties ?? {}).map(([key, value]) => [`property.${key}`, Array.isArray(value) ? value.join(', ') : value])),
       }))
+    } else if (tab === 'subsystems') {
+      rows = projected.rawState.rows.subsystems.map((row) => ({
+        _key: `subsystems:${row.id}`, id: row.id, kind: 'subsystems', name: row.name ?? row.id,
+        parent: row.parent, status: statusFor('subsystems', row.id, diff),
+        ...Object.fromEntries(Object.entries(row.properties ?? {}).map(([key, value]) => [`property.${key}`, Array.isArray(value) ? value.join(', ') : value])),
+      }))
     } else if (tab === 'interfaces') {
       rows = projected.state.rows.interfaces.map((row) => ({
         _key: `interfaces:${row.id}`, call_direction: row.call_direction ?? 'consumer_to_provider', consumer: row.consumer,
@@ -219,7 +225,7 @@ export function GridPanel({
   return (
     <div className="tables-content">
       <header>
-        <nav aria-label="Architecture table">{(['entities', 'interfaces', 'milestones', 'diff'] as const).map((name) => <button aria-pressed={tab === name} key={name} onClick={() => setTab(name)} type="button">{name}</button>)}</nav>
+        <nav aria-label="Architecture table">{(['entities', 'subsystems', 'interfaces', 'milestones', 'diff'] as const).map((name) => <button aria-pressed={tab === name} key={name} onClick={() => setTab(name)} type="button">{name}</button>)}</nav>
         <label>Density<select aria-label="Table density" onChange={(event) => onDensity(event.target.value as Density)} value={density}><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select></label>
       </header>
       <Grid columns={table.columns} density={density} layout={layouts[tab]} onDiagnostic={onDiagnostic} onLayout={(layout) => onLayout(tab, layout)} onSelect={(row) => { if (row.kind) onSelect(row.kind, row.id) }} rows={table.rows} selectedKey={selectedKey} />

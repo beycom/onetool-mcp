@@ -70,8 +70,14 @@ class System(TemporalNamedItem):
     """Highest-level software boundary."""
 
 
+class Subsystem(TemporalNamedItem):
+    """Logical grouping of related containers within one system."""
+
+    parent: Identifier
+
+
 class Container(TemporalNamedItem):
-    """Deployable boundary nested under a system or container."""
+    """Deployable boundary nested under a system or subsystem."""
 
     parent: Identifier
 
@@ -122,6 +128,7 @@ class Architecture(StrictModel):
     milestones: list[Milestone]
     timelines: list[Timeline] | None = None
     systems: list[System]
+    subsystems: list[Subsystem]
     containers: list[Container]
     components: list[Component]
     code: list[Code]

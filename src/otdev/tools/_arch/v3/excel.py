@@ -27,6 +27,7 @@ from .model import (
     Container,
     Interface,
     Relationship,
+    Subsystem,
     System,
     User,
 )
@@ -38,6 +39,7 @@ SHEETS = (
     "Milestones",
     "Timelines",
     "Systems",
+    "Subsystems",
     "Containers",
     "Components",
     "Code",
@@ -48,6 +50,7 @@ SHEETS = (
 COLLECTIONS = {
     "Milestones": "milestones",
     "Systems": "systems",
+    "Subsystems": "subsystems",
     "Containers": "containers",
     "Components": "components",
     "Code": "code",
@@ -60,6 +63,15 @@ HEADERS = {
     "Milestones": ("id", "name", "description", "tags"),
     "Timelines": ("timeline", "milestone"),
     "Systems": ("id", "name", "start_in", "end_in", "description", "tags"),
+    "Subsystems": (
+        "id",
+        "name",
+        "parent",
+        "start_in",
+        "end_in",
+        "description",
+        "tags",
+    ),
     "Containers": (
         "id",
         "name",
@@ -132,6 +144,7 @@ MILESTONE_VALIDATION_NAME = "arch_milestones"
 END_MILESTONE_VALIDATION_NAME = "arch_end_milestones"
 ROW_MODELS = {
     "systems": System,
+    "subsystems": Subsystem,
     "containers": Container,
     "components": Component,
     "code": Code,
@@ -824,6 +837,7 @@ def generate_template(path: Path) -> None:
         schema_version=3,
         milestones=[],
         systems=[],
+        subsystems=[],
         containers=[],
         components=[],
         code=[],

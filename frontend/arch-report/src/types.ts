@@ -1,5 +1,6 @@
 export const KINDS = [
   'systems',
+  'subsystems',
   'containers',
   'components',
   'code',
@@ -8,7 +9,7 @@ export const KINDS = [
   'relationships',
 ] as const
 
-export const ENTITY_KINDS = ['systems', 'containers', 'components', 'code', 'users'] as const
+export const ENTITY_KINDS = ['systems', 'subsystems', 'containers', 'components', 'code', 'users'] as const
 
 export type Bound = number | null
 export type LiveSegment = [number, Bound]
@@ -39,7 +40,7 @@ export type ReportRow = {
 export type Timeline = { id: string | null; milestones: string[] }
 export type RowKind = typeof KINDS[number]
 export type EntityKind = typeof ENTITY_KINDS[number]
-export type Level = 'systems' | 'top-containers' | 'containers' | 'components'
+export type Level = 'systems' | 'subsystems' | 'containers' | 'components'
 export type Aspect = 'ownership' | 'call-direction' | 'data-flow'
 export type Theme = 'light' | 'dark'
 export type CompareMode = 'off' | 'base' | 'position'

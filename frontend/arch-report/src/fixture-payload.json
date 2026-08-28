@@ -340,6 +340,137 @@
         ]
       }
     ],
+    "subsystems": [
+      {
+        "id": "storefront-edge",
+        "name": "Storefront and Edge",
+        "description": "Customer-facing entry points routing storefront traffic into the new platform.",
+        "tags": [
+          "ecommerce",
+          "frontend"
+        ],
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "platform-foundation",
+        "name": "Platform Foundation",
+        "description": "Cross-cutting eventing, observability, and legacy integration capability underpinning every other subsystem.",
+        "tags": [
+          "platform",
+          "integration"
+        ],
+        "start_in": "acme-2027-edge-foundation",
+        "parent": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "catalog-search",
+        "name": "Catalog and Search",
+        "description": "Product catalog mastering, merchandising, and search capability.",
+        "tags": [
+          "bounded-context-catalog"
+        ],
+        "start_in": "acme-2028-catalog-search",
+        "parent": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                2,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "customer-cart-pricing",
+        "name": "Customer, Cart and Pricing",
+        "description": "Customer-identity-linked shopping capability - profiles, carts, prices, and notifications.",
+        "tags": [
+          "bounded-context-customer"
+        ],
+        "start_in": "acme-2029-customer-cart-pricing",
+        "parent": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                3,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "transaction-core",
+        "name": "Transaction Core",
+        "description": "Order capture and fulfilment initiation - checkout, orders, payments, and inventory.",
+        "tags": [
+          "bounded-context-order"
+        ],
+        "start_in": "acme-2030-transaction-core",
+        "parent": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                4,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "back-office-insight",
+        "name": "Back Office and Insight",
+        "description": "Administration and operational reporting over the completed platform.",
+        "tags": [
+          "admin",
+          "analytics"
+        ],
+        "start_in": "acme-2031-complete-cutover",
+        "parent": "commerce-platform",
+        "intervals": [
+          {
+            "live": [
+              [
+                5,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      }
+    ],
     "containers": [
       {
         "id": "commerce-monolith",
@@ -647,7 +778,7 @@
           "technology": "Managed CDN / WAF / API gateway"
         },
         "start_in": "acme-2027-edge-foundation",
-        "parent": "commerce-platform",
+        "parent": "storefront-edge",
         "intervals": [
           {
             "live": [
@@ -675,7 +806,7 @@
           "technology": "TypeScript / Node.js"
         },
         "start_in": "acme-2027-edge-foundation",
-        "parent": "commerce-platform",
+        "parent": "storefront-edge",
         "intervals": [
           {
             "live": [
@@ -702,7 +833,7 @@
           "technology": "Managed Kafka"
         },
         "start_in": "acme-2027-edge-foundation",
-        "parent": "commerce-platform",
+        "parent": "platform-foundation",
         "intervals": [
           {
             "live": [
@@ -728,7 +859,7 @@
           "technology": "OpenTelemetry / managed observability"
         },
         "start_in": "acme-2027-edge-foundation",
-        "parent": "commerce-platform",
+        "parent": "platform-foundation",
         "intervals": [
           {
             "live": [
@@ -757,7 +888,7 @@
         },
         "start_in": "acme-2027-edge-foundation",
         "end_in": "acme-2030-transaction-core",
-        "parent": "commerce-platform",
+        "parent": "platform-foundation",
         "intervals": [
           {
             "live": [
@@ -785,7 +916,7 @@
           "technology": "TypeScript / streaming runtime"
         },
         "start_in": "acme-2027-edge-foundation",
-        "parent": "commerce-platform",
+        "parent": "platform-foundation",
         "intervals": [
           {
             "live": [
@@ -813,7 +944,7 @@
           "technology": "Kotlin / Spring Boot"
         },
         "start_in": "acme-2028-catalog-search",
-        "parent": "commerce-platform",
+        "parent": "catalog-search",
         "intervals": [
           {
             "live": [
@@ -841,7 +972,7 @@
           "technology": "Java / OpenSearch"
         },
         "start_in": "acme-2028-catalog-search",
-        "parent": "commerce-platform",
+        "parent": "catalog-search",
         "intervals": [
           {
             "live": [
@@ -869,7 +1000,7 @@
         },
         "start_in": "acme-2028-catalog-search",
         "end_in": "acme-2030-transaction-core",
-        "parent": "commerce-platform",
+        "parent": "catalog-search",
         "intervals": [
           {
             "live": [
@@ -896,7 +1027,7 @@
           "technology": "Kotlin / Spring Boot"
         },
         "start_in": "acme-2029-customer-cart-pricing",
-        "parent": "commerce-platform",
+        "parent": "customer-cart-pricing",
         "intervals": [
           {
             "live": [
@@ -923,7 +1054,7 @@
           "technology": "Go"
         },
         "start_in": "acme-2029-customer-cart-pricing",
-        "parent": "commerce-platform",
+        "parent": "customer-cart-pricing",
         "intervals": [
           {
             "live": [
@@ -949,7 +1080,7 @@
           "technology": "Java / Spring Boot"
         },
         "start_in": "acme-2029-customer-cart-pricing",
-        "parent": "commerce-platform",
+        "parent": "customer-cart-pricing",
         "intervals": [
           {
             "live": [
@@ -976,7 +1107,7 @@
           "technology": "TypeScript / Node.js"
         },
         "start_in": "acme-2029-customer-cart-pricing",
-        "parent": "commerce-platform",
+        "parent": "customer-cart-pricing",
         "intervals": [
           {
             "live": [
@@ -1005,7 +1136,7 @@
           "technology": "Java / workflow engine"
         },
         "start_in": "acme-2030-transaction-core",
-        "parent": "commerce-platform",
+        "parent": "transaction-core",
         "intervals": [
           {
             "live": [
@@ -1032,7 +1163,7 @@
           "technology": "Kotlin / Spring Boot"
         },
         "start_in": "acme-2030-transaction-core",
-        "parent": "commerce-platform",
+        "parent": "transaction-core",
         "intervals": [
           {
             "live": [
@@ -1060,7 +1191,7 @@
           "technology": "Java / Spring Boot"
         },
         "start_in": "acme-2030-transaction-core",
-        "parent": "commerce-platform",
+        "parent": "transaction-core",
         "intervals": [
           {
             "live": [
@@ -1087,7 +1218,7 @@
           "technology": "Go"
         },
         "start_in": "acme-2030-transaction-core",
-        "parent": "commerce-platform",
+        "parent": "transaction-core",
         "intervals": [
           {
             "live": [
@@ -1115,7 +1246,7 @@
           "technology": "React / TypeScript"
         },
         "start_in": "acme-2031-complete-cutover",
-        "parent": "commerce-platform",
+        "parent": "back-office-insight",
         "intervals": [
           {
             "live": [
@@ -1142,7 +1273,7 @@
           "technology": "Python / SQL"
         },
         "start_in": "acme-2031-complete-cutover",
-        "parent": "commerce-platform",
+        "parent": "back-office-insight",
         "intervals": [
           {
             "live": [

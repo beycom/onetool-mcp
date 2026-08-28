@@ -262,11 +262,11 @@ tagged to it; the exit gate checks the list is empty.
       drill sets; Map minimap attaches above the lower-left row.
       Behavior changes get tests; existing projection vectors and
       tests must stay green. Highest-risk pass.
-- [ ] **Interlude — subsystem level rename (user-directed 2026-08-28;
+- [x] **Interlude — subsystem level rename (user-directed 2026-08-28;
       exception to the no-new-features rule; runs after the pass-3
       gate — D13c was already in flight when this was designed).**
-      `→ D14` (prompt READY in delegation.md; budget 1,100 changed
-      source lines proposed — confirm before running.)
+      `→ D14` (DONE, gate PASSED 2026-08-29; 293/1,100 changed
+      source lines.)
       The detail-level model becomes System / Subsystem (optional) /
       Container / Component / Code: Subsystem is a new entity kind (a
       logical grouping of related containers inside a system);
@@ -429,6 +429,74 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-29** — D14 architect gate PASSED; #21 payload precheck PASSED;
+  tree committed. Independently re-verified: 78 arch py tests + `just lint`
+  clean, 36 frontend tests (12 files) including the five prescribed D14
+  cases, `just build-arch-report` reproduces the tree's template
+  byte-for-byte (shasum match), budget confirmed at 293/1,100 changed
+  source lines (203 py/TS + 90 acme fixture). Code review conforms to the
+  D14 contract: Subsystem kind with `ss` prefix and the strict
+  system→subsystem→container chain (model/ids/yamlio), resolver replaces
+  the container-nesting recursion with flat subsystem/container passes,
+  ambiguous-parent moves to systems×subsystems, the containment-cycle
+  check is correctly deleted (no cycle is constructible in the new chain),
+  eleven-sheet Excel with Subsystems as sheet 5; frontend Level rename
+  with the Subsystem option hidden for empty datasets, the rewritten
+  boundary-nesting table, and search/Info/Data wiring. Fixture verified:
+  six subsystems under commerce-platform, exactly the 19 prescribed
+  container rewires, zero clips at base. Because the executor's cold-load
+  screenshot showed only 3–4 subsystems, a live Playwright spot-check was
+  run: at the final stage the subsystem level renders all 6 Subsystem
+  cards plus 10 ungrouped container leaves (3 in-viewport — correct under
+  D13b's Read-capped cold framing); at Base the level shows none because
+  the subsystems arrive with the migration waves (correct liveness — note
+  for the exit-gate walkthrough); console clean. Minor, not gate-blocking:
+  Data gained a dedicated `subsystems` tab reading rawState rows — pass 4
+  owns Data-table shape and may fold or keep it. #21 precheck: interface
+  rows already carry provider/consumer/call_direction/name/tags/
+  properties/intervals and relationship rows source/target/action/
+  description/intervals — connection details render from the existing
+  payload, no plumbing, nothing escalates to the user. Log entries dated
+  2026-08-27 and older moved to log-archive.md (inline log was at 15).
+  Next action: author the D13d pass-4 spec + prompt.
+
+- **2026-08-28** — D14 subsystem level rename complete; worktree left dirty
+  for architect review. Schema-v3 now models the strict System > Subsystem >
+  Container > Component > Code chain: YAML, generated ids, resolver clipping,
+  validation, the eleven-sheet Excel adapter, and report payloads all include
+  Subsystems; container nesting is rejected. The report now uses System /
+  Subsystem / Container / Component levels, hides the Subsystem option for
+  empty datasets, rolls grouped and ungrouped containers per contract, nests
+  Subsystem boundaries inside System boundaries, includes Subsystems in search
+  and Data, and keeps D13c card and edge presentation unchanged. The acme model
+  has the six prescribed Subsystems and 19 container rewires. Source budget:
+  293/1,100 changed Python, TS/TSX, and acme-fixture lines, counted as additions
+  plus deletions with tests and generated artifacts excluded. Tests: exactly
+  five prescribed cases added; 36 frontend tests passed, arch Python 78 passed /
+  540 deselected, smoke 27 passed / 3,209 deselected, and `just lint`,
+  `just build-arch-report`, payload regeneration, and CLI acme report generation
+  passed. Rule-9 Playwright passed on the regenerated `file://` report at
+  1440 x 900: every pass had zero console errors and zero external requests;
+  the Detail options were System / Subsystem / Container / Component; the
+  Subsystem cold load showed all six Subsystems plus ungrouped container leaves;
+  the Container level rendered six Subsystem boundaries nested within System
+  boundaries; 44 entities live across the Stage 5 to 4 switch and the viewport
+  kept identical transforms. Screenshots:
+  `plans/arch/wip/d14-subsystem-cold-load.png` and
+  `plans/arch/wip/d14-container-nested-boundaries.png`. Assumptions: the
+  execution request confirms the proposed 1,100-line budget; the final
+  no-commit instruction controls; rule 8 permits this progress entry as the
+  sole design-doc write; schema.md's explicit five-kind chain supersedes the
+  index.md summary typo that omits Container; "same dropdown/validation pattern
+  as Containers" means the existing milestone validations, since Containers
+  have no parent-id dropdown; a container parented to a container reports the
+  existing `unresolved_parent` code because the allowed parent sets are now
+  Systems and Subsystems; the required Subsystem cold load uses the final acme
+  stage where all six prescribed rows are live; Stage stability compares rows
+  live at both positions and excludes the intentional removal ghost. Open
+  questions: none. Next action: architect gate review, then the #21 payload
+  precheck and D13d authoring.
 
 - **2026-08-28** — D13c architect gate PASSED; tree committed. Independently
   re-verified: 33 frontend tests including exactly the five prescribed D13c
@@ -643,136 +711,5 @@ inclusive `end_in` (Q7, 2026-08-24).
   source lines (confirm before running). Next action: user confirms the
   D13b budget and passes the delegation.md prompt to the executor; the
   architect gates the result, then authors D13c.
-
-- **2026-08-27** — D13a rule-9 browser gate PASSED on retry. OneTool
-  Playwright verified the regenerated `file://` acme report at 1440 x 900
-  and 1024 x 720 in light theme: clean console in every pass; no external
-  requests (the report file itself was the sole network entry); View and Data
-  collapse/open, pointer resize, localStorage persistence, and double-click
-  default restore all worked; Map opened and closed its attached minimap;
-  Stage changed the fragment and projected node count; global search ranked
-  and selected a live row, restored focus to its trigger, and obeyed the
-  temporary-UI-first Escape order. At 1024, selecting Legacy Commerce wrote
-  `select=systems:legacy-commerce`, opened Info, transiently collapsed View,
-  and left the selected node fully inside the measured Canvas rectangle;
-  closing Info cleared selection and restored View. Screenshots:
-  `wip/test-results/d13a/1440-before.png` (baseline regenerated from
-  c37e3d05), `1440-after.png`, and `1024-info-open.png`; visual inspection
-  found no D13a shell defect (card density remains pass 2). Playwright closed.
-  Open questions: none. D13a executor definition of done is complete; next
-  action: architect gate review, then author D13b.
-
-- **2026-08-27** — D13a app-shell implementation complete; browser gate
-  blocked by a shared Playwright profile lock. The report now has the compact
-  identity/search header, persisted View/Info/Data docks, responsive transient
-  View collapse at 1024 px, dropdown-based Detail/Stage/Relationship controls,
-  the tags lens and Copy view link in View, ranked global search, the lower-left
-  Map/Fit/zoom row, light-only tokens and inline SVG chrome icons. Removed
-  viewer fragments diagnose and ignore old keys; validated row selections use
-  `select`. Source: 974 changed TS/TSX/CSS lines / 1,800 budget (additions plus
-  deletions, tests excluded). Tests: exactly 4 prescribed D13a cases represented
-  within 22 passing frontend tests; TypeScript and single-file build clean;
-  `just lint` clean; smoke 27 passed / 3,208 deselected; arch Python 77 passed /
-  540 deselected. Bundle rebuilt and acme report regenerated. Rule-9 evidence is
-  incomplete: OneTool's Playwright proxy reports its shared Chrome profile is
-  already in use by an older MCP process, including after the one allowed proxy
-  restart, so the 1440 x 900 and 1024 x 720 interaction pass and required
-  screenshots were not captured. Assumptions: the request to execute confirms
-  the 1,800-line budget; the final no-commit instruction overrides any earlier
-  commit wording; rule 8 is the explicit exception allowing this entry in the
-  otherwise read-only design docs; dock defaults are View 280 px, Info 360 px,
-  Data 280 px with existing practical bounds; search ranks exact, prefix, then
-  substring matches case-insensitively; "at 1024 px" means 1024 px and below;
-  responsive View collapse is transient so closing Info restores the persisted
-  user state; the `select=<kind>:<id>` grammar covers payload-backed entity and
-  interface rows, while aggregated spline selection stays local because it has
-  no payload row id; searched interfaces center their rendered aggregate
-  endpoints. Open questions: none. Blocker: release the shared Playwright
-  browser profile, then run the rule-9 gate and capture the three screenshots
-  before marking pass 1 complete.
-
-- **2026-08-27** — UI direction reconciled into the contracts
-  (architect). `ui-polish-direction.md` (confirmed 2026-08-27) is now
-  the decision source for the report/sequence UI; registered in Ground
-  truth. report.md: new "Confirmed UI direction" section; "The time
-  slider is the hero" replaced by the Stage-dropdown section; fragment
-  table loses `scope`/`hops`, `compare`, `theme` and gains `select`;
-  the Wave-2 UI contract is banner-superseded where it conflicts
-  (zoom rail placement, fullscreen, dark theme, floating legend,
-  500 px target); the D13a "Polish contract — pass 1" is marked
-  superseded pre-run. sequence.md: SEQ-* contract rewritten to the
-  direction — controls move into View (Scenario dropdown, compact
-  playback, local search, participant eye-hide), Map opens a vertical
-  overview, Info/Data own message details and payload files; SEQ-GROUP
-  (C4 bands, group collapse, merged lifelines, retargeting, self-loop
-  aggregation), SEQ-NAV (floating navigator), and the `collapse`
-  fragment key are removed; SEQ-PART records the containment-as-
-  header-context rule. plan.md/delivery.md: 3P passes re-scoped to
-  implement the direction (pass 1 = app shell; D13a spec/prompt
-  superseded — re-author before issuing), the 500 px target replaced
-  by the 1024 × 720 floor, 3S gate updated. delegation.md: D13a
-  status → SUPERSEDED, prompt body collapsed. ui-polish.md: direction
-  note added; #14/#16/#18/#24 carry supersession notes. designs/:
-  REMOVED entirely (user-directed, same day) — the direction doc is
-  the sole design source; all artboards, canvas.json, and the
-  published report-ui-polish.html bundle remain in git history
-  (d7db02a0). D13a re-authored the same day: normative spec "Polish
-  contract — pass 1: app shell (D13a)" in report.md, prompt READY in
-  delegation.md with a proposed budget of 1,800 changed source lines
-  (confirm before running). Next action: user confirms the D13a
-  budget and passes the delegation.md prompt to the executor; the
-  architect gates the result with screenshots at 1440×900 and
-  1024×720, then authors D13b.
-
-- **2026-08-26** — New capability registered (user request): sequence
-  messages and model interfaces can link to message files — sample
-  request/response payloads (xml, json, csv) — rendered
-  syntax-highlighted in the report. Tracked as a new Phase 3S architect
-  design item (amendments to schema.md, sequence.md, report.md); the
-  held D12a prompt gets re-scoped to include the refs before it runs;
-  the 3S gate now checks a highlighted message file opens. No 3P
-  impact — polish passes proceed unchanged; next action still: user
-  confirms the D13a budget and runs it.
-
-- **2026-08-25** — UI walkthrough evidence captured (architect,
-  user-directed): full Playwright pass over the acme report per
-  wip/notes/test-ui.md (both themes, System/Container levels, time
-  scrub, compare, tables, node+edge selection, 1440×900 and
-  1024×720). Result: `ui-polish.md` — 24 observed→expected issues
-  tagged D13a–D13d, registered in Ground truth. Confirms the 3P
-  baseline and adds measured edge values (all edges 1px `#B1B1B7`,
-  no marker-end, zero labels) plus six behavior defects now folded
-  into the pass bullets: selection hidden behind the details panel,
-  legend self-expanding on select, time toolbar vanishing after
-  select/close, time-pill reflow while scrubbing (→ pass 2 with
-  tests); Escape not closing overlays, "Dependencies" spliced into
-  the level bar (→ pass 4). Pass-4 precheck added: confirm the
-  payload carries edge endpoint/interface data before speccing the
-  connection-details fix (#21). Exit gate now requires every
-  ui-polish.md issue closed or waived and a re-run of the
-  walkthrough. D13a is untouched by all this and stays READY —
-  next action unchanged: user confirms the D13a budget and runs it;
-  the architect folds the tagged issues into each pass spec as it
-  is authored.
-
-- **2026-08-25** — plans/arch reorg (user-directed). Deleted
-  `react-flow-poc/` (198M incl. node_modules; superseded by the
-  implemented app, tracked files in git history). Created
-  `plans/arch/archive/` holding the arch-v2 design history and the
-  v2-era wip docs (design/ideas/requirements/mocks + superseded
-  interactions.md); `wip/` keeps only acme-report.html and
-  acme-arch-v2.xlsx. arch-v3 tracking compacted: phases 0–3R waves 1–2
-  collapsed to a summary section, older log entries moved to
-  log-archive.md (keep ~10 inline, archive the rest — new standing
-  rule), answered open questions compacted, ground-truth table
-  refreshed. delegation.md 873→~290 lines: completed prompt bodies
-  (D1–D10b) collapsed to outcome headers (full prompts in git
-  history), status table refreshed, standard rules updated (v2 donor
-  harvesting closed, v1 references removed), all forward gates renamed
-  to the Phase 3P exit gate. issues/ split: resolved p1/p2 files →
-  issues/resolved/ (relative links fixed), index rewritten; reference
-  screenshots stay (cited by 3P specs). `git worktree prune` cleared
-  the dead arch-v2 entry. Next action: unchanged — user confirms the
-  D13a budget and runs it.
 
 - **(older entries)** — see [log-archive.md](log-archive.md).

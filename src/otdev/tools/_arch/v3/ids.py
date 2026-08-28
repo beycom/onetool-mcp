@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 PREFIXES = {
     "systems": "s",
+    "subsystems": "ss",
     "containers": "c",
     "components": "cp",
     "code": "cd",

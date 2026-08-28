@@ -153,6 +153,58 @@ systems:
     availability_target: 99.95%
     criticality: tier-1
     lifecycle: strategic
+subsystems:
+- id: storefront-edge
+  name: Storefront and Edge
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
+  description: Customer-facing entry points routing storefront traffic
+    into the new platform.
+  tags:
+  - ecommerce
+  - frontend
+- id: platform-foundation
+  name: Platform Foundation
+  parent: commerce-platform
+  start_in: acme-2027-edge-foundation
+  description: Cross-cutting eventing, observability, and legacy
+    integration capability underpinning every other subsystem.
+  tags:
+  - platform
+  - integration
+- id: catalog-search
+  name: Catalog and Search
+  parent: commerce-platform
+  start_in: acme-2028-catalog-search
+  description: Product catalog mastering, merchandising, and search
+    capability.
+  tags:
+  - bounded-context-catalog
+- id: customer-cart-pricing
+  name: Customer, Cart and Pricing
+  parent: commerce-platform
+  start_in: acme-2029-customer-cart-pricing
+  description: Customer-identity-linked shopping capability - profiles,
+    carts, prices, and notifications.
+  tags:
+  - bounded-context-customer
+- id: transaction-core
+  name: Transaction Core
+  parent: commerce-platform
+  start_in: acme-2030-transaction-core
+  description: Order capture and fulfilment initiation - checkout,
+    orders, payments, and inventory.
+  tags:
+  - bounded-context-order
+- id: back-office-insight
+  name: Back Office and Insight
+  parent: commerce-platform
+  start_in: acme-2031-complete-cutover
+  description: Administration and operational reporting over the
+    completed platform.
+  tags:
+  - admin
+  - analytics
 containers:
 - id: commerce-monolith
   name: Commerce Monolith
@@ -278,7 +330,7 @@ containers:
     technology: REST API
 - id: commerce-edge
   name: Commerce Edge
-  parent: commerce-platform
+  parent: storefront-edge
   start_in: acme-2027-edge-foundation
   description: CDN, WAF, TLS termination, and route-based strangler control plane.
   tags:
@@ -291,7 +343,7 @@ containers:
     technology: Managed CDN / WAF / API gateway
 - id: storefront-bff
   name: Storefront BFF
-  parent: commerce-platform
+  parent: storefront-edge
   start_in: acme-2027-edge-foundation
   description: Channel-oriented API composition layer for the web storefront.
   tags:
@@ -304,7 +356,7 @@ containers:
     technology: TypeScript / Node.js
 - id: event-backbone
   name: Commerce Event Backbone
-  parent: commerce-platform
+  parent: platform-foundation
   start_in: acme-2027-edge-foundation
   description: Durable domain-event transport with schema governance and replay.
   tags:
@@ -316,7 +368,7 @@ containers:
     technology: Managed Kafka
 - id: observability-platform
   name: Commerce Observability Platform
-  parent: commerce-platform
+  parent: platform-foundation
   start_in: acme-2027-edge-foundation
   description: Central metrics, logs, traces, alerting, and service-level objectives.
   tags:
@@ -327,7 +379,7 @@ containers:
     technology: OpenTelemetry / managed observability
 - id: legacy-integration-adapter
   name: Legacy Anti-corruption Layer
-  parent: commerce-platform
+  parent: platform-foundation
   start_in: acme-2027-edge-foundation
   end_in: acme-2030-transaction-core
   description: Stable adapters translating legacy concepts and contracts into target-domain
@@ -342,7 +394,7 @@ containers:
     technology: Java / integration runtime
 - id: analytics-event-adapter
   name: Analytics Event Adapter
-  parent: commerce-platform
+  parent: platform-foundation
   start_in: acme-2027-edge-foundation
   description: Consent-aware, schema-controlled adapter for external digital analytics.
   tags:
@@ -355,7 +407,7 @@ containers:
     technology: TypeScript / streaming runtime
 - id: catalog-service
   name: Catalog Service
-  parent: commerce-platform
+  parent: catalog-search
   start_in: acme-2028-catalog-search
   description: System of record for products, categories, assortment, and sellability.
   tags:
@@ -368,7 +420,7 @@ containers:
     technology: Kotlin / Spring Boot
 - id: search-service
   name: Search Service
-  parent: commerce-platform
+  parent: catalog-search
   start_in: acme-2028-catalog-search
   description: Product search, faceting, ranking, and query suggestions from event-fed projections.
   tags:
@@ -381,7 +433,7 @@ containers:
     technology: Java / OpenSearch
 - id: catalog-sync-adapter
   name: Catalog Migration Adapter
-  parent: commerce-platform
+  parent: catalog-search
   start_in: acme-2028-catalog-search
   end_in: acme-2030-transaction-core
   description: Temporary idempotent translation and reconciliation between legacy merchandising
@@ -395,7 +447,7 @@ containers:
     technology: Java / Kafka Connect
 - id: customer-service
   name: Customer Service
-  parent: commerce-platform
+  parent: customer-cart-pricing
   start_in: acme-2029-customer-cart-pricing
   description: Customer profile, addresses, preferences, and identity linkage.
   tags:
@@ -407,7 +459,7 @@ containers:
     technology: Kotlin / Spring Boot
 - id: cart-service
   name: Cart Service
-  parent: commerce-platform
+  parent: customer-cart-pricing
   start_in: acme-2029-customer-cart-pricing
   description: Durable shopping carts with optimistic concurrency and expiry policies.
   tags:
@@ -419,7 +471,7 @@ containers:
     technology: Go
 - id: pricing-service
   name: Pricing Service
-  parent: commerce-platform
+  parent: customer-cart-pricing
   start_in: acme-2029-customer-cart-pricing
   description: Effective prices, promotions, eligibility, and explainable calculation results.
   tags:
@@ -430,7 +482,7 @@ containers:
     technology: Java / Spring Boot
 - id: notification-service
   name: Notification Service
-  parent: commerce-platform
+  parent: customer-cart-pricing
   start_in: acme-2029-customer-cart-pricing
   description: Template, preference, deduplication, and delivery orchestration for customer
     communications.
@@ -443,7 +495,7 @@ containers:
     technology: TypeScript / Node.js
 - id: checkout-service
   name: Checkout Orchestrator
-  parent: commerce-platform
+  parent: transaction-core
   start_in: acme-2030-transaction-core
   description: Explicit saga coordinating validation, reservation, payment, order creation,
     and compensations.
@@ -458,7 +510,7 @@ containers:
     technology: Java / workflow engine
 - id: order-service
   name: Order Service
-  parent: commerce-platform
+  parent: transaction-core
   start_in: acme-2030-transaction-core
   description: System of record for accepted orders and order lifecycle state.
   tags:
@@ -470,7 +522,7 @@ containers:
     technology: Kotlin / Spring Boot
 - id: payment-service
   name: Payment Service
-  parent: commerce-platform
+  parent: transaction-core
   start_in: acme-2030-transaction-core
   description: PCI-minimized payment intents, authorization, capture, refund, and reconciliation.
   tags:
@@ -483,7 +535,7 @@ containers:
     technology: Java / Spring Boot
 - id: inventory-service
   name: Inventory Service
-  parent: commerce-platform
+  parent: transaction-core
   start_in: acme-2030-transaction-core
   description: Commerce availability projection and time-bound stock reservations synchronized
     with ERP/WMS.
@@ -496,7 +548,7 @@ containers:
     technology: Go
 - id: admin-portal
   name: Commerce Administration Portal
-  parent: commerce-platform
+  parent: back-office-insight
   start_in: acme-2031-complete-cutover
   description: Role-based customer service and merchandising experience composed over target-domain
     APIs.
@@ -510,7 +562,7 @@ containers:
     technology: React / TypeScript
 - id: reporting-service
   name: Commerce Reporting Service
-  parent: commerce-platform
+  parent: back-office-insight
   start_in: acme-2031-complete-cutover
   description: Operational reporting over event-fed read models; never queries service databases
     directly.

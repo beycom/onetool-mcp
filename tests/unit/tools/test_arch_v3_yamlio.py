@@ -30,6 +30,7 @@ systems:
   - id: legacy-clearing
     name: Legacy Clearing
     end_in: phase-1
+subsystems: []
 containers:
   - id: payments-api
     name: Payments API
@@ -73,6 +74,7 @@ MINIMAL_YAML = """\
 schema_version: 3
 milestones: []
 systems: []
+subsystems: []
 containers: []
 components: []
 code: []
@@ -123,7 +125,10 @@ def test_code_round_trips(tmp_path: Path) -> None:
             "containers: []",
             "containers:\n  - id: container\n    name: Container\n    parent: system",
         )
-        .replace("systems: []", "systems:\n  - id: system\n    name: System"),
+        .replace(
+            "systems: []\nsubsystems: []",
+            "systems:\n  - id: system\n    name: System\nsubsystems: []",
+        ),
     )
     output = tmp_path / "output.yaml"
 
@@ -138,7 +143,8 @@ def test_direction_defaults_are_applied_and_omitted(tmp_path: Path) -> None:
     source = _write(
         tmp_path / "source.yaml",
         MINIMAL_YAML.replace(
-            "systems: []", "systems:\n  - id: system\n    name: System"
+            "systems: []\nsubsystems: []",
+            "systems:\n  - id: system\n    name: System\nsubsystems: []",
         ).replace(
             "interfaces: []",
             "interfaces:\n  - id: interface\n    name: Interface\n"
@@ -163,12 +169,16 @@ def test_direction_defaults_are_applied_and_omitted(tmp_path: Path) -> None:
     [
         MINIMAL_YAML + "unknown: value\n",
         MINIMAL_YAML.replace(
-            "systems: []", "systems:\n  - id: 'bad id'\n    name: Bad"
+            "systems: []\nsubsystems: []",
+            "systems:\n  - id: 'bad id'\n    name: Bad\nsubsystems: []",
         ),
-        MINIMAL_YAML.replace("systems: []", "systems:\n  - id: bad\n    name: null"),
         MINIMAL_YAML.replace(
-            "systems: []",
-            "systems:\n  - &base\n    id: base\n    name: Base\n  - <<: *base\n    id: copy",
+            "systems: []\nsubsystems: []",
+            "systems:\n  - id: bad\n    name: null\nsubsystems: []",
+        ),
+        MINIMAL_YAML.replace(
+            "systems: []\nsubsystems: []",
+            "systems:\n  - &base\n    id: base\n    name: Base\n  - <<: *base\n    id: copy\nsubsystems: []",
         ),
     ],
     ids=["unknown-field", "bad-id", "null", "anchor-merge-key"],

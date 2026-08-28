@@ -20,6 +20,7 @@ def _architecture(**updates: object) -> Architecture:
         "schema_version": 3,
         "milestones": [],
         "systems": [],
+        "subsystems": [],
         "containers": [],
         "components": [],
         "code": [],
@@ -89,25 +90,16 @@ def _missing_required() -> Architecture:
             ),
         ),
         (
-            "containment_cycle",
-            lambda: _architecture(
-                containers=[
-                    {"id": "a", "name": "A", "parent": "b"},
-                    {"id": "b", "name": "B", "parent": "a"},
-                ]
-            ),
-        ),
-        (
             "ambiguous_parent",
             lambda: _architecture(
                 systems=[
                     {"id": "root", "name": "Root"},
                     {"id": "parent", "name": "System"},
                 ],
-                containers=[
-                    {"id": "parent", "name": "Container", "parent": "root"},
-                    {"id": "child", "name": "Child", "parent": "parent"},
+                subsystems=[
+                    {"id": "parent", "name": "Subsystem", "parent": "root"},
                 ],
+                containers=[{"id": "child", "name": "Child", "parent": "parent"}],
             ),
         ),
         (
@@ -155,3 +147,24 @@ def _missing_required() -> Architecture:
 )
 def test_each_finding_code_fires(code: str, build: Callable[[], Architecture]) -> None:
     assert code in {finding.code for finding in validate(build())}
+
+
+def test_subsystem_ambiguity_and_container_parent_are_errors() -> None:
+    architecture = _architecture(
+        systems=[
+            {"id": "root", "name": "Root"},
+            {"id": "shared", "name": "Shared system"},
+        ],
+        subsystems=[
+            {"id": "shared", "name": "Shared subsystem", "parent": "root"},
+        ],
+        containers=[
+            {"id": "grouped", "name": "Grouped", "parent": "shared"},
+            {"id": "nested", "name": "Nested", "parent": "grouped"},
+        ],
+    )
+
+    errors = {(finding.code, finding.path) for finding in validate(architecture)}
+
+    assert ("ambiguous_parent", "containers[0].parent") in errors
+    assert ("unresolved_parent", "containers[1].parent") in errors

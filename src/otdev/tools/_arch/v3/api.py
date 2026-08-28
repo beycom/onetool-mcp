@@ -24,6 +24,7 @@ def _starter() -> Architecture:
         schema_version=3,
         milestones=[],
         systems=[],
+        subsystems=[],
         containers=[],
         components=[],
         code=[],

@@ -5,7 +5,7 @@ export type CardDimensions = { width: number; height: number; nameLines: 1 | 2 }
 
 export const CARD_WIDTH: Record<Level, number> = {
   systems: 280,
-  'top-containers': 260,
+  subsystems: 260,
   containers: 240,
   components: 240,
 }

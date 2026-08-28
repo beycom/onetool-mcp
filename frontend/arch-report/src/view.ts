@@ -6,7 +6,7 @@ import type {
 } from './types'
 import { ENTITY_KINDS } from './types'
 
-const LEVELS = new Set<Level>(['systems', 'top-containers', 'containers', 'components'])
+const LEVELS = new Set<Level>(['systems', 'subsystems', 'containers', 'components'])
 const ASPECTS = new Set<Aspect>(['ownership', 'call-direction', 'data-flow'])
 const RETIRED_FRAGMENT_KEYS = new Set([
   'mode', 'scope', 'hops', 'compare', 'compare-at', 'theme',

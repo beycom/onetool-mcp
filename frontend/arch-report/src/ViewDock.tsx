@@ -3,8 +3,8 @@ import type { Aspect, Level, ReportPayload, View } from './types'
 
 const DETAILS: Array<[Level, string]> = [
   ['systems', 'System'],
-  ['top-containers', 'Container'],
-  ['containers', 'Child Containers'],
+  ['subsystems', 'Subsystem'],
+  ['containers', 'Container'],
   ['components', 'Component'],
 ]
 
@@ -22,6 +22,9 @@ export function ViewDock({ canvasActive, copyStatus, drillPath, legend, onCanvas
 }) {
   const timeline = payload.timelines[view.timeline]
   const milestoneById = new Map(payload.milestones.map((milestone) => [milestone.id, milestone]))
+  const details = payload.rows.subsystems.length
+    ? DETAILS
+    : DETAILS.filter(([level]) => level !== 'subsystems')
   const selectedTags = new Set(view.lens)
   const toggleTag = (tag: string) => {
     const next = new Set(selectedTags)
@@ -39,7 +42,7 @@ export function ViewDock({ canvasActive, copyStatus, drillPath, legend, onCanvas
           <button aria-current={canvasActive ? 'page' : undefined} onClick={onCanvas} type="button"><span>Canvas</span><small>Model map</small></button>
         </details>
         <section className="view-controls">
-          <label><span>Detail</span><select aria-label="Detail" onChange={(event) => onView({ level: event.target.value as Level })} value={view.level}>{DETAILS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label><span>Detail</span><select aria-label="Detail" onChange={(event) => onView({ level: event.target.value as Level })} value={view.level}>{details.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           {payload.timelines.length > 1 ? <label><span>Timeline</span><select aria-label="Timeline" onChange={(event) => onView({ timeline: Number(event.target.value), position: 0 })} value={view.timeline}>{payload.timelines.map((item, index) => <option key={item.id ?? 'implicit'} value={index}>{item.id ?? 'Default'}</option>)}</select></label> : null}
           {timeline.milestones.length ? <label><span>Stage</span><select aria-label="Stage" onChange={(event) => onView({ position: Number(event.target.value) })} value={view.position}><option value={0}>0 · Base</option>{timeline.milestones.map((id, index) => <option key={id} value={index + 1}>{index + 1} · {milestoneById.get(id)?.name ?? id}</option>)}</select></label> : null}
           <label><span>Relationship</span><select aria-label="Relationship" onChange={(event) => onView({ aspect: event.target.value as Aspect })} value={view.aspect}><option value="call-direction">Calls</option><option value="data-flow">Data flow</option><option value="ownership">Ownership</option></select></label>

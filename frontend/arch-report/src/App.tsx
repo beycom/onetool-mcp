@@ -105,6 +105,7 @@ const STATUS_ORDER: DiffStatus[] = ['added', 'removed', 'changed']
 const STATUS_ICON: Record<DiffStatus, string> = { added: '+', removed: '−', changed: 'Δ' }
 const KIND_LABEL: Record<RowKind, string> = {
   systems: 'System',
+  subsystems: 'Subsystem',
   containers: 'Container',
   components: 'Component',
   code: 'Code',
@@ -769,7 +770,7 @@ export default function App() {
   }, [projected.rawState])
   const searchResults = useMemo<SearchResult[]>(() => {
     const diagrams: SearchResult[] = [{ id: 'canvas', kind: 'diagram', label: 'Canvas', meta: 'Architecture', onChoose: () => setView({ deps: null }) }]
-    const rows = (['systems', 'containers', 'components', 'code', 'users', 'interfaces'] as RowKind[])
+    const rows = (['systems', 'subsystems', 'containers', 'components', 'code', 'users', 'interfaces'] as RowKind[])
       .flatMap((kind) => projected.rawState.rows[kind].map((row) => ({
         id: row.id,
         kind,
@@ -801,7 +802,7 @@ export default function App() {
     const row = payload.rows[kind as RowKind]?.find((item) => item.id === idParts.join(':'))
     const parentId = row?.parent ?? row?.container ?? row?.component
     if (!parentId) return null
-    for (const parentKind of ['systems', 'containers', 'components'] as EntityKind[]) {
+    for (const parentKind of ['systems', 'subsystems', 'containers', 'components'] as EntityKind[]) {
       if (payload.rows[parentKind].some((item) => item.id === parentId)) return `${parentKind}:${parentId}`
     }
     return null

@@ -127,10 +127,14 @@ def _reference_findings(architecture: Architecture) -> list[Finding]:
     for kind in KINDS:
         for index, row in enumerate(getattr(architecture, kind)):
             references: list[tuple[str, str, set[str], str]] = []
-            if kind == "containers":
+            if kind == "subsystems":
+                references.append(
+                    ("parent", row.parent, identity["systems"], "unresolved_parent")
+                )
+            elif kind == "containers":
                 parent_kinds = [
                     parent_kind
-                    for parent_kind in ("systems", "containers")
+                    for parent_kind in ("systems", "subsystems")
                     if row.parent in identity[parent_kind]
                 ]
                 if len(parent_kinds) > 1:
@@ -139,7 +143,7 @@ def _reference_findings(architecture: Architecture) -> list[Finding]:
                             architecture,
                             "error",
                             "ambiguous_parent",
-                            f"parent {row.parent!r} matches a system and container",
+                            f"parent {row.parent!r} matches a system and subsystem",
                             (kind, index, "parent"),
                         )
                     )
@@ -202,45 +206,6 @@ def _reference_findings(architecture: Architecture) -> list[Finding]:
                         )
                     )
     return findings
-
-
-def _containment_findings(architecture: Architecture) -> list[Finding]:
-    container_ids = {row.id for row in architecture.containers}
-    parents: dict[str, set[str]] = {entity_id: set() for entity_id in container_ids}
-    for row in architecture.containers:
-        if row.parent in container_ids:
-            parents[row.id].add(row.parent)
-
-    state: dict[str, int] = {}
-    stack: list[str] = []
-    cycle_ids: set[str] = set()
-
-    def visit(entity_id: str) -> None:
-        state[entity_id] = 1
-        stack.append(entity_id)
-        for parent in parents[entity_id]:
-            if state.get(parent, 0) == 0:
-                visit(parent)
-            elif state[parent] == 1:
-                cycle_ids.update(stack[stack.index(parent) :])
-        stack.pop()
-        state[entity_id] = 2
-
-    for entity_id in parents:
-        if state.get(entity_id, 0) == 0:
-            visit(entity_id)
-
-    return [
-        _finding(
-            architecture,
-            "error",
-            "containment_cycle",
-            f"container {row.id!r} belongs to a containment cycle",
-            ("containers", index, "parent"),
-        )
-        for index, row in enumerate(architecture.containers)
-        if row.id in cycle_ids
-    ]
 
 
 def _temporal_findings(architecture: Architecture) -> list[Finding]:
@@ -384,7 +349,6 @@ def validate(architecture: Architecture) -> list[Finding]:
     findings = _required_findings(architecture)
     findings.extend(_duplicate_findings(architecture))
     findings.extend(_reference_findings(architecture))
-    findings.extend(_containment_findings(architecture))
     findings.extend(_temporal_findings(architecture))
     findings.extend(_revision_warnings(architecture))
     findings.extend(_resolution_warnings(architecture))

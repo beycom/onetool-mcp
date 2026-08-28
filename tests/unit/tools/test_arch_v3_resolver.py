@@ -39,6 +39,7 @@ def build(**collections) -> Architecture:
         "schema_version": 3,
         "milestones": milestones,
         "systems": [],
+        "subsystems": [],
         "containers": [],
         "components": [],
         "code": [],
@@ -335,17 +336,17 @@ def _tree_arch() -> Architecture:
 
 
 class TestClipping:
-    def test_nested_container_chain_clips_to_system(self) -> None:
+    def test_subsystem_chain_clips_to_system(self) -> None:
         arch = build(
             milestones=["m1"],
             systems=[
                 {"id": "retired", "name": "Retired", "end_in": "base"},
                 {"id": "live", "name": "Live"},
             ],
-            containers=[
-                {"id": "outer", "name": "Outer", "parent": "retired"},
-                {"id": "inner", "name": "Inner", "parent": "outer"},
+            subsystems=[
+                {"id": "group", "name": "Group", "parent": "retired"},
             ],
+            containers=[{"id": "inner", "name": "Inner", "parent": "group"}],
             components=[{"id": "component", "name": "Component", "container": "inner"}],
             code=[{"id": "code", "name": "Code", "component": "component"}],
             interfaces=[
@@ -361,7 +362,7 @@ class TestClipping:
         state = resolve(arch, sel("m1"))
 
         assert {(clip.kind, clip.id): clip.clipped_by for clip in state.clips} == {
-            ("containers", "outer"): "retired",
+            ("subsystems", "group"): "retired",
             ("containers", "inner"): "retired",
             ("components", "component"): "retired",
             ("code", "code"): "retired",

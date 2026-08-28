@@ -9,6 +9,9 @@
             "sysA",
             "sysL"
           ],
+          "subsystems": [
+            "ssA"
+          ],
           "containers": [
             "subA",
             "subL",
@@ -41,6 +44,9 @@
             "sysA",
             "sysB",
             "sysL"
+          ],
+          "subsystems": [
+            "ssA"
           ],
           "containers": [
             "subA",
@@ -76,6 +82,9 @@
           "systems": [
             "sysA",
             "sysB"
+          ],
+          "subsystems": [
+            "ssA"
           ],
           "containers": [
             "subA",
@@ -129,6 +138,9 @@
           "systems": [
             "sysA",
             "sysB"
+          ],
+          "subsystems": [
+            "ssA"
           ],
           "containers": [
             "subA",
@@ -424,6 +436,7 @@
           "containers:subB",
           "containers:subG",
           "containers:subR",
+          "subsystems:ssA",
           "systems:sysA",
           "systems:sysB",
           "users:u1"

@@ -4,6 +4,137 @@ Older progress-log entries moved out of plan.md (reorg 2026-08-25).
 Same append-only content, newest first; plan.md keeps only recent
 entries. Continue archiving from plan.md as its log grows.
 
+- **2026-08-27** — D13a rule-9 browser gate PASSED on retry. OneTool
+  Playwright verified the regenerated `file://` acme report at 1440 x 900
+  and 1024 x 720 in light theme: clean console in every pass; no external
+  requests (the report file itself was the sole network entry); View and Data
+  collapse/open, pointer resize, localStorage persistence, and double-click
+  default restore all worked; Map opened and closed its attached minimap;
+  Stage changed the fragment and projected node count; global search ranked
+  and selected a live row, restored focus to its trigger, and obeyed the
+  temporary-UI-first Escape order. At 1024, selecting Legacy Commerce wrote
+  `select=systems:legacy-commerce`, opened Info, transiently collapsed View,
+  and left the selected node fully inside the measured Canvas rectangle;
+  closing Info cleared selection and restored View. Screenshots:
+  `wip/test-results/d13a/1440-before.png` (baseline regenerated from
+  c37e3d05), `1440-after.png`, and `1024-info-open.png`; visual inspection
+  found no D13a shell defect (card density remains pass 2). Playwright closed.
+  Open questions: none. D13a executor definition of done is complete; next
+  action: architect gate review, then author D13b.
+
+- **2026-08-27** — D13a app-shell implementation complete; browser gate
+  blocked by a shared Playwright profile lock. The report now has the compact
+  identity/search header, persisted View/Info/Data docks, responsive transient
+  View collapse at 1024 px, dropdown-based Detail/Stage/Relationship controls,
+  the tags lens and Copy view link in View, ranked global search, the lower-left
+  Map/Fit/zoom row, light-only tokens and inline SVG chrome icons. Removed
+  viewer fragments diagnose and ignore old keys; validated row selections use
+  `select`. Source: 974 changed TS/TSX/CSS lines / 1,800 budget (additions plus
+  deletions, tests excluded). Tests: exactly 4 prescribed D13a cases represented
+  within 22 passing frontend tests; TypeScript and single-file build clean;
+  `just lint` clean; smoke 27 passed / 3,208 deselected; arch Python 77 passed /
+  540 deselected. Bundle rebuilt and acme report regenerated. Rule-9 evidence is
+  incomplete: OneTool's Playwright proxy reports its shared Chrome profile is
+  already in use by an older MCP process, including after the one allowed proxy
+  restart, so the 1440 x 900 and 1024 x 720 interaction pass and required
+  screenshots were not captured. Assumptions: the request to execute confirms
+  the 1,800-line budget; the final no-commit instruction overrides any earlier
+  commit wording; rule 8 is the explicit exception allowing this entry in the
+  otherwise read-only design docs; dock defaults are View 280 px, Info 360 px,
+  Data 280 px with existing practical bounds; search ranks exact, prefix, then
+  substring matches case-insensitively; "at 1024 px" means 1024 px and below;
+  responsive View collapse is transient so closing Info restores the persisted
+  user state; the `select=<kind>:<id>` grammar covers payload-backed entity and
+  interface rows, while aggregated spline selection stays local because it has
+  no payload row id; searched interfaces center their rendered aggregate
+  endpoints. Open questions: none. Blocker: release the shared Playwright
+  browser profile, then run the rule-9 gate and capture the three screenshots
+  before marking pass 1 complete.
+
+- **2026-08-27** — UI direction reconciled into the contracts
+  (architect). `ui-polish-direction.md` (confirmed 2026-08-27) is now
+  the decision source for the report/sequence UI; registered in Ground
+  truth. report.md: new "Confirmed UI direction" section; "The time
+  slider is the hero" replaced by the Stage-dropdown section; fragment
+  table loses `scope`/`hops`, `compare`, `theme` and gains `select`;
+  the Wave-2 UI contract is banner-superseded where it conflicts
+  (zoom rail placement, fullscreen, dark theme, floating legend,
+  500 px target); the D13a "Polish contract — pass 1" is marked
+  superseded pre-run. sequence.md: SEQ-* contract rewritten to the
+  direction — controls move into View (Scenario dropdown, compact
+  playback, local search, participant eye-hide), Map opens a vertical
+  overview, Info/Data own message details and payload files; SEQ-GROUP
+  (C4 bands, group collapse, merged lifelines, retargeting, self-loop
+  aggregation), SEQ-NAV (floating navigator), and the `collapse`
+  fragment key are removed; SEQ-PART records the containment-as-
+  header-context rule. plan.md/delivery.md: 3P passes re-scoped to
+  implement the direction (pass 1 = app shell; D13a spec/prompt
+  superseded — re-author before issuing), the 500 px target replaced
+  by the 1024 × 720 floor, 3S gate updated. delegation.md: D13a
+  status → SUPERSEDED, prompt body collapsed. ui-polish.md: direction
+  note added; #14/#16/#18/#24 carry supersession notes. designs/:
+  REMOVED entirely (user-directed, same day) — the direction doc is
+  the sole design source; all artboards, canvas.json, and the
+  published report-ui-polish.html bundle remain in git history
+  (d7db02a0). D13a re-authored the same day: normative spec "Polish
+  contract — pass 1: app shell (D13a)" in report.md, prompt READY in
+  delegation.md with a proposed budget of 1,800 changed source lines
+  (confirm before running). Next action: user confirms the D13a
+  budget and passes the delegation.md prompt to the executor; the
+  architect gates the result with screenshots at 1440×900 and
+  1024×720, then authors D13b.
+
+- **2026-08-26** — New capability registered (user request): sequence
+  messages and model interfaces can link to message files — sample
+  request/response payloads (xml, json, csv) — rendered
+  syntax-highlighted in the report. Tracked as a new Phase 3S architect
+  design item (amendments to schema.md, sequence.md, report.md); the
+  held D12a prompt gets re-scoped to include the refs before it runs;
+  the 3S gate now checks a highlighted message file opens. No 3P
+  impact — polish passes proceed unchanged; next action still: user
+  confirms the D13a budget and runs it.
+
+- **2026-08-25** — UI walkthrough evidence captured (architect,
+  user-directed): full Playwright pass over the acme report per
+  wip/notes/test-ui.md (both themes, System/Container levels, time
+  scrub, compare, tables, node+edge selection, 1440×900 and
+  1024×720). Result: `ui-polish.md` — 24 observed→expected issues
+  tagged D13a–D13d, registered in Ground truth. Confirms the 3P
+  baseline and adds measured edge values (all edges 1px `#B1B1B7`,
+  no marker-end, zero labels) plus six behavior defects now folded
+  into the pass bullets: selection hidden behind the details panel,
+  legend self-expanding on select, time toolbar vanishing after
+  select/close, time-pill reflow while scrubbing (→ pass 2 with
+  tests); Escape not closing overlays, "Dependencies" spliced into
+  the level bar (→ pass 4). Pass-4 precheck added: confirm the
+  payload carries edge endpoint/interface data before speccing the
+  connection-details fix (#21). Exit gate now requires every
+  ui-polish.md issue closed or waived and a re-run of the
+  walkthrough. D13a is untouched by all this and stays READY —
+  next action unchanged: user confirms the D13a budget and runs it;
+  the architect folds the tagged issues into each pass spec as it
+  is authored.
+
+- **2026-08-25** — plans/arch reorg (user-directed). Deleted
+  `react-flow-poc/` (198M incl. node_modules; superseded by the
+  implemented app, tracked files in git history). Created
+  `plans/arch/archive/` holding the arch-v2 design history and the
+  v2-era wip docs (design/ideas/requirements/mocks + superseded
+  interactions.md); `wip/` keeps only acme-report.html and
+  acme-arch-v2.xlsx. arch-v3 tracking compacted: phases 0–3R waves 1–2
+  collapsed to a summary section, older log entries moved to
+  log-archive.md (keep ~10 inline, archive the rest — new standing
+  rule), answered open questions compacted, ground-truth table
+  refreshed. delegation.md 873→~290 lines: completed prompt bodies
+  (D1–D10b) collapsed to outcome headers (full prompts in git
+  history), status table refreshed, standard rules updated (v2 donor
+  harvesting closed, v1 references removed), all forward gates renamed
+  to the Phase 3P exit gate. issues/ split: resolved p1/p2 files →
+  issues/resolved/ (relative links fixed), index rewritten; reference
+  screenshots stay (cited by 3P specs). `git worktree prune` cleared
+  the dead arch-v2 entry. Next action: unchanged — user confirms the
+  D13a budget and runs it.
+
 - **2026-08-25** — Phase-3 re-gate user half folded into the 3P exit
   gate (user decision); the wave-2 checkboxes are closed on that
   basis. D13a authored: normative spec added to report.md ("Polish

@@ -20,10 +20,14 @@ systems:
   - id: sysL
     name: Legacy Suite
     end_in: m1
+subsystems:
+  - id: ssA
+    name: Alpha Services
+    parent: sysA
 containers:
   - id: subA
     name: Alpha Core
-    parent: sysA
+    parent: ssA
   - id: subB
     name: Beta API
     parent: sysB
@@ -41,13 +45,13 @@ containers:
     start_in: m2
   - id: subR
     name: Registry
-    parent: sysA
+    parent: ssA
     description: Legacy registry
     properties:
       owner: core
   - id: subR
     name: Registry
-    parent: sysA
+    parent: ssA
     start_in: m2
     description: Rewritten registry
     properties:

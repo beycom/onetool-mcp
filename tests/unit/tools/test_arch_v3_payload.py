@@ -15,6 +15,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.tools]
 FIXTURE = Path(__file__).parent / "fixtures" / "arch" / "acme.yaml"
 KINDS = (
     "systems",
+    "subsystems",
     "containers",
     "components",
     "code",

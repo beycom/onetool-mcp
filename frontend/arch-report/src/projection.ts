@@ -142,9 +142,12 @@ function idIndex(state: ProjectedState): Map<string, RowRef> {
 }
 
 function parentRef(ref: RowRef, byId: Map<string, RowRef>): RowRef | null {
+  if (ref.kind === 'subsystems' && ref.row.parent) {
+    return byId.get(`systems:${ref.row.parent}`) ?? null
+  }
   if (ref.kind === 'containers' && ref.row.parent) {
     return byId.get(`systems:${ref.row.parent}`)
-      ?? byId.get(`containers:${ref.row.parent}`)
+      ?? byId.get(`subsystems:${ref.row.parent}`)
       ?? null
   }
   if (ref.kind === 'components' && ref.row.container) {
@@ -180,20 +183,6 @@ function ancestorOfKind(
     if (seen.has(key)) return null
     seen.add(key)
     cursor = parentRef(cursor, byId)
-  }
-  return cursor
-}
-
-function topContainerRepresentative(ref: RowRef, byId: Map<string, RowRef>): RowRef | null {
-  const seen = new Set<string>()
-  let cursor: RowRef | null = ref
-  while (cursor && cursor.kind !== 'systems' && cursor.kind !== 'users') {
-    const key = nodeKey(cursor.kind as EntityKind, cursor.row.id)
-    if (seen.has(key)) return null
-    seen.add(key)
-    const parent = parentRef(cursor, byId)
-    if (cursor.kind === 'containers' && parent?.kind === 'systems') return cursor
-    cursor = parent
   }
   return cursor
 }
@@ -298,7 +287,11 @@ function representativeAtLevel(
   if (top && boundaryStubs.has(nodeKey(top.kind as EntityKind, top.row.id))) return top
   if (ref.kind === 'users' || ref.kind === 'systems') return ref
   if (level === 'systems') return top
-  if (level === 'top-containers') return topContainerRepresentative(ref, byId)
+  if (level === 'subsystems') {
+    return ancestorOfKind(ref, 'subsystems', byId)
+      ?? ancestorOfKind(ref, 'containers', byId)
+      ?? ref
+  }
   if (level === 'containers') {
     return ancestorOfKind(ref, 'containers', byId) ?? ref
   }
@@ -322,7 +315,7 @@ export function rollUp(state: ScopedState, level: Level): RolledGraph {
     return created
   }
 
-  const levelKind = level === 'top-containers' ? null : level as EntityKind
+  const levelKind = level as EntityKind
   for (const ref of entityRows(state)) {
     if (ref.kind === levelKind || ref.kind === 'users') ensureNode(ref)
     const representative = representativeAtLevel(ref, level, byId, state.boundaryStubs)
@@ -391,12 +384,15 @@ function boundaryKey(ref: RowRef): string {
 
 function boundaryAncestors(ref: RowRef, level: Level, byId: Map<string, RowRef>): RowRef[] {
   if (level === 'systems') return []
+  const boundaryKinds: Record<Exclude<Level, 'systems'>, Set<EntityKind>> = {
+    subsystems: new Set(['systems']),
+    containers: new Set(['systems', 'subsystems']),
+    components: new Set(['systems', 'subsystems', 'containers']),
+  }
   const ancestors: RowRef[] = []
   let cursor = parentRef(ref, byId)
   while (cursor) {
-    if (cursor.kind === 'systems' || (level !== 'top-containers' && cursor.kind === 'containers')) {
-      ancestors.unshift(cursor)
-    }
+    if (boundaryKinds[level].has(cursor.kind as EntityKind)) ancestors.unshift(cursor)
     cursor = parentRef(cursor, byId)
   }
   return ancestors

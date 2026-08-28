@@ -14,8 +14,15 @@ from otdev.tools._arch.v3.excel import (
     read_workbook,
     write_workbook,
 )
-from otdev.tools._arch.v3.model import Architecture, Code, Component, Container, System
-from otdev.tools._arch.v3.yamlio import load_architecture
+from otdev.tools._arch.v3.model import (
+    Architecture,
+    Code,
+    Component,
+    Container,
+    Subsystem,
+    System,
+)
+from otdev.tools._arch.v3.yamlio import dump_architecture, load_architecture
 
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
 
@@ -74,14 +81,15 @@ def test_import_assigns_blank_ids_in_sheet_order(tmp_path: Path) -> None:
     ]
 
 
-def test_code_and_nested_container_round_trip(tmp_path: Path) -> None:
+def test_code_and_container_round_trip(tmp_path: Path) -> None:
     architecture = Architecture(
         schema_version=3,
         milestones=[],
         systems=[System(id="s-0001", name="Platform")],
+        subsystems=[],
         containers=[
             Container(id="c-0001", name="Runtime", parent="s-0001"),
-            Container(id="c-0002", name="Worker", parent="c-0001"),
+            Container(id="c-0002", name="Worker", parent="s-0001"),
         ],
         components=[
             Component(id="cp-0001", name="Handler", container="c-0002")
@@ -96,3 +104,28 @@ def test_code_and_nested_container_round_trip(tmp_path: Path) -> None:
     write_workbook(architecture, workbook)
 
     assert read_workbook(workbook) == architecture
+
+
+def test_subsystem_yaml_and_excel_round_trip(tmp_path: Path) -> None:
+    architecture = Architecture(
+        schema_version=3,
+        milestones=[],
+        systems=[System(id="s-0001", name="Platform")],
+        subsystems=[
+            Subsystem(id="ss-0001", name="Commerce", parent="s-0001")
+        ],
+        containers=[Container(id="c-0001", name="Storefront", parent="ss-0001")],
+        components=[],
+        code=[],
+        users=[],
+        interfaces=[],
+        relationships=[],
+    )
+    yaml_path = tmp_path / "architecture.yaml"
+    workbook_path = tmp_path / "architecture.xlsx"
+
+    dump_architecture(architecture, yaml_path)
+    write_workbook(architecture, workbook_path)
+
+    assert load_architecture(yaml_path) == architecture
+    assert read_workbook(workbook_path) == architecture

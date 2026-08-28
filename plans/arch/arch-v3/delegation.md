@@ -21,9 +21,9 @@ below is the template it will be issued from.
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
 | D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
 | D13b | Phase 3P pass 2: canvas composition | DONE (gate PASSED 2026-08-28) | — |
-| D13c | Phase 3P pass 3: graph elements | ISSUED 2026-08-28 — running in the worktree (budget 1,600) | — |
-| D14 | Subsystem level rename (schema + report + acme) | READY (schema.md/report.md amended 2026-08-28; budget 1,100 proposed) | D13c gate, once the budget is confirmed |
-| D13d | Phase 3P pass 4 | GATED on its spec + the #21 payload precheck | D13c gate |
+| D13c | Phase 3P pass 3: graph elements | DONE, gate PASSED 2026-08-28 (797/1,600 lines) | — |
+| D14 | Subsystem level rename (schema + report + acme) | DONE, gate PASSED 2026-08-29 (293/1,100 lines) | — |
+| D13d | Phase 3P pass 4 | READY (spec + prompt authored 2026-08-29; #21 precheck PASSED — payload needs no plumbing) | budget confirmed |
 | D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
 | D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
 | D11 | wave 3: view-mode capabilities | GATED on designs | Phase 3P exit gate |
@@ -217,7 +217,7 @@ capped at Read, thresholds derived from the type scale (79% Read /
 effect; 407/1,400 changed source lines. Gate review 2026-08-28.
 (Prompt text in git history.)
 
-## D14 — Subsystem level rename (READY, authored 2026-08-28; run after the D13c gate — D13c was already in flight when D14 was authored)
+## D14 — Subsystem level rename (DONE, gate PASSED 2026-08-29)
 
 ```text
 [standard rules + UI rule 9]
@@ -392,7 +392,7 @@ level showing nested boundaries. Definition of done: rules 5-8, then
 STOP — D13c is a separate prompt.
 ```
 
-## D13c — Phase 3P pass 3: graph elements (ISSUED 2026-08-28, running)
+## D13c — Phase 3P pass 3: graph elements (DONE, gate PASSED 2026-08-28)
 
 ```text
 [standard rules + UI rule 9]

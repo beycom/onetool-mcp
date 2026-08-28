@@ -14,6 +14,7 @@ timelines:
 systems:
   - id: shop
     name: Shop Platform
+subsystems: []
 containers:
   - id: pay-api
     name: Payments API

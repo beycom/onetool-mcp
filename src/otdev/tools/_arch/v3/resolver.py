@@ -23,17 +23,21 @@ from .model import (
     Container,
     Interface,
     Relationship,
+    Subsystem,
     System,
     User,
 )
 
-EntityRow = System | Container | Component | Code | User | Interface | Relationship
+EntityRow = (
+    System | Subsystem | Container | Component | Code | User | Interface | Relationship
+)
 
 #: Collection names in canonical order. Used as the ``kind`` vocabulary
 #: everywhere in this module (``Clip.kind``, ``DiffEntry.kind``,
 #: ``ResolvedState.entities`` keys, ordering of diff output).
 KINDS = (
     "systems",
+    "subsystems",
     "containers",
     "components",
     "code",
@@ -44,7 +48,14 @@ KINDS = (
 
 #: Kinds searched (in this order) when resolving interface provider/consumer
 #: and relationship source/target endpoints. First match wins.
-ENDPOINT_KINDS = ("systems", "containers", "components", "code", "users")
+ENDPOINT_KINDS = (
+    "systems",
+    "subsystems",
+    "containers",
+    "components",
+    "code",
+    "users",
+)
 
 
 class ResolverError(ValueError):
@@ -268,8 +279,8 @@ def resolve(
     """Resolve the state selected by ``selector`` (default: base).
 
     Effective liveness per schema.md Resolution: an entity is effectively
-    live only while its parent chain (code -> component -> container -> ...
-    -> system) is
+    live only while its parent chain (code -> component -> container ->
+    subsystem -> system) is
     effectively live; an interface/relationship only while both endpoints
     are effectively live (endpoint lookup over ENDPOINT_KINDS, first match).
     Rows authored-live but not effectively live appear in ``clips``, not in
@@ -304,35 +315,26 @@ def resolve(
 
     effective["systems"].update(authored["systems"])
 
-    visiting: set[str] = set()
+    for entity_id, row in authored["subsystems"].items():
+        assert isinstance(row, Subsystem)
+        cause = blocked_by("systems", row.parent)
+        if cause is None:
+            effective["subsystems"][entity_id] = row
+        else:
+            clip_causes[("subsystems", entity_id)] = cause
 
-    def resolve_container(entity_id: str) -> str | None:
-        if entity_id in effective["containers"]:
-            return None
-        if ("containers", entity_id) in clip_causes:
-            return clip_causes[("containers", entity_id)]
-        row = authored["containers"].get(entity_id)
-        if row is None:
-            return entity_id
+    for entity_id, row in authored["containers"].items():
         assert isinstance(row, Container)
-        if entity_id in visiting:
-            return entity_id
-        visiting.add(entity_id)
         if row.parent in groups["systems"]:
             cause = blocked_by("systems", row.parent)
-        elif row.parent in groups["containers"]:
-            cause = resolve_container(row.parent)
+        elif row.parent in groups["subsystems"]:
+            cause = blocked_by("subsystems", row.parent)
         else:
             cause = row.parent
-        visiting.remove(entity_id)
         if cause is None:
             effective["containers"][entity_id] = row
         else:
             clip_causes[("containers", entity_id)] = cause
-        return cause
-
-    for entity_id in authored["containers"]:
-        resolve_container(entity_id)
 
     for entity_id, row in authored["components"].items():
         assert isinstance(row, Component)

@@ -18,6 +18,7 @@ def test_revision_rows_may_share_an_id() -> None:
                 {"id": "payments", "name": "Payments"},
                 {"id": "payments", "name": "Payment platform", "start_in": "phase-1"},
             ],
+            "subsystems": [],
             "containers": [],
             "components": [],
             "code": [],
