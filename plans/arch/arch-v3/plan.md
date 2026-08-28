@@ -263,6 +263,10 @@ tagged to it; the exit gate checks the list is empty.
       Behavior changes get tests; existing projection vectors and
       tests must stay green. Highest-risk pass.
 - [ ] **Pass 3 — graph elements: cards, splines, selection.** `→ D13c`
+      (spec: report.md "Polish contract — pass 3: graph elements",
+      authored 2026-08-28; prompt READY in delegation.md, runs only
+      after the D13b gate; budget 1,600 changed source lines
+      proposed — confirm before running.)
       Larger text-led cards per the direction's card anatomy — one
       rounded shape for every kind, no entity icons or logos, kind
       and fact pills, two-line name wrap; persistent drill affordance
@@ -399,6 +403,29 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-28** — D13c authored ahead of the D13b run (user-directed;
+  the prompt still waits for the D13b gate). Normative spec "Polish
+  contract — pass 3: graph elements (D13c)" added to report.md,
+  grounded in the current render layer: card anatomy per depth with
+  kind pills and `entityIcon` deleted, persistent ≥24 px drill
+  control, boundary stubs as compact external cards, subtle-tint
+  containment boundaries, bezier-only splines with geometry-derived
+  floating anchors (`edgeAnchors` pure function, lane separation)
+  replacing the hash-mod-3 left/right handles, per-direction spline
+  split of aggregated edges (bidirectional members count on both),
+  zoom-compensated strokes + custom arrowheads, neutral-at-Full /
+  always-on-selection label pills, provider-side interface ports,
+  IcePanel one-hop selection with reduced-motion fallback, stage-diff
+  as increments on a legible base; five prescribed tests. Scope
+  boundaries fixed against neighbors: pass 2's layout/camera code and
+  projection.ts untouched (direction split happens in App-side edge
+  building); the Δ change-popover survives until pass 4 moves field
+  changes into Info. D13c prompt READY in delegation.md, run-after =
+  D13b gate, proposed budget 1,600 changed source lines (confirm
+  before running). ui-polish #1–#7 are D13c's gate checklist. Next
+  action unchanged for execution order: user confirms the D13b budget
+  and runs D13b first; D13c follows its gate.
 
 - **2026-08-28** — D13a architect gate PASSED; D13b authored; tree
   committed. Gate evidence, independently re-verified: 22 frontend tests

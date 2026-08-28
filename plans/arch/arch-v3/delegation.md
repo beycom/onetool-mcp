@@ -21,7 +21,8 @@ below is the template it will be issued from.
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
 | D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
 | D13b | Phase 3P pass 2: canvas composition | READY (spec in report.md; budget 1,400 proposed) | now, once the budget is confirmed |
-| D13c–D13d | Phase 3P passes 3–4 | GATED on per-pass specs (authored from ui-polish-direction.md) | previous pass gate |
+| D13c | Phase 3P pass 3: graph elements | READY (spec in report.md; budget 1,600 proposed) | D13b gate |
+| D13d | Phase 3P pass 4 | GATED on its spec + the #21 payload precheck | D13c gate |
 | D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
 | D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
 | D11 | wave 3: view-mode capabilities | GATED on designs | Phase 3P exit gate |
@@ -267,6 +268,77 @@ Stage/Relationship switches move nothing, Container level readable.
 Capture the five screenshots listed in the pass contract. Definition
 of done: rules 5-8 (report npm test output; pytest run unchanged by
 this chunk), then STOP — D13c is a separate prompt.
+```
+
+## D13c — Phase 3P pass 3: graph elements (READY, authored 2026-08-28; run after the D13b gate)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the D13b canvas-composition commit is the baseline (content-
+sized cards, tuned ELK, initialViewport framing, shiftViewport
+camera). Authoritative contract — READ IN FULL, in this order:
+1. plans/arch/arch-v3/ui-polish-direction.md (the product direction);
+2. plans/arch/arch-v3/report.md, sections "Confirmed UI direction
+   (2026-08-27)" and "Polish contract — pass 3: graph elements
+   (D13c)" — the pass contract scopes exactly what this pass
+   implements versus defers.
+Do NOT read issue, research, or ui-polish files. The pass contract
+wins on scope; the direction wins on behavior; any other ambiguity is
+a rule-1 stop.
+
+This pass owns what cards, boundaries, interface ports, and splines
+LOOK like and how selection emphasizes them. It does NOT touch
+layout, framing, camera, thresholds (pass 2 code stays), dock
+content (pass 4), or projection semantics: projection.ts is
+READ-ONLY (rendered per-direction spline splitting happens in the
+App-side edge building, not in projection). Expected surface:
+App.tsx (node/edge components + edge building), styles.css, the
+cardSize module's content model, plus new modules for anchor/spline
+math and edge presentation (suggested: edgeAnchors.ts,
+edgePresentation.ts) and their test files.
+
+Budget: 1,600 changed source lines (excluding tests). Python changes:
+none. No new npm dependencies.
+
+Scope — implement the pass contract exactly:
+1. Card anatomy per depth (kind pill, two-line name, description,
+   fact pills, counts); entityIcon DELETED everywhere; persistent
+   >=24px drill control; boundary stubs as compact external cards;
+   card diffs as pills + narrow border markers (the change-popover
+   stays this pass).
+2. Containment boundaries as subtle tints with readable headers.
+3. Splines: bezier only, geometry-derived floating anchors via the
+   edgeAnchors pure function with lane separation; per-direction
+   spline split of aggregated edges (bidirectional members count on
+   both); count chips; zoom-compensated stroke >= ~1.5 screen px and
+   visible custom arrowheads; labels neutral-at-Full /
+   always-when-selected-or-hovered; diff styling as an increment on
+   a legible base.
+4. Interface ports: dot at Far/Read, labeled chip at Full or on
+   spline hover/selection, attached at the provider-side anchor;
+   never a detached empty box.
+5. Selection: the IcePanel one-hop model exactly (accent border,
+   animated outgoing / static incoming in one accent, brightened
+   neighbors, dimmed-but-readable rest, reduced-motion static
+   fallback); emphasis priority selection > tag lens > neutral;
+   Relationship switch re-resolves directions with zero node
+   movement.
+
+Tests: exactly the five cases listed in the pass contract's
+Verification section, plus mechanical updates to existing cardSize/
+emphasis/presentation tests. The projection/vector suites must pass
+untouched.
+
+Finish: `just build-arch-report`, regenerate the acme report via the
+CLI, verify per rule 9 from file:// at 1440x900 AND 1024x720 (light):
+clean console, zero external requests, no orthogonal detours or
+interior crossings, arrowheads visible at cold-load zoom, one-hop
+selection correct incl. forced prefers-reduced-motion, Stage diff
+legible-base. Capture the five screenshots listed in the pass
+contract. Definition of done: rules 5-8 (report npm test output;
+pytest run unchanged by this chunk), then STOP — D13d is a separate
+prompt.
 ```
 
 ## D12a — Phase 3S: sequence parser + payload (issued 2026-08-25, ON HOLD until the Phase 3P exit gate)

@@ -931,6 +931,171 @@ gate eyeballs it). No behavior change.
   after), cold load at 1024 × 720, Info open with a selection visible,
   Container level default framing.
 
+## Polish contract — pass 3: graph elements (D13c)
+
+Normative for D13c (authored 2026-08-28). This pass implements the
+Cards / Containment and interfaces / Splines / Selection sections of
+[ui-polish-direction.md](ui-polish-direction.md) on top of the D13b
+canvas composition. It owns what cards, boundaries, ports, and edges
+*look like and emphasize*; it does NOT own layout, framing, camera, or
+thresholds (pass 2, unchanged) nor dock content (pass 4). Closes or
+discharges ui-polish issues #1–#7 (see gate inputs).
+
+### Card anatomy (within pass 2's geometry contract)
+
+- One rounded rectangular card for every kind — actors, systems,
+  containers, components. Remove the `entityIcon` glyph set and the
+  kind-specific letterforms entirely; kind is conveyed by a **kind
+  pill**, not an icon or shape (direction "Cards").
+- Card content at each depth (semantic zoom, thresholds from pass 2):
+  - **Far**: kind pill + full name.
+  - **Read**: + one/two description lines + up to three high-value
+    fact pills.
+  - **Full**: + the remaining approved details (child / connection
+    count when relevant) and neutral edge labels (see Splines).
+- Name wraps to two lines before truncating (pass 2's rule); hover
+  and Info always carry the full value.
+- The content model feeds pass 2's `cardSize(node, level, measure)` —
+  update its content model to this anatomy, keeping the injectable
+  measurer and the per-level tier widths. Existing cardSize tests
+  update mechanically; the "no truncation while spare height remains"
+  invariant must keep holding.
+- **Drill affordance**: boxes with children get a small *persistent*
+  drill control (visible at every depth, not hover-only) with a real
+  hit target (≥ 24 × 24 px), replacing the `⌕` glyph button. It stops
+  propagation (drill, not select), and keeps its aria-label.
+- **Boundary stubs** (external endpoints across a drill cut): never an
+  empty box (#6's floaters) — render as a compact card: kind pill +
+  name + an "external" marker. Same recipe, reduced content.
+- **Stage-diff on cards** (#7 sibling rule): added / removed / changed
+  render as pills and a narrow accent border marker — never opacity,
+  never a fill wash (direction "Selection", last rule). The Δ
+  change-popover stays as-is this pass (pass 4 moves field changes
+  into Info and removes it).
+
+### Containment boundaries
+
+Boundaries render as subtle tinted regions — a light fill tint and a
+1 px border distinct from any edge stroke — with a clear header
+(name + kind pill + the drill control). Selectable; no in-place
+expand/collapse. The header must remain readable at Read framing of
+the Container level (D13b acceptance baseline).
+
+### Splines (replaces orthogonal routing — kills #4/#5)
+
+- **Path**: bezier splines are the only architecture edge style.
+  Replace `getSmoothStepPath` with bezier paths between
+  geometry-derived anchor points. No orthogonal segments remain.
+- **Anchors**: replace the hash-mod-3 left/right handles with floating
+  anchors computed from geometry — each endpoint anchors on the card
+  border facing the other endpoint (any of the four sides), so routes
+  head toward their target instead of detouring (#4). Parallel splines
+  between the same pair separate by offsetting their anchor points.
+  Pure function: `edgeAnchors(sourceRect, targetRect, laneIndex,
+  laneCount) → {sourcePoint, targetPoint}` — testable without React
+  Flow.
+- **Routes avoid interiors**: with facing anchors and bezier control
+  points perpendicular to the card border, routes must not cross card
+  bodies except when endpoints overlap after layout (#5); no route may
+  loop around empty space larger than the cards it avoids (#4's
+  acceptance).
+- **Direction split**: rendered splines are per-direction. Members of
+  an aggregated (a, b) edge resolve their direction under the active
+  Relationship; forward members render on one spline, reverse members
+  on a second separated spline, and a bidirectional member counts on
+  both. Each spline is independently selectable and animatable
+  (direction "Splines"). Selecting either spline opens the shared
+  member list in Info. Edge selection stays local (no payload row id —
+  D13a rule unchanged).
+- **Aggregation chips**: a spline whose direction group has more than
+  one member shows a count chip on its label pill.
+- **Contrast and arrowheads** (#1, #2): neutral splines use a real
+  stroke (from the token palette, ~4.5:1 against the canvas at
+  standard weight) with zoom compensation so an edge never renders
+  below ~1.5 screen px; every spline ends in a visible arrowhead
+  sized with the same compensation (custom marker — the React Flow
+  default gray is superseded). Selected/emphasized splines gain weight
+  and the accent.
+- **Labels** (#3): label pills (name + count chip + diff icons) render
+  for *neutral* splines at Full only; a selected or hovered spline
+  shows its label at every zoom. The label pill is also the spline's
+  primary click target (keep the existing wide hit path underneath).
+- **Stage-diff on splines** (#7): base splines stay at full neutral
+  legibility in every stage; added / removed / changed styling is an
+  increment (diff hue + label icon, dashed for removed) on top of the
+  base weight — the diff may never be more visible than the
+  architecture.
+
+### Interfaces as ports (#6)
+
+Interfaces render as small labeled ports attached where a spline
+connects to the owning (provider) card or containment boundary — a
+small chip sitting on the border at the spline's anchor point. At Far
+and Read a port is a dot; at Full, and whenever its spline is selected
+or hovered, it shows the interface name (aggregated splines: one port,
+name of the first interface + count). Never render a detached empty
+interface box. Ports are part of the spline's hover/selection group.
+
+### Selection emphasis (IcePanel one-hop model)
+
+Refine the existing emphasis machinery to exactly the direction's
+model, one hop, one accent color:
+
+- selected card: strongest accent border;
+- direct outgoing splines: accent + directional animation;
+- direct incoming splines: same accent, static;
+- direct neighbor cards: brightened;
+- everything else: dimmed but readable (opacity floor — text still
+  legible, never invisible);
+- arrowheads keep direction without motion;
+- `prefers-reduced-motion`: static emphasized splines both directions;
+- emphasis priority: selection one-hop > tag lens > neutral (guided
+  stories slot in above tags when D11 lands).
+
+Switching Relationship re-resolves spline directions, animation, and
+incoming/outgoing grouping — the picture visibly changes while no box
+moves (pass 2's layout-stability contract already enforces the
+latter).
+
+### Mechanical consequences
+
+- `entityIcon` is deleted; the dependency view and any other glyph
+  call sites take the kind-pill treatment (content otherwise
+  unchanged — the dependency view's own redesign is not this pass).
+- The `.semantic-edge` CSS block is rewritten for splines; the D10b
+  edge-anchor hash and its handle ids go away.
+
+### Verification (gate inputs)
+
+- Tests — exactly five new cases (plus mechanical updates to existing
+  cardSize / emphasis / presentation tests):
+  (1) `edgeAnchors`: anchors land on the facing borders of both rects
+  (all four relative placements) and parallel lanes get separated
+  points;
+  (2) direction split: an aggregate with forward + reverse +
+  bidirectional members yields two splines with correct member counts
+  under each Relationship;
+  (3) label visibility: neutral label only at Full; selected/hovered
+  label at every depth (pure decision function);
+  (4) emphasis classification: selection assigns
+  outgoing/incoming/neighbor/unrelated correctly on a small graph,
+  and tag-lens dim never overrides one-hop emphasis;
+  (5) port assignment: interfaces map to the provider-side anchor,
+  aggregated splines yield one port with a count.
+  Projection vectors and all existing suites stay green.
+- Rule-9 browser pass at 1440 × 900 AND 1024 × 720, light, `file://`:
+  clean console, zero external requests; no orthogonal detours or
+  interior crossings on acme at System and Container levels (#4, #5);
+  every edge visibly stroked with an arrowhead at cold-load zoom (#1,
+  #2); labels behave per depth/selection (#3); no detached empty
+  boxes (#6); Stage switch shows diff as increments on a legible base
+  (#7); selecting a card reproduces the IcePanel one-hop picture,
+  including under forced `prefers-reduced-motion`; Relationship
+  switch visibly changes arrows/animation with zero node movement.
+  Screenshots for the gate: System level cold load, Container level,
+  a selection with one-hop emphasis at 1440 × 900, the same selection
+  under reduced motion, and a Stage-diff view.
+
 ## Exports
 
 Phase one exports are data-shaped and require no layout engine in Python:
