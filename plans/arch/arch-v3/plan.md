@@ -262,7 +262,8 @@ tagged to it; the exit gate checks the list is empty.
       Behavior changes get tests; existing projection vectors and
       tests must stay green. Highest-risk pass.
 - [ ] **Interlude — subsystem level rename (user-directed 2026-08-28;
-      exception to the no-new-features rule; runs before pass 3).**
+      exception to the no-new-features rule; runs after the pass-3
+      gate — D13c was already in flight when this was designed).**
       `→ D14` (prompt READY in delegation.md; budget 1,100 changed
       source lines proposed — confirm before running.)
       The detail-level model becomes System / Subsystem (optional) /
@@ -445,11 +446,15 @@ inclusive `end_in` (Q7, 2026-08-24).
   (storefront-edge, platform-foundation, catalog-search,
   customer-cart-pricing, transaction-core, back-office-insight) and
   rewires 19 container parents, leaving single-container systems
-  ungrouped to exercise the optional path. D13c re-sequenced after the
-  D14 gate (prompt prereq updated; its anchors are level-agnostic).
-  Next action: user confirms the D14 budget (1,100 changed source
-  lines proposed) and runs the delegation.md D14 prompt; the architect
-  gates it, then D13c runs on the renamed baseline.
+  ungrouped to exercise the optional path. Sequencing correction made
+  while designing: D13c executor work (edgeAnchors/splinePath/
+  edgePresentation) appeared in the worktree mid-design — D13c was
+  already in flight, so D14 runs AFTER the D13c gate on its baseline
+  (D14's rename surface is level keys and kind lists; D13c's anatomy
+  rules apply to subsystem cards automatically). Next action: D13c
+  finishes and is gated; then the user confirms the D14 budget (1,100
+  changed source lines proposed) and runs the delegation.md D14
+  prompt.
 
 - **2026-08-28** — D13b architect gate PASSED; tree committed. Independently
   re-verified: 28 frontend tests including exactly the six prescribed D13b

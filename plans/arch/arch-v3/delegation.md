@@ -21,8 +21,8 @@ below is the template it will be issued from.
 | D10a, D10b | Phase 3R wave 2: report UI | DONE, commit c37e3d05 | — |
 | D13a | Phase 3P pass 1: app shell | DONE, gate PASSED 2026-08-28 (974/1,800 lines) | — |
 | D13b | Phase 3P pass 2: canvas composition | DONE (gate PASSED 2026-08-28) | — |
-| D14 | Subsystem level rename (schema + report + acme) | READY (schema.md/report.md amended 2026-08-28; budget 1,100 proposed) | now, once the budget is confirmed |
-| D13c | Phase 3P pass 3: graph elements | READY (spec in report.md; budget 1,600 proposed) | D14 gate |
+| D13c | Phase 3P pass 3: graph elements | ISSUED 2026-08-28 — running in the worktree (budget 1,600) | — |
+| D14 | Subsystem level rename (schema + report + acme) | READY (schema.md/report.md amended 2026-08-28; budget 1,100 proposed) | D13c gate, once the budget is confirmed |
 | D13d | Phase 3P pass 4 | GATED on its spec + the #21 payload precheck | D13c gate |
 | D12a | Phase 3S: sequence parser + payload | ISSUED, ON HOLD | Phase 3P exit gate |
 | D12b | Phase 3S: sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | Phase 3P exit gate |
@@ -217,12 +217,14 @@ capped at Read, thresholds derived from the type scale (79% Read /
 effect; 407/1,400 changed source lines. Gate review 2026-08-28.
 (Prompt text in git history.)
 
-## D14 — Subsystem level rename (READY, authored 2026-08-28; run before D13c)
+## D14 — Subsystem level rename (READY, authored 2026-08-28; run after the D13c gate — D13c was already in flight when D14 was authored)
 
 ```text
 [standard rules + UI rule 9]
 
-Prereq: the D13b canvas-composition commit is the baseline.
+Prereq: the D13c graph-elements commit is the baseline. Subsystem
+cards, boundaries, and kind pills inherit D13c's anatomy rules
+automatically — no new visual design in this chunk.
 Authoritative contract — READ IN FULL, in this order:
 1. plans/arch/arch-v3/schema.md, section "Entity kinds (C4-aligned)"
    (amended 2026-08-28: the new Subsystem kind and the strict
@@ -390,16 +392,14 @@ level showing nested boundaries. Definition of done: rules 5-8, then
 STOP — D13c is a separate prompt.
 ```
 
-## D13c — Phase 3P pass 3: graph elements (READY, authored 2026-08-28; D13b gate passed — run after the D14 gate, once the budget is confirmed)
+## D13c — Phase 3P pass 3: graph elements (ISSUED 2026-08-28, running)
 
 ```text
 [standard rules + UI rule 9]
 
-Prereq: the D14 subsystem-rename commit is the baseline (D13b
-content-sized cards, tuned ELK, initialViewport framing, shiftViewport
-camera, plus the renamed detail levels System / Subsystem / Container /
-Component — subsystem cards and boundaries get the same anatomy rules
-as every other kind). Authoritative contract — READ IN FULL, in this order:
+Prereq: the D13b canvas-composition commit is the baseline (content-
+sized cards, tuned ELK, initialViewport framing, shiftViewport
+camera). Authoritative contract — READ IN FULL, in this order:
 1. plans/arch/arch-v3/ui-polish-direction.md (the product direction);
 2. plans/arch/arch-v3/report.md, sections "Confirmed UI direction
    (2026-08-27)" and "Polish contract — pass 3: graph elements
