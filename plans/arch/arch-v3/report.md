@@ -1303,6 +1303,17 @@ semantics (P12), `projection.ts`, Info/Data content, drill behavior.
   its counterpart; a side's edges are ordered by bearing and placed
   along the side with ≥ 14 px separation, clamped ≥ 14 px from each
   corner. Attachment points never converge and never sit on corners.
+- **Perimeter overflow (decision 2026-08-29, P12 open question 2):** a
+  side has finite capacity (`floor((span − 28) / 14) + 1` anchors).
+  When a batch exceeds it, the side sheds its outermost endpoints
+  around the nearest corner: the bearing-sorted batch's low end spills
+  to the adjacent side at that corner, the high end to the opposite
+  one, most-extreme bearing first; a spilled endpoint's bearing is
+  recomputed in the destination side's metric so it stays in perimeter
+  order, and spills cascade deterministically (an endpoint never
+  returns to a side it left). Card geometry never grows for edge
+  count, and aggregation is unchanged. `RangeError` remains only for
+  a node whose total demand exceeds its whole perimeter's capacity.
 - **Normal stubs:** every spline begins and ends with a straight stub
   perpendicular to its card side (12 px at zoom 1); the curve runs
   between stub tips; arrowheads sit flush on the border.

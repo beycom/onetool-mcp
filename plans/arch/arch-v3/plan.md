@@ -217,12 +217,11 @@ docs):
   Python scope), compact user cards. Prechecks done 2026-08-29: elkjs
   0.12.0 bundles radial/stress/force/sporeOverlap; endpoint kinds
   already unrestricted; systems structurally root-only.
-- [ ] **P12 — map model: in-place C4 expansion** (added 2026-08-29,
+- [x] **P12 — map model: in-place C4 expansion** (added 2026-08-29,
   user-directed; spec: report.md "Map contract — in-place C4 expansion
-  (P12)"; prompt READY in delegation.md — re-reviewed at the P11 gate
-  with post-P11 integration notes and the exact acme showcase rows;
-  proposed budget 2,600 changed source lines — confirm before
-  running). Expansion-set view state replacing
+  (P12)"; DONE, gate PASSED 2026-08-29 at 710/2,600 executor lines
+  plus the architect's 120-line anchor perimeter-overflow fix — see
+  the progress log). Expansion-set view state replacing
   level+drill, tree-based one-generation expand/collapse (mixed child
   kinds), persistent cumulative expansion, deepest-visible endpoint
   resolution (defined vs derived attachment), Detail dropdown as bulk
@@ -336,7 +335,10 @@ None yet. Format: `branch-name — question being explored — outcome`.
    gate — D13b's layout work may moot it).
 
 Answered questions (answers live in the design docs; details in
-log-archive.md): bundle location/build wiring (report.md "Shape");
+log-archive.md): P12 anchor-capacity overflow (Q2 of the P12 gate,
+2026-08-29 — perimeter spill to adjacent sides, architect-implemented;
+report.md "Perimeter overflow" under pass-5 edge termination is the
+authority); bundle location/build wiring (report.md "Shape");
 `arch.convert` umbrella naming (as-shipped by D5); legend dim-not-hide
 with tags driver (Q4, 2026-08-24); drill + 4-level C4 zoom over
 in-place expand/collapse (Q5, 2026-08-24 — **REVERSED 2026-08-29**,
@@ -346,6 +348,99 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-29** — P12 anchor-capacity blocker resolved (architect) and
+  the P12 architect gate PASSED; tree committed. Design decision on open
+  question 2: **perimeter overflow** — an over-full card side sheds its
+  outermost endpoints around the nearest corner to the adjacent side,
+  bearing-recomputed so perimeter order holds, cascading
+  deterministically; cards never grow for edge count, aggregation
+  unchanged, RangeError only when total demand exceeds the whole
+  perimeter (report.md "Perimeter overflow" under the pass-5 edge
+  termination rules is the authority; enlarging cards and cross-pair
+  aggregation were rejected — the former couples geometry to edge
+  count, the latter is semantically impossible for distinct visible
+  pairs). Implemented in `edgeAnchors.ts` (+120 architect lines outside
+  the executor budget) with a spill + true-impossible test added.
+  Previously blocked walkthrough steps then verified live: the
+  Container preset at stage 1 renders (20 cards / 13 boundaries, the
+  monolith's edges distributed with zero converged ports), all four
+  presets apply, browser Back walks preset history, link reload
+  restores the full Component expansion (33 cards / 28 boundaries,
+  dropdown "Custom"/preset detection correct), 1024×720 fills with no
+  scroll — console clean at every step; `preset-container.png` replaced
+  with passing evidence. Gate re-verification: frontend 45 passed
+  (16 files incl. all six prescribed P12 cases — three in
+  projectionWave2.test.ts, presets/stability/fragment in
+  App/layout/view tests), arch py 79 passed, `just lint`, `tsc
+  --noEmit`, `just build-arch-report`, acme regenerated; executor
+  budget confirmed at 710/2,600 (686 TS/CSS + 24 acme). Code review
+  conforms to the map contract: validated cumulative `expand` fragment
+  with legacy level/drill mapping, authored-containment presets with
+  Custom detection, one history entry per action, recursive mixed-kind
+  boundary projection with deepest-visible endpoint resolution
+  (boundary attachment for definitions on expanded entities),
+  internal-edge suppression, drill/breadcrumb/Up retirement,
+  `stableExpansionLayout` minimal push-apart with cached collapse
+  restore, presets re-laying fresh under P11 star rules, boundary
+  identity with description, and the two showcase interfaces exactly
+  as authored. The executor's own live pass (center drift < 0.003 px,
+  15/15 position restore, four-level reattachment) plus the
+  map-four-levels screenshot confirm the showcase path. Next action:
+  the Phase 1 exit gate (architect + user).
+
+- **2026-08-29** — P12 rule-9 retry reached the prompt's explicit
+  anchor-capacity stop condition. Before the stop, the 1440×900 file pass
+  had a clean console and one local-file request; system expansion preserved
+  Digital Commerce Platform's screen center within 0.003 px and kept the
+  viewport transform unchanged, while only four overlapping neighbors moved.
+  The live four-level path rendered System → Storefront and Edge → Commerce
+  Edge → both components; the cutover edge reattached from subsystem to
+  container to `components:strangler-route-config`; collapse restored all 15
+  cold-layout node styles exactly; each tested expansion, collapse, and preset
+  added one history entry. Captured `map-collapsed.png`,
+  `map-sys-expanded.png`, `endpoint-slide.png`, and `map-four-levels.png`.
+  Applying the Container preset then raised `RangeError`: 11 anchors cannot
+  fit the 162 px right side of `containers:commerce-monolith` with 14 px
+  separation and corner clearance. `preset-container.png` records the failed
+  render, not passing evidence. Stopped without changing spacing. The
+  remaining presets, link reload/Back checks, 1024×720 pass, and successful
+  Container screenshot remain blocked on open question 2.
+
+- **2026-08-29** — P12 in-place C4 map expansion implemented; left
+  uncommitted for architect review. Fragment state now uses a validated,
+  cumulative `expand` set with legacy link mapping, Detail bulk presets,
+  Custom detection, one-entry history updates, subtree-pruning collapse,
+  and selection restoration. The map projects recursive mixed-kind
+  boundaries, resolves each connection endpoint to its deepest visible
+  ancestor, aggregates shared pairs, suppresses internal splines while
+  retaining connection facts, and attaches definitions on expanded
+  entities to their boundary. Expansion uses nested ELK interiors, caches
+  layouts by `(timeline, expansion set)`, grows locally with deterministic
+  48 px push-apart, restores cached collapse positions, and leaves camera
+  zoom unchanged. The Acme fixture adds `edge-bot-defense` and
+  `strangler-route-cutover`; payload, bundle, and wip report regenerated.
+  Source budget: **710 / 2,600 changed lines** (tests and generated files
+  excluded). Tests: exactly six prescribed P12 cases added or recut;
+  frontend **44 passed**, arch Python **79 passed / 540 deselected**, smoke
+  **27 passed / 3,210 deselected**, `just lint`, TypeScript, bundle build,
+  fixture validation (**0 errors / 25 warnings**), and `git diff --check`
+  passed. Live UI gate remains outstanding: OneTool Playwright stayed
+  locked by another browser profile after its proxy restart, and the
+  isolated in-app browser had no available backend, so no P12 screenshots,
+  console/network capture, or viewport walkthrough were claimed.
+  Assumptions resolved from the strongest explicit contracts: (1) the
+  user's final no-commit instruction and standard rule 8 override the
+  request's earlier commit wording; (2) expansion ids use the existing
+  canonical `kind:id` node keys; (3) fragment validation and presets use
+  authored containment rather than one stage's live children so expansion
+  survives stage changes, while affordances/counts use live children; (4)
+  an explicit `expand` value wins over legacy `level` when both exist, and
+  a legacy `drill` adds its expandable ancestor chain and selection; (5)
+  applying a preset deliberately replaces any cached target layout with a
+  fresh P11 radial-or-layered layout. Open questions: none. Next action:
+  architect review, then rerun the rule-9 live gate when the browser profile
+  is free.
 
 - **2026-08-29** — P11 architect gate PASSED (with one gate fix); tree
   committed; P12 prompt re-reviewed and finalized per the pipeline rule.

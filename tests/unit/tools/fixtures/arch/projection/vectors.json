@@ -393,17 +393,18 @@
       }
     }
   ],
-  "rollup": [
+  "map": [
     {
       "timeline": "program",
       "position": 2,
-      "level": "systems",
+      "expand": [],
       "expect": {
         "nodes": [
           "systems:sysA",
           "systems:sysB",
           "users:u1"
         ],
+        "boundaries": [],
         "edges": [
           {
             "a": "systems:sysA",
@@ -429,17 +430,23 @@
     {
       "timeline": "program",
       "position": 2,
-      "level": "containers",
+      "expand": [
+        "systems:sysA",
+        "systems:sysB",
+        "subsystems:ssA"
+      ],
       "expect": {
         "nodes": [
           "containers:subA",
           "containers:subB",
           "containers:subG",
           "containers:subR",
+          "users:u1"
+        ],
+        "boundaries": [
           "subsystems:ssA",
           "systems:sysA",
-          "systems:sysB",
-          "users:u1"
+          "systems:sysB"
         ],
         "edges": [
           {
@@ -479,7 +486,7 @@
     },
     {
       "timeline": "program",
-      "level": "systems",
+      "expand": [],
       "union": true,
       "expect": {
         "nodes": [
@@ -488,6 +495,7 @@
           "systems:sysL",
           "users:u1"
         ],
+        "boundaries": [],
         "edges": [
           {
             "a": "systems:sysA",

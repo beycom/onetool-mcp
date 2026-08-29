@@ -77,9 +77,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .view-dock .panel-resize-handle { bottom: 0; cursor: ew-resize; right: -5px; top: 0; width: 10px; }
 .view-dock-body { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; }
 .view-dock-scroll { min-height: 0; overflow: auto; padding: var(--space-3); }
-.drill-breadcrumb { align-items: center; background: var(--surface-muted); border-radius: var(--radius-1); display: flex; font-size: 11px; gap: var(--space-2); margin-bottom: var(--space-3); padding: var(--space-2); }
-.drill-breadcrumb button { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
-.drill-breadcrumb span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .diagram-group > summary { color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 700; list-style-position: inside; padding: var(--space-1) 0; }
 .diagram-group > button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: var(--radius-1); display: flex; gap: var(--space-2); margin-top: var(--space-1); min-height: 34px; padding: var(--space-1) var(--space-2); text-align: left; width: 100%; }
 .diagram-group > button:hover, .diagram-group > button[aria-current='page'] { background: color-mix(in srgb, var(--teal) 10%, var(--surface)); border-color: color-mix(in srgb, var(--teal) 35%, var(--border)); }
@@ -164,14 +161,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .node-counts { align-items: center; display: flex; gap: 5px; min-width: 0; }
 .node-counts span { font: 8px var(--font-data); }
 .node-description:empty, .node-facts:empty, .node-counts:empty { display: none; }
-.drill-button { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; bottom: 8px; font-size: 14px; height: 28px; position: absolute; right: 8px; width: 28px; }
-.drill-button svg, .containment-boundary > header button svg { fill: currentColor; height: 14px; width: 14px; }
+.expand-button { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; bottom: 8px; display: flex; font: 700 9px var(--font-data); gap: 3px; height: 28px; justify-content: center; padding: 0 7px; position: absolute; right: 8px; }
+.expand-button svg { fill: currentColor; height: 14px; width: 14px; }
 .depth-far .architecture-node { align-content: center; }
 .depth-far .node-context, .depth-far .node-description, .depth-far .node-facts, .depth-far .node-counts { display: none; }
 .depth-read .node-counts { display: none; }
-.architecture-node[data-kind='users'] .node-context, .architecture-node[data-kind='users'] .node-facts, .architecture-node[data-kind='users'] .node-counts, .architecture-node[data-kind='users'] .drill-button { display: none; }
+.architecture-node[data-kind='users'] .node-context, .architecture-node[data-kind='users'] .node-facts, .architecture-node[data-kind='users'] .node-counts, .architecture-node[data-kind='users'] .expand-button { display: none; }
 .depth-read .architecture-node[data-kind='users'] .node-description { display: none; }
-.depth-far .architecture-node > .drill-button { bottom: 8px; }
+.depth-far .architecture-node > .expand-button { bottom: 8px; }
 .diff-badges { display: flex; gap: 4px; position: absolute; right: 10px; top: 8px; }
 .diff-badges b, .edge-label b { align-items: center; border: 1px solid currentColor; border-radius: 999px; display: inline-flex; font: 800 9px "SFMono-Regular", Consolas, monospace; height: 18px; justify-content: center; margin-left: 4px; min-width: 18px; padding: 0 4px; }
 [data-status='added'] { color: var(--diff-added); }
@@ -184,6 +181,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .containment-boundary > header { align-items: center; color: var(--muted); display: flex; font: 10px var(--font-ui); gap: 7px; height: 38px; padding: 8px 10px; }
 .containment-boundary > header strong { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .containment-boundary > header button { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; display: flex; height: 28px; justify-content: center; margin-left: auto; width: 28px; }
+.boundary-description { bottom: 10px; color: var(--muted); font: 10px/1.3 var(--font-ui); left: 20px; margin: 0; overflow: hidden; position: absolute; right: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .semantic-edge-focus { opacity: 0; pointer-events: none; stroke: var(--accent); }
 .semantic-edge-focus.is-outgoing, .semantic-edge-focus.is-incoming, .semantic-edge-focus.is-selected { opacity: .18; }
 .semantic-edge { stroke: var(--edge); transition: opacity 150ms ease, stroke 150ms ease; }

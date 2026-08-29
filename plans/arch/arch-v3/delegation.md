@@ -30,7 +30,7 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | D14 | Subsystem level rename (schema + report + acme) | DONE, gate PASSED 2026-08-29 (293/1,100 lines) | — |
 | D13d | Polish pass 4: View / Info / Data | DONE, gate PASSED 2026-08-29 (630/1,500 lines) | — |
 | P11 | Canvas presentation: radial layout, labels, ports, color economy, theme | DONE, gate PASSED 2026-08-29 (736/2,400 lines + a small architect fix at the gate) | — |
-| P12 | Map model: in-place C4 expansion | READY (re-reviewed at the P11 gate 2026-08-29; showcase rows authored) | budget confirmed |
+| P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
 | P21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
 | P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -668,7 +668,7 @@ selection-accent, theme-kinds. Definition of done: rules 5-8, then
 STOP.
 ```
 
-## P12 — Map model: in-place C4 expansion (READY — re-reviewed at the P11 gate 2026-08-29; run once the budget is confirmed)
+## P12 — Map model: in-place C4 expansion (DONE 2026-08-29, gate PASSED; the anchor-capacity stop was resolved by the architect's perimeter-overflow decision — report.md "Perimeter overflow")
 
 ```text
 [standard rules + UI rule 9]

@@ -29,7 +29,8 @@ vi.mock('./layout', () => ({
   NODE_HEIGHT: 112,
   NODE_WIDTH: 240,
   applyPositions: (nodes: unknown[]) => nodes,
-  makeLayoutKey: ({ timeline, level, drill }: { timeline: number; level: string; drill: string | null }) => `${timeline}:${level}:${drill ?? 'map'}`,
+  makeLayoutKey: ({ timeline, expand }: { timeline: number; expand: string[] }) => `${timeline}:${expand.join(',')}`,
+  stableExpansionLayout: (_previous: unknown, fresh: unknown) => fresh,
   starHub: () => null,
   unionLayout: async () => new Map(),
 }))
@@ -41,8 +42,14 @@ vi.mock('./cardSize', () => ({
 
 import App from './App'
 import payload from './fixture-payload.json'
+import type { ReportPayload } from './types'
+import { presetExpansion } from './view'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  history.replaceState(null, '', '#')
+  vi.restoreAllMocks()
+})
 
 test('the Stage dropdown has every position and changes the projected state', async () => {
   render(<App />)
@@ -83,4 +90,17 @@ test('Escape closes search before clearing the selection and Info', async () => 
 
   fireEvent.keyDown(window, { key: 'Escape' })
   await waitFor(() => expect(screen.queryByLabelText('Close details')).toBeNull())
+})
+
+test('Detail presets write one history entry and hand expansion displays Custom', async () => {
+  const push = vi.spyOn(history, 'pushState')
+  render(<App />)
+
+  fireEvent.change(screen.getByLabelText('Detail'), { target: { value: 'containers' } })
+  await waitFor(() => expect((screen.getByLabelText('Detail') as HTMLSelectElement).value).toBe('containers'))
+  expect(new URLSearchParams(location.hash.slice(1)).get('expand')?.split(',')).toEqual(presetExpansion(payload as unknown as ReportPayload, 'containers'))
+  expect(push).toHaveBeenCalledTimes(1)
+
+  fireEvent.click(screen.getAllByRole('button', { name: /^Expand / })[0])
+  await waitFor(() => expect((screen.getByLabelText('Detail') as HTMLSelectElement).value).toBe('custom'))
 })

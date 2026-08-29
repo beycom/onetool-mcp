@@ -48,8 +48,8 @@ test('Data folds subsystems into raw Entities, hides empty columns, and auto-siz
   const system = payload.rows.systems.find((row) => row.id === 'commerce-platform')!
   system.properties = { ...system.properties, empty_note: '', populated_note: 'Visible value' }
   const view: View = {
-    aspect: 'call-direction', compare: 'off', comparePosition: 0, deps: null, drill: null,
-    lens: [], level: 'systems', position: 5, scope: null, theme: 'light', timeline: 0,
+    aspect: 'call-direction', compare: 'off', comparePosition: 0, deps: null, expand: [],
+    lens: [], position: 5, scope: null, theme: 'light', timeline: 0,
   }
 
   render(<GridPanel

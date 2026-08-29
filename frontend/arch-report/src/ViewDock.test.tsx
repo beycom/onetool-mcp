@@ -11,13 +11,12 @@ const payload = payloadFixture as unknown as ReportPayload
 const view: View = {
   timeline: 0,
   position: 0,
-  level: 'systems',
+  expand: [],
   scope: null,
   compare: 'off',
   comparePosition: 0,
   aspect: 'call-direction',
   deps: null,
-  drill: null,
   lens: [],
   theme: 'light',
 }
@@ -28,11 +27,10 @@ test('Subsystem detail is hidden for empty datasets and shown when populated', (
   const props = {
     canvasActive: true,
     copyStatus: '',
-    drillPath: [],
     legend: [],
     onCanvas: () => undefined,
     onCopy: () => undefined,
-    onUp: () => undefined,
+    onPreset: () => undefined,
     onView: () => undefined,
     view,
   }

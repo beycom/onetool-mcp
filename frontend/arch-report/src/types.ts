@@ -120,13 +120,12 @@ export type RolledGraph = {
 export type View = {
   timeline: number
   position: number
-  level: Level
+  expand: string[]
   scope: ScopeSelection
   compare: CompareMode
   comparePosition: number
   aspect: Aspect
   deps: string | null
-  drill: string | null
   lens: string[]
   theme: Theme
 }

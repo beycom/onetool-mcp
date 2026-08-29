@@ -32,7 +32,7 @@ import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
 import { InfoPanel, selectionKey, type Selection } from './InfoPanel'
 import { FitIcon, MapIcon, SearchIcon } from './Icons'
-import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, starHub, unionLayout, type Positions } from './layout'
+import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, stableExpansionLayout, starHub, unionLayout, type Positions } from './layout'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
 import { readPayload } from './payload'
 import { diffStates, legendEntries, projectState, unionGraph } from './projection'
@@ -45,7 +45,6 @@ import {
   type GraphBoundary,
   type GraphNode,
   type EntityKind,
-  type Level,
   type ReportPayload,
   type ReportRow,
   type RowRef,
@@ -53,7 +52,7 @@ import {
   type StateDiff,
   type View,
 } from './types'
-import { copyViewLink, decodeView, persistView } from './view'
+import { containmentIndex, copyViewLink, decodeView, expansionPath, persistView, presetExpansion } from './view'
 import { ViewDock } from './ViewDock'
 import { READING_DEPTH, readingDepth } from './zoom'
 
@@ -64,18 +63,18 @@ type ArchitectureData = {
   connectionCount: number
   context: string
   description: string
-  drillable: boolean
+  expandable: boolean
   emphasis: 'normal' | 'emphasized' | 'neighbor' | 'unrelated'
   facts: Array<[string, string]>
   kind: EntityKind
   label: string
   members: RowRef[]
-  onDrill: () => void
+  onExpand: () => void
   row: ReportRow
   statuses: DiffStatus[]
 }
 type ArchitectureNode = Node<ArchitectureData, 'architecture'>
-type BoundaryData = { boundary: GraphBoundary; label: string; onDrill: () => void }
+type BoundaryData = { boundary: GraphBoundary; description: string; label: string; onCollapse: () => void }
 type BoundaryNode = Node<BoundaryData, 'boundary'>
 type CanvasNode = ArchitectureNode | BoundaryNode
 type SemanticData = {
@@ -102,8 +101,8 @@ const payload = readPayload()
 const STATUS_ORDER: DiffStatus[] = ['added', 'removed', 'changed']
 const STATUS_ICON: Record<DiffStatus, string> = { added: '+', removed: '−', changed: 'Δ' }
 
-function DrillIcon() {
-  return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 3h5v2H5v6h6V8h2v5H3z" /><path d="M8 3h5v5h-2V6.4l-4.3 4.3-1.4-1.4L9.6 5H8z" /></svg>
+function ExpandIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M7 2a5 5 0 1 0 3.2 8.8L14 14l1-1-3.8-3.2A5 5 0 0 0 7 2Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z" /></svg>
 }
 
 export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
@@ -127,7 +126,7 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
         {data.childCount ? <span title={`${data.childCount} children`}>{data.childCount} children</span> : null}
         {data.connectionCount ? <span title={`${data.connectionCount} connections`}>{data.connectionCount} connections</span> : null}
       </div>
-      {data.drillable ? <button aria-label={`Drill into ${data.label}`} className="drill-button" onClick={(event) => { event.stopPropagation(); data.onDrill() }} title="Drill into direct children" type="button"><DrillIcon /></button> : null}
+      {data.expandable ? <button aria-label={`Expand ${data.label}, ${data.childCount} children`} className="expand-button" onClick={(event) => { event.stopPropagation(); data.onExpand() }} title="Expand direct children" type="button"><ExpandIcon /><span>{data.childCount}</span></button> : null}
       {data.statuses.length ? (
         <span aria-label={`Changes: ${data.statuses.join(', ')}`} className="diff-badges">
           {data.statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
@@ -142,7 +141,8 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
 function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
   return (
     <section className="containment-boundary" data-kind={data.boundary.kind} data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'} style={kindPresentationStyle(data.boundary.kind, selected)}>
-      <header><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Drill into ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onDrill() }} type="button"><DrillIcon /></button></header>
+      <header><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Collapse ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onCollapse() }} title="Collapse" type="button">×</button></header>
+      {data.description ? <p className="boundary-description">{data.description}</p> : null}
     </section>
   )
 }
@@ -306,12 +306,22 @@ function DependencyView({
   onSelect: (kind: RowKind, row: ReportRow, members?: RowRef[]) => void
   projected: ReturnType<typeof projectState>
 }) {
-  const focus = projected.nodes.find((node) => node.key === focusKey)
+  const visibleNodes = [
+    ...projected.nodes,
+    ...projected.boundaries.filter((boundary) => !boundary.stub).map((boundary): GraphNode => ({
+      key: boundary.key,
+      kind: boundary.kind,
+      row: boundary.row,
+      boundary: false,
+      members: [{ kind: boundary.kind, row: boundary.row }],
+    })),
+  ]
+  const focus = visibleNodes.find((node) => node.key === focusKey)
   if (!focus) return <div className="empty-state"><p>The focused entity is not in this projection.</p><button onClick={onClose} type="button">Return to map</button></div>
   const incoming: Array<{ edge: GraphEdge; node: GraphNode }> = []
   const outgoing: Array<{ edge: GraphEdge; node: GraphNode }> = []
   for (const edge of projected.edges.filter((item) => item.a === focusKey || item.b === focusKey)) {
-    const neighbor = projected.nodes.find((node) => node.key === (edge.a === focusKey ? edge.b : edge.a))
+    const neighbor = visibleNodes.find((node) => node.key === (edge.a === focusKey ? edge.b : edge.a))
     if (!neighbor) continue
     const splines = splitEdgeDirections(edge, aspect)
     if (splines.some((spline) => spline.target === focusKey)) incoming.push({ edge, node: neighbor })
@@ -325,7 +335,7 @@ function DependencyView({
   )
   return (
     <section className="dependency-view">
-      <header><div><span className="panel-kicker">DEPENDENCY FOCUS</span><h2>{rowLabel(focus.row)}</h2><p>{incoming.length} incoming · {outgoing.length} outgoing · {new Set([...incoming, ...outgoing].flatMap(({ edge }) => [...edge.interfaces, ...edge.relationships])).size} connections</p><label>Focus <select aria-label="Dependency focus" onChange={(event) => { const node = projected.nodes.find((item) => item.key === event.target.value); if (node) { onFocus(node.key); onSelect(node.kind, node.row, node.members) } }} value={focusKey}>{projected.nodes.map((node) => <option key={node.key} value={node.key}>{rowLabel(node.row)}</option>)}</select></label></div><button aria-label="Close dependency view" onClick={onClose} type="button">×</button></header>
+      <header><div><span className="panel-kicker">DEPENDENCY FOCUS</span><h2>{rowLabel(focus.row)}</h2><p>{incoming.length} incoming · {outgoing.length} outgoing · {new Set([...incoming, ...outgoing].flatMap(({ edge }) => [...edge.interfaces, ...edge.relationships])).size} connections</p><label>Focus <select aria-label="Dependency focus" onChange={(event) => { const node = visibleNodes.find((item) => item.key === event.target.value); if (node) { onFocus(node.key); onSelect(node.kind, node.row, node.members) } }} value={focusKey}>{visibleNodes.map((node) => <option key={node.key} value={node.key}>{rowLabel(node.row)}</option>)}</select></label></div><button aria-label="Close dependency view" onClick={onClose} type="button">×</button></header>
       <div className="dependency-columns">
         {column('Incoming', incoming)}
         <button className="dependency-focus-node" data-kind={focus.kind} onClick={() => onSelect(focus.kind, focus.row, focus.members)} style={kindPresentationStyle(focus.kind, true)} type="button"><span className="kind-pill" data-kind={focus.kind}>{KIND_LABEL[focus.kind]}</span><strong>{rowLabel(focus.row)}</strong></button>
@@ -356,6 +366,8 @@ export default function App() {
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const framedLayout = useRef('')
+  const positionCache = useRef(new Map<string, Positions>())
+  const layoutIntent = useRef<{ anchor: string; previous: Positions; target: string; preset: boolean } | null>(null)
   const cameraFrame = useRef(0)
   const searchTrigger = useRef<HTMLButtonElement>(null)
   const selectedRef = useRef<Selection | null>(null)
@@ -406,10 +418,10 @@ export default function App() {
   const compared = useMemo(() => previousPosition === null
     ? null
     : projectState(payload, { ...view, position: previousPosition }), [previousPosition, view])
-  const union = useMemo(() => unionGraph(payload, view.timeline, view.level, view.drill), [view.drill, view.level, view.timeline])
+  const union = useMemo(() => unionGraph(payload, view.timeline, view.expand), [view.expand, view.timeline])
   const projectedHub = useMemo(() => starHub(projected), [projected])
   const layoutKey = makeLayoutKey(view)
-  const cardSizes = useMemo(() => new Map(union.nodes.map((node) => [node.key, cardSize(node, view.level, measureCardText)])), [union, view.level])
+  const cardSizes = useMemo(() => new Map(union.nodes.map((node) => [node.key, cardSize(node, levelForKind(node.kind), measureCardText)])), [union])
   // A layout computed for a different projection must never apply
   // (INT-STATE-06): stale positions carry parentIds for boundaries that no
   // longer exist in the current graph.
@@ -420,12 +432,10 @@ export default function App() {
   const selectedDisplayKey = useMemo(() => {
     if (!selectedKey) return null
     const exact = projected.nodes.find((node) => node.key === selectedKey)?.key
+      ?? projected.boundaries.find((boundary) => boundary.nodeKey === selectedKey)?.key
     if (exact) return exact
-    if (selected?.type === 'row' && selected.kind === 'code' && view.level === 'components') {
-      return projected.nodes.find((node) => node.members.some((member) => `${member.kind}:${member.row.id}` === selectedKey))?.key ?? null
-    }
-    return null
-  }, [projected.nodes, selected, selectedKey, view.level])
+    return projected.nodes.find((node) => node.members.some((member) => `${member.kind}:${member.row.id}` === selectedKey))?.key ?? null
+  }, [projected.boundaries, projected.nodes, selectedKey])
   const selectedSplineId = useMemo(() => {
     if (selected?.type === 'edge') return `${selected.edge.key}:${selected.direction}`
     if (selected?.type !== 'row' || !['interfaces', 'relationships'].includes(selected.kind)) return null
@@ -455,11 +465,51 @@ export default function App() {
     let active = true
     const rect = canvasRef.current?.getBoundingClientRect()
     const aspectRatio = rect?.height ? rect.width / rect.height : 1.6
-    void unionLayout(union, layoutKey, cardSizes, aspectRatio, projectedHub)
-      .then((next) => { if (active) setLayoutResult({ key: layoutKey, positions: next }) })
+    const intent = layoutIntent.current?.target === layoutKey ? layoutIntent.current : null
+    const cached = !intent?.preset ? positionCache.current.get(layoutKey) : undefined
+    const request = cached
+      ? Promise.resolve(cached)
+      : unionLayout(union, layoutKey, cardSizes, aspectRatio, projectedHub, intent?.preset ?? false)
+        .then((fresh) => intent && !intent.preset ? stableExpansionLayout(intent.previous, fresh, intent.anchor) : fresh)
+    void request
+      .then((next) => {
+        if (!active) return
+        positionCache.current.set(layoutKey, next)
+        if (layoutIntent.current?.target === layoutKey) layoutIntent.current = null
+        setLayoutResult({ key: layoutKey, positions: next })
+      })
       .catch(() => { if (active) setDiagnostic('Layout failed. The report remains available with fallback positions.') })
     return () => { active = false }
   }, [cardSizes, layoutKey, projectedHub, union])
+
+  const changeExpansion = useCallback((key: string, expand: boolean) => {
+    const next = new Set(view.expand)
+    if (expand) next.add(key)
+    else {
+      const { parentByKey } = containmentIndex(payload)
+      for (const candidate of next) {
+        let cursor: string | undefined = candidate
+        while (cursor) {
+          if (cursor === key) { next.delete(candidate); break }
+          cursor = parentByKey.get(cursor)
+        }
+      }
+    }
+    const expansion = [...next].sort()
+    const target = makeLayoutKey({ timeline: view.timeline, expand: expansion })
+    layoutIntent.current = { anchor: key, previous: positions, target, preset: false }
+    framedLayout.current = target
+    setView({ deps: null, expand: expansion }, true)
+  }, [positions, setView, view.expand, view.timeline])
+
+  const applyPreset = useCallback((preset: import('./types').Level) => {
+    const expand = presetExpansion(payload, preset)
+    const target = makeLayoutKey({ timeline: view.timeline, expand })
+    layoutIntent.current = { anchor: '', previous: positions, target, preset: true }
+    positionCache.current.delete(target)
+    framedLayout.current = ''
+    setView({ deps: null, expand }, true)
+  }, [positions, setView, view.timeline])
 
   const graphNodes = useMemo(() => {
     const merged = new Map(projected.nodes.map((node) => [node.key, { node, ghost: false }]))
@@ -477,7 +527,8 @@ export default function App() {
     const memberKeys = (node: GraphNode) => new Set([node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)])
     const lensMatched = new Set(graphNodes.filter(({ node }) => nodeTags(node).some((tag) => view.lens.includes(tag))).map(({ node }) => node.key))
     const directionalEdges = projected.edges.flatMap((edge) => splitEdgeDirections(edge, view.aspect))
-    const classified = classifyEmphasis(graphNodes.map(({ node }) => node.key), directionalEdges, selectedDisplayKey, lensMatched)
+    const visibleKeys = [...graphNodes.map(({ node }) => node.key), ...projected.boundaries.map((boundary) => boundary.key)]
+    const classified = classifyEmphasis(visibleKeys, directionalEdges, selectedDisplayKey, lensMatched)
     const neighborKeys = (keys: Set<string>) => new Set(projected.edges.flatMap((edge) => keys.has(edge.a) ? [edge.b] : keys.has(edge.b) ? [edge.a] : []))
     const selectedNodes = new Set(graphNodes.filter(({ node }) => selectedKey && memberKeys(node).has(selectedKey)).map(({ node }) => node.key))
     const hoverNodes = new Set(hoveredKey ? [hoveredKey] : [])
@@ -489,15 +540,14 @@ export default function App() {
       if (hoverNodes.size) return hoverNodes.has(key) ? 'emphasized' : hoverNeighbors.has(key) ? 'neighbor' : 'unrelated'
       return 'normal'
     }
-    const boundaryEntityKeys = new Set(projected.boundaries.filter((boundary) => !boundary.stub).map((boundary) => boundary.nodeKey))
-    const edgeEndpoints = new Set(projected.edges.flatMap((edge) => [edge.a, edge.b]))
-    const visibleGraphNodes = graphNodes.filter(({ node }) => !boundaryEntityKeys.has(node.key) || edgeEndpoints.has(node.key))
-    const architectureNodes: ArchitectureNode[] = visibleGraphNodes.map(({ ghost, node }, index) => {
+    const architectureNodes: ArchitectureNode[] = graphNodes.map(({ ghost, node }, index) => {
       const parentId = node.row.parent ?? node.row.container ?? node.row.component
       const parent = parentId ? byId.get(parentId)?.row : undefined
       const childCount = Object.values(projected.rawState.rows).flat().filter((row) => [row.parent, row.container, row.component].includes(node.row.id)).length
-      const connectionCount = new Set(projected.edges.filter((edge) => edge.a === node.key || edge.b === node.key)
-        .flatMap((edge) => [...edge.interfaces, ...edge.relationships])).size
+      const rolledMemberIds = new Set(node.members.map((member) => member.row.id))
+      const connectionCount = (['interfaces', 'relationships'] as const).flatMap((kind) => projected.rawState.rows[kind]
+        .filter((row) => [row.provider ?? row.source, row.consumer ?? row.target].some((id) => id && rolledMemberIds.has(id)))
+        .map((row) => `${kind}:${row.id}`)).length
       const size = cardSizes.get(node.key) ?? { width: NODE_WIDTH, height: NODE_HEIGHT }
       return {
         data: {
@@ -506,7 +556,7 @@ export default function App() {
           connectionCount,
           context: parent ? rowLabel(parent) : KIND_LABEL[node.kind],
           description: node.row.description ?? '',
-          drillable: childCount > 0,
+          expandable: childCount > 0,
           emphasis: emphasis(node.key),
           facts: factKeys.flatMap((key) => {
             const value = node.row.properties?.[key]
@@ -515,7 +565,7 @@ export default function App() {
           kind: node.kind,
           label: rowLabel(node.row),
           members: node.members,
-          onDrill: () => setView({ deps: null, drill: node.key }, true),
+          onExpand: () => changeExpansion(node.key, true),
           row: node.row,
           statuses: ghost ? ['removed'] : statusesForNode(node, diff),
         },
@@ -534,8 +584,9 @@ export default function App() {
       .sort((left, right) => boundaryDepth(left) - boundaryDepth(right) || left.key.localeCompare(right.key)).map((boundary) => ({
       data: {
         boundary,
+        description: boundary.row.description ?? '',
         label: rowLabel(boundary.row),
-        onDrill: () => setView({ deps: null, drill: boundary.nodeKey }, true),
+        onCollapse: () => changeExpansion(boundary.nodeKey, false),
       },
       id: boundary.key,
       position: { x: 0, y: 0 },
@@ -545,7 +596,7 @@ export default function App() {
       type: 'boundary',
     }))
     return applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
-  }, [cardSizes, diff, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedKey, setView, view.aspect, view.lens])
+  }, [cardSizes, changeExpansion, diff, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedKey, view.aspect, view.lens])
 
   const graphEdges = useMemo(() => {
     const merged = new Map(projected.edges.map((edge) => [edge.key, { edge, ghost: false }]))
@@ -563,7 +614,10 @@ export default function App() {
       const rect = absoluteRect(node.id, positions)
       return rect ? [rect] : []
     })
-    const classified = classifyEmphasis(projected.nodes.map((node) => node.key), rendered.map(({ spline }) => spline), selectedDisplayKey, lensMatched)
+    const classified = classifyEmphasis([
+      ...projected.nodes.map((node) => node.key),
+      ...projected.boundaries.map((boundary) => boundary.key),
+    ], rendered.map(({ spline }) => spline), selectedDisplayKey, lensMatched)
     const edgeEmphasis = (spline: DirectionalSpline): SemanticData['emphasis'] => {
       if (selectedSplineId) return spline.id === selectedSplineId ? 'selected' : 'unrelated'
       if (selectedDisplayKey || view.lens.length) return classified.edges[spline.id]
@@ -730,17 +784,7 @@ export default function App() {
 
   const openDependencies = (key: string) => {
     const displayKey = projected.nodes.find((node) => [node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)].includes(key))?.key ?? key
-    setView({ deps: displayKey, drill: null }, true)
-  }
-  const parentKey = (key: string): string | null => {
-    const [kind, ...idParts] = key.split(':')
-    const row = payload.rows[kind as RowKind]?.find((item) => item.id === idParts.join(':'))
-    const parentId = row?.parent ?? row?.container ?? row?.component
-    if (!parentId) return null
-    for (const parentKind of ['systems', 'subsystems', 'containers', 'components'] as EntityKind[]) {
-      if (payload.rows[parentKind].some((item) => item.id === parentId)) return `${parentKind}:${parentId}`
-    }
-    return null
+    setView({ deps: displayKey }, true)
   }
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
@@ -770,14 +814,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', keydown)
   }, [closeInfo, closeSearch, flow, searchOpen, selected])
 
-  const drillPath: string[] = []
-  let drillCursor = view.drill
-  while (drillCursor) {
-    const [kind, ...id] = drillCursor.split(':')
-    const row = payload.rows[kind as RowKind]?.find((item) => item.id === id.join(':'))
-    if (row) drillPath.unshift(rowLabel(row))
-    drillCursor = parentKey(drillCursor)
-  }
   return (
     <div className="app" data-hover={hoveredKey || hoveredEdgeId ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selected ? 'active' : 'off'} style={themeStyle(payload.theme)}>
       <header className="app-header">
@@ -788,11 +824,11 @@ export default function App() {
       <main className="workspace">
         <div className="dock-row">
           <ResizablePanel className="view-dock" label="View" layout={autoViewCollapsed ? { ...layout.docks.view, collapsed: true } : layout.docks.view} name="view" onChange={(dock) => { setAutoViewCollapsed(false); setDock('view', dock) }}>
-            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} drillPath={drillPath} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onUp={() => setView({ drill: parentKey(view.drill!), deps: null }, true)} onView={setView} payload={payload} view={view} />
+            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onPreset={applyPreset} onView={setView} payload={payload} view={view} />
           </ResizablePanel>
 
           <div className={`canvas-root depth-${depth}`} data-reading-depth={depth} ref={canvasRef}>
-            {view.deps ? <DependencyView aspect={view.aspect} focusKey={view.deps} onClose={() => setView({ deps: null }, true)} onFocus={(key) => setView({ deps: key }, true)} onSelect={selectRow} projected={projected} /> : !projected.nodes.length ? <div className="empty-state"><p>No entities match the current projection.</p><button onClick={() => setView({ deps: null, drill: null, lens: [] })} type="button">Show the full architecture</button></div> : <ReactFlow
+            {view.deps ? <DependencyView aspect={view.aspect} focusKey={view.deps} onClose={() => setView({ deps: null }, true)} onFocus={(key) => setView({ deps: key }, true)} onSelect={selectRow} projected={projected} /> : !projected.nodes.length && !projected.boundaries.length ? <div className="empty-state"><p>No entities match the current projection.</p><button onClick={() => setView({ deps: null, expand: [], lens: [] })} type="button">Show the full architecture</button></div> : <ReactFlow
               colorMode="light"
               edges={edges}
               edgeTypes={edgeTypes}
@@ -816,6 +852,11 @@ export default function App() {
                   const data = node.data as ArchitectureData
                   selectRow(data.kind, data.row, data.members)
                 }
+              }}
+              onNodeDoubleClick={(_event, node) => {
+                if (node.type !== 'architecture') return
+                const data = node.data as ArchitectureData
+                if (data.expandable) data.onExpand()
               }}
               onNodeMouseEnter={(_event, node) => { if (node.type !== 'boundary') setHoveredKey(node.id) }}
               onNodeMouseLeave={() => setHoveredKey(null)}
@@ -853,7 +894,9 @@ export default function App() {
             onLayout={(table, tableLayout) => setLayout((current) => ({ ...current, tableLayouts: { ...current.tableLayouts, [table]: tableLayout } }))}
             onSelect={selectById}
             onShowOnCanvas={(kind, id) => {
-              setView({ deps: null, drill: null, level: levelForKind(kind), scope: null }, true)
+              const key = `${kind}:${id}`
+              const expand = expansionPath(payload, key, false)
+              setView({ deps: null, expand, scope: null }, true)
               selectById(kind, id)
             }}
             payload={payload}

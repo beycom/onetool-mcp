@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 
 import payloadFixture from './fixture-payload.json'
-import { buildLayoutInput, gridPack, makeLayoutKey, starHub, unionLayout } from './layout'
+import { buildLayoutInput, gridPack, makeLayoutKey, stableExpansionLayout, starHub, unionLayout, type Positions } from './layout'
 import { unionGraph } from './projection'
 import type { Aspect, GraphNode, ReportPayload, RolledGraph, View } from './types'
 
@@ -11,14 +11,13 @@ test('stage, relationship, and lens changes leave the layout key and ELK input u
   const base = {
     timeline: 0,
     position: 0,
-    level: 'systems',
-    drill: null,
+    expand: [],
     aspect: 'call-direction',
     lens: [],
-  } satisfies Pick<View, 'timeline' | 'position' | 'level' | 'drill' | 'aspect' | 'lens'>
+  } satisfies Pick<View, 'timeline' | 'position' | 'expand' | 'aspect' | 'lens'>
   const changed = { ...base, position: 4, aspect: 'data-flow' as Aspect, lens: ['core'] }
-  const baseGraph = unionGraph(payload, base.timeline, base.level, base.drill)
-  const changedGraph = unionGraph(payload, changed.timeline, changed.level, changed.drill)
+  const baseGraph = unionGraph(payload, base.timeline, base.expand)
+  const changedGraph = unionGraph(payload, changed.timeline, changed.expand)
 
   expect(makeLayoutKey(base)).toBe(makeLayoutKey(changed))
   expect(buildLayoutInput(baseGraph, new Map(), 1.6)).toEqual(buildLayoutInput(changedGraph, new Map(), 1.6))
@@ -84,7 +83,7 @@ test('star graphs use a centered radial ring while non-stars retain the layered 
   })
 })
 
-test('an edgeless drill set packs into a non-overlapping near-square grid', () => {
+test('an edgeless set packs into a non-overlapping near-square grid', () => {
   const graph = {
     nodes: Array.from({ length: 5 }, (_, index): GraphNode => ({
       key: `components:node-${index}`,
@@ -110,4 +109,25 @@ test('an edgeless drill set packs into a non-overlapping near-square grid', () =
       expect(overlaps).toBe(false)
     }
   }
+})
+
+test('local expansion displaces only overlaps and the cached collapse restores every position', () => {
+  const previous: Positions = new Map([
+    ['systems:anchor', { x: 0, y: 0, width: 100, height: 100 }],
+    ['systems:near', { x: 180, y: 0, width: 100, height: 100 }],
+    ['systems:far', { x: 900, y: 0, width: 100, height: 100 }],
+  ])
+  const fresh: Positions = new Map([
+    ['systems:anchor', { x: 0, y: 0, width: 400, height: 240 }],
+    ['containers:child', { x: 20, y: 50, width: 120, height: 80, parentId: 'systems:anchor' }],
+    ['systems:near', { x: 600, y: 0, width: 100, height: 100 }],
+    ['systems:far', { x: 800, y: 0, width: 100, height: 100 }],
+  ])
+  const expanded = stableExpansionLayout(previous, fresh, 'systems:anchor')
+
+  expect(expanded.get('systems:far')).toEqual(previous.get('systems:far'))
+  expect(expanded.get('systems:near')).not.toEqual(previous.get('systems:near'))
+  expect(expanded.get('systems:anchor')).toMatchObject({ x: -150, y: -70, width: 400, height: 240 })
+  const cache = new Map([['0:', previous], ['0:systems:anchor', expanded]])
+  expect(cache.get('0:')).toEqual(previous)
 })

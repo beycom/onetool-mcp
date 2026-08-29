@@ -1351,6 +1351,30 @@ interfaces:
     security: tls-waf-bot-control
     technology: HTTPS
     type: web
+- id: edge-bot-defense
+  name: Edge bot and abuse signals
+  provider: storefront-edge
+  consumer: fraud-provider
+  call_direction: provider_to_consumer
+  start_in: acme-2027-edge-foundation
+  tags:
+  - security
+  - synchronous
+  properties:
+    technology: HTTPS
+    type: api
+- id: strangler-route-cutover
+  name: Strangler route cutover control
+  provider: strangler-route-config
+  consumer: commerce-monolith
+  call_direction: provider_to_consumer
+  start_in: acme-2027-edge-foundation
+  tags:
+  - strangler
+  - internal
+  properties:
+    technology: Config push
+    type: control
 - id: edge-to-bff
   name: Route target storefront requests
   provider: commerce-edge

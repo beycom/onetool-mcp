@@ -54,3 +54,37 @@ test('anchors use facing borders, distribute each side, and terminate with perpe
     expect(Math.abs(last.x - penultimate.x)).toBe(12)
   }
 })
+
+test('an over-capacity side spills its outermost anchors to adjacent sides; only perimeter overflow throws', () => {
+  const hub: EdgeRect = { x: 0, y: 0, width: 250, height: 162 }
+  const inputs = Array.from({ length: 11 }, (_, index) => ({
+    id: `spill-${String(index).padStart(2, '0')}`,
+    sourceId: 'hub',
+    sourceRect: hub,
+    targetId: `spill-target-${index}`,
+    targetRect: { x: 700, y: index * 90 - 380, width: 80, height: 60 },
+  }))
+  const anchors = edgeAnchors(inputs)
+
+  const sourcePoints = inputs.map((input) => anchors.get(input.id)!.sourcePoint)
+  const bySide = new Map<string, typeof sourcePoints>()
+  for (const point of sourcePoints) bySide.set(point.side, [...(bySide.get(point.side) ?? []), point])
+  expect(bySide.get('right')!).toHaveLength(10)
+  expect(sourcePoints).toHaveLength(11)
+  expect((bySide.get('top')?.length ?? 0) + (bySide.get('bottom')?.length ?? 0)).toBe(1)
+  const rightYs = bySide.get('right')!.map((point) => point.y).sort((left, right) => left - right)
+  for (let index = 1; index < rightYs.length; index += 1) {
+    expect(rightYs[index] - rightYs[index - 1]).toBeGreaterThanOrEqual(14)
+  }
+  expect(rightYs[0] - hub.y).toBeGreaterThanOrEqual(14)
+  expect(hub.y + hub.height - rightYs.at(-1)!).toBeGreaterThanOrEqual(14)
+
+  const tiny: EdgeRect = { x: 0, y: 0, width: 20, height: 20 }
+  expect(() => edgeAnchors([{
+    id: 'impossible',
+    sourceId: 'tiny',
+    sourceRect: tiny,
+    targetId: 'far',
+    targetRect: { x: 700, y: 0, width: 80, height: 60 },
+  }])).toThrow(RangeError)
+})

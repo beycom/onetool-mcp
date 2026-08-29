@@ -3266,6 +3266,66 @@
         ]
       },
       {
+        "id": "edge-bot-defense",
+        "name": "Edge bot and abuse signals",
+        "tags": [
+          "security",
+          "synchronous"
+        ],
+        "properties": {
+          "technology": "HTTPS",
+          "type": "api"
+        },
+        "start_in": "acme-2027-edge-foundation",
+        "provider": "storefront-edge",
+        "consumer": "fraud-provider",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ]
+      },
+      {
+        "id": "strangler-route-cutover",
+        "name": "Strangler route cutover control",
+        "tags": [
+          "strangler",
+          "internal"
+        ],
+        "properties": {
+          "technology": "Config push",
+          "type": "control"
+        },
+        "start_in": "acme-2027-edge-foundation",
+        "provider": "strangler-route-config",
+        "consumer": "commerce-monolith",
+        "call_direction": "provider_to_consumer",
+        "intervals": [
+          {
+            "live": [
+              [
+                1,
+                4
+              ]
+            ],
+            "clips": [
+              {
+                "start": 5,
+                "end": null,
+                "by": "legacy-commerce"
+              }
+            ]
+          }
+        ]
+      },
+      {
         "id": "edge-to-bff",
         "name": "Route target storefront requests",
         "tags": [

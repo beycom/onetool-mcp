@@ -8,18 +8,20 @@ import { decodeView, encodeView } from './view'
 
 const payload = payloadFixture as unknown as ReportPayload
 
-test('select fragment round-trips and ignores an invalid id', () => {
-  const entityKey = `systems:${payload.rows.systems[0].id}`
-  const interfaceKey = `interfaces:${payload.rows.interfaces[0].id}`
-  const entityResult = decodeView(payload, `#select=${entityKey}`)
-  const interfaceResult = decodeView(payload, `#${encodeView(entityResult.view, interfaceKey)}`)
+test('expand round-trips, drops invalid ids, and maps a legacy drill to expansion plus selection', () => {
+  const decoded = decodeView(payload, '#expand=systems:sysA,systems:missing,users:u1')
+  const roundTrip = decodeView(payload, `#${encodeView(decoded.view)}`)
 
-  expect(entityResult.select).toBe(entityKey)
-  expect(interfaceResult.select).toBe(interfaceKey)
+  expect(decoded.view.expand).toEqual(['systems:sysA'])
+  expect(roundTrip.view.expand).toEqual(decoded.view.expand)
+  expect(decoded.diagnostics).toEqual([
+    'view.fragment.expand.systems:missing: unknown or childless entity id ignored',
+    'view.fragment.expand.users:u1: unknown or childless entity id ignored',
+  ])
 
-  const invalidResult = decodeView(payload, '#select=systems:missing')
-  expect(invalidResult.select).toBeNull()
-  expect(invalidResult.diagnostics).toContain('view.fragment.select.systems:missing: unknown row id ignored')
+  const legacy = decodeView(payload, '#drill=subsystems:ssA')
+  expect(legacy.view.expand).toEqual(['subsystems:ssA', 'systems:sysA'])
+  expect(legacy.select).toBe('subsystems:ssA')
 })
 
 test('removed fragment keys are ignored with a diagnostic', () => {

@@ -1,7 +1,7 @@
 import type { Node } from '@xyflow/react'
 import ELK, { type ElkNode } from 'elkjs/lib/elk.bundled.js'
 
-import type { Level, RolledGraph } from './types'
+import type { RolledGraph } from './types'
 
 export type LayoutPosition = { x: number; y: number; width: number; height: number; parentId?: string }
 export type Positions = Map<string, LayoutPosition>
@@ -15,12 +15,12 @@ const RADIAL_CLEARANCE = 48
 const RADIAL_LABEL_CLEARANCE = 180
 const LAYER_SPACING = 72
 const BOUNDARY_HEADER_HEIGHT = 38
-const BOUNDARY_PADDING = { top: BOUNDARY_HEADER_HEIGHT + 12, side: 20, bottom: 20 }
+const BOUNDARY_PADDING = { top: BOUNDARY_HEADER_HEIGHT + 12, side: 20, bottom: 48 }
 const elk = new ELK()
 const cache = new Map<string, Promise<Positions>>()
 
-export function makeLayoutKey(view: { timeline: number; level: Level; drill: string | null }): string {
-  return `${view.timeline}:${view.level}:${view.drill ?? 'map'}`
+export function makeLayoutKey(view: { timeline: number; expand: readonly string[] }): string {
+  return `${view.timeline}:${[...new Set(view.expand)].sort().join(',')}`
 }
 
 function graphParts(graph: RolledGraph) {
@@ -321,8 +321,9 @@ export function unionLayout(
   sizes: NodeSizes = new Map(),
   aspectRatio = 1.6,
   preferredHub: string | null = null,
+  fresh = false,
 ): Promise<Positions> {
-  const cached = cache.get(cacheKey)
+  const cached = fresh ? undefined : cache.get(cacheKey)
   if (cached) return cached
   const hub = preferredHub ?? starHub(graph)
   const result = hub
@@ -347,6 +348,116 @@ export function unionLayout(
       return positions
     })
   cache.set(cacheKey, result)
+  return result
+}
+
+function sameParent(position: LayoutPosition, parentId: string | undefined): boolean {
+  return position.parentId === parentId
+}
+
+function overlapsWithClearance(left: LayoutPosition, right: LayoutPosition): boolean {
+  return rectClearance(left, right) < RADIAL_CLEARANCE
+}
+
+function shifted(position: LayoutPosition, dx: number, dy: number): LayoutPosition {
+  return { ...position, x: position.x + dx, y: position.y + dy }
+}
+
+function minimumShift(position: LayoutPosition, obstacle: LayoutPosition, vector: { x: number; y: number }): LayoutPosition {
+  let high = 1
+  while (overlapsWithClearance(shifted(position, vector.x * high, vector.y * high), obstacle)) high *= 2
+  let low = 0
+  for (let step = 0; step < 40; step += 1) {
+    const middle = (low + high) / 2
+    if (overlapsWithClearance(shifted(position, vector.x * middle, vector.y * middle), obstacle)) low = middle
+    else high = middle
+  }
+  return shifted(position, vector.x * high, vector.y * high)
+}
+
+export function stableExpansionLayout(previous: Positions, fresh: Positions, anchorKey: string): Positions {
+  const oldAnchor = previous.get(anchorKey)
+  const nextAnchor = fresh.get(anchorKey)
+  if (!oldAnchor || !nextAnchor) return fresh
+  const result: Positions = new Map()
+  for (const [key, position] of previous) if (fresh.has(key)) result.set(key, { ...position })
+
+  const descendants = new Set([anchorKey])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const [key, position] of fresh) {
+      if (position.parentId && descendants.has(position.parentId) && !descendants.has(key)) {
+        descendants.add(key)
+        changed = true
+      }
+    }
+  }
+  for (const key of descendants) {
+    const position = fresh.get(key)
+    if (position) result.set(key, { ...position })
+  }
+  result.set(anchorKey, {
+    ...nextAnchor,
+    parentId: oldAnchor.parentId,
+    x: oldAnchor.x + (oldAnchor.width - nextAnchor.width) / 2,
+    y: oldAnchor.y + (oldAnchor.height - nextAnchor.height) / 2,
+  })
+
+  const pushApart = (changedKey: string) => {
+    const anchor = result.get(changedKey)!
+    const anchorCenter = { x: anchor.x + anchor.width / 2, y: anchor.y + anchor.height / 2 }
+    const candidates = [...result.entries()]
+      .filter(([key, position]) => key !== changedKey && sameParent(position, anchor.parentId))
+      .sort(([leftKey, left], [rightKey, right]) => {
+        const leftDistance = Math.hypot(left.x + left.width / 2 - anchorCenter.x, left.y + left.height / 2 - anchorCenter.y)
+        const rightDistance = Math.hypot(right.x + right.width / 2 - anchorCenter.x, right.y + right.height / 2 - anchorCenter.y)
+        return leftDistance - rightDistance || leftKey.localeCompare(rightKey)
+      })
+    const displaced: LayoutPosition[] = [anchor]
+    for (const [key, original] of candidates) {
+      let position = original
+      let moved = false
+      for (;;) {
+        const obstacle = displaced.find((item) => overlapsWithClearance(position, item))
+        if (!obstacle) break
+        const dx = position.x + position.width / 2 - anchorCenter.x
+        const dy = position.y + position.height / 2 - anchorCenter.y
+        const length = Math.hypot(dx, dy)
+        const vector = length ? { x: dx / length, y: dy / length } : { x: key.localeCompare(changedKey) < 0 ? -1 : 1, y: 0 }
+        position = minimumShift(position, obstacle, vector)
+        moved = true
+      }
+      if (moved) {
+        result.set(key, position)
+        displaced.push(position)
+      }
+    }
+  }
+
+  pushApart(anchorKey)
+  let parentId = oldAnchor.parentId
+  while (parentId) {
+    const parent = result.get(parentId)
+    if (!parent) break
+    const childKeys = [...result.entries()].filter(([, position]) => position.parentId === parentId).map(([key]) => key)
+    const childBounds = positionBounds(result, childKeys)
+    const shiftX = Math.max(0, BOUNDARY_PADDING.side - childBounds.minX)
+    const shiftY = Math.max(0, BOUNDARY_PADDING.top - childBounds.minY)
+    if (shiftX || shiftY) {
+      for (const key of childKeys) result.set(key, shifted(result.get(key)!, shiftX, shiftY))
+    }
+    const grown = {
+      ...parent,
+      x: parent.x - shiftX,
+      y: parent.y - shiftY,
+      width: Math.max(parent.width, childBounds.maxX + shiftX + BOUNDARY_PADDING.side),
+      height: Math.max(parent.height, childBounds.maxY + shiftY + BOUNDARY_PADDING.bottom),
+    }
+    result.set(parentId, grown)
+    pushApart(parentId)
+    parentId = parent.parentId
+  }
   return result
 }
 
