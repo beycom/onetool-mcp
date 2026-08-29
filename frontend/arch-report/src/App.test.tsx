@@ -30,6 +30,7 @@ vi.mock('./layout', () => ({
   NODE_WIDTH: 240,
   applyPositions: (nodes: unknown[]) => nodes,
   makeLayoutKey: ({ timeline, level, drill }: { timeline: number; level: string; drill: string | null }) => `${timeline}:${level}:${drill ?? 'map'}`,
+  starHub: () => null,
   unionLayout: async () => new Map(),
 }))
 

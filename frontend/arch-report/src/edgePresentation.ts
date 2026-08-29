@@ -85,7 +85,15 @@ export function splitEdgeDirections(edge: GraphEdge, aspect: Aspect): Directiona
 }
 
 export function edgeLabelVisible(depth: ReadingDepth, selected: boolean, hovered: boolean): boolean {
-  return depth === 'full' || selected || hovered
+  return depth !== 'far' || selected || hovered
+}
+
+export function edgeStrokeToken(emphasis: EdgeEmphasis | 'selected', statuses: string[]): string {
+  if (emphasis === 'outgoing' || emphasis === 'incoming' || emphasis === 'selected') return 'var(--accent)'
+  if (statuses.includes('removed')) return 'var(--diff-removed)'
+  if (statuses.includes('changed')) return 'var(--diff-changed)'
+  if (statuses.includes('added')) return 'var(--diff-edge-added)'
+  return 'var(--edge)'
 }
 
 export function classifyEmphasis(

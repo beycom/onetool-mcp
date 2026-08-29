@@ -6,11 +6,12 @@ import {
   type ColDef,
   type ColumnState,
   type GridApi,
+  type ICellRendererParams,
   type RowSelectedEvent,
 } from 'ag-grid-community'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { humanizeField } from './display'
+import { humanizeField, KIND_LABEL } from './display'
 import type { Density } from './layoutPreferences'
 import { ENTITY_KINDS, type EntityKind, type ProjectedView, type ReportPayload, type RowKind, type StateDiff } from './types'
 
@@ -18,6 +19,20 @@ ModuleRegistry.registerModules([AllCommunityModule])
 
 export type TableTab = 'entities' | 'interfaces' | 'milestones' | 'diff'
 type GridRow = Record<string, unknown> & { _key: string; id: string; kind?: RowKind; status?: string }
+
+export function dataKindChip(value: unknown): HTMLElement | string {
+  const kind = String(value ?? '') as RowKind
+  if (!(ENTITY_KINDS as readonly string[]).includes(kind)) return humanizeField(kind)
+  const chip = document.createElement('span')
+  chip.className = 'data-kind-chip'
+  chip.dataset.kind = kind
+  chip.textContent = KIND_LABEL[kind]
+  return chip
+}
+
+function KindCell({ value }: ICellRendererParams<GridRow>) {
+  return dataKindChip(value)
+}
 
 function selectedRowsAsTsv(rows: GridRow[], columns: string[]): string {
   const clean = (value: unknown) => String(value ?? '').replaceAll('\t', ' ').replaceAll('\n', ' ')
@@ -231,7 +246,13 @@ export function GridPanel({
     const empty = (field: string) => rows.every((row) => row[field] === undefined || row[field] === null || row[field] === '')
     return { columns: [{ field: '_key', hide: true }, ...unique.map((field) => {
       const headerName = humanizeField(field)
-      return { field, headerName, hide: empty(field), minWidth: Math.max(80, headerName.length * 7 + 36) }
+      return {
+        field,
+        headerName,
+        hide: empty(field),
+        minWidth: Math.max(80, headerName.length * 7 + 36),
+        ...(field === 'kind' ? { cellRenderer: KindCell } : {}),
+      }
     })] as ColDef<GridRow>[], rows }
   }, [diff, payload, projected, tab, timeline])
   const selectedEntity = selectedKey?.split(':', 1)[0] as EntityKind | undefined

@@ -36,7 +36,7 @@ function wrappedLines(text: string, width: number, font: string, measure: TextMe
 }
 
 export function cardSize(node: GraphNode, level: Level, measure: TextMeasure): CardDimensions {
-  const width = CARD_WIDTH[level]
+  const width = node.kind === 'users' ? 220 : CARD_WIDTH[level]
   const textWidth = width - HORIZONTAL_PADDING
   const name = node.row.name ?? node.row.action ?? node.row.id
   const nameLines = Math.min(2, wrappedLines(name, textWidth, NAME_FONT, measure)) as 1 | 2
@@ -48,6 +48,18 @@ export function cardSize(node: GraphNode, level: Level, measure: TextMeasure): C
     }
   }
   const descriptionLines = Math.min(2, wrappedLines(node.row.description ?? '', textWidth, BODY_FONT, measure))
+  if (node.kind === 'users') {
+    const rowHeights = [
+      18,
+      nameLines * NAME_LINE_HEIGHT,
+      ...(descriptionLines ? [descriptionLines * BODY_LINE_HEIGHT] : []),
+    ]
+    return {
+      width,
+      height: VERTICAL_PADDING + rowHeights.reduce((total, value) => total + value, 0) + (rowHeights.length - 1) * ROW_GAP,
+      nameLines,
+    }
+  }
   const hasFacts = Object.keys(node.row.properties ?? {}).length > 0
   const rowHeights = [
     18,

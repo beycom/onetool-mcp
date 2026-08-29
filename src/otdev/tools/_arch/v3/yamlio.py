@@ -24,6 +24,7 @@ _ROOT_KEYS = (
     "schema_version",
     "milestones",
     "timelines",
+    "theme",
     "systems",
     "subsystems",
     "containers",

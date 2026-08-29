@@ -46,7 +46,9 @@ SHEETS = (
     "Users",
     "Interfaces",
     "Relationships",
+    "Settings",
 )
+REQUIRED_SHEETS = SHEETS[:-1]
 COLLECTIONS = {
     "Milestones": "milestones",
     "Systems": "systems",
@@ -122,6 +124,7 @@ HEADERS = {
         "description",
         "tags",
     ),
+    "Settings": ("setting", "value"),
 }
 ID_FIELDS = {
     "id",
@@ -443,6 +446,36 @@ def _architecture_raw(
             if location:
                 sources[model_path] = location
     raw["timelines"] = timelines or None
+    settings = sheets.get("Settings")
+    if settings is not None and settings.rows:
+        kinds: dict[str, object] = {}
+        for row_index, (row_number, row) in enumerate(settings.rows):
+            setting = row.get("setting")
+            value = row.get("value")
+            for field, field_value in (("setting", setting), ("value", value)):
+                if field_value is None:
+                    location = settings.locations.get((row_index, field))
+                    message = f"required field {field!r} is missing"
+                    issues.append(
+                        location.render(message)
+                        if location
+                        else f"{path}: sheet 'Settings', row {row_number}, field {field!r}: {message}"
+                    )
+            if setting is None or value is None:
+                continue
+            setting_text = str(setting).strip()
+            prefix = "theme.kinds."
+            key = (
+                setting_text[len(prefix) :]
+                if setting_text.startswith(prefix)
+                else setting_text
+            )
+            kinds[key] = value
+            location = settings.locations.get((row_index, "value"))
+            if location is not None:
+                sources[f"theme.kinds.{key}"] = location
+        if kinds:
+            raw["theme"] = {"kinds": kinds}
     draft_values = {
         **raw,
         **{
@@ -518,14 +551,15 @@ def _read_workbook(
         raise WorkbookError(f"Unable to read workbook {path}: {exc}") from exc
     try:
         by_name = {name.casefold(): name for name in workbook.sheetnames}
-        missing = [name for name in SHEETS if name.casefold() not in by_name]
+        missing = [name for name in REQUIRED_SHEETS if name.casefold() not in by_name]
         if missing:
             raise WorkbookError(
                 f"{path}: missing required sheets: {', '.join(missing)}"
             )
         parsed: dict[str, _SheetRows] = {}
         issues: list[str] = []
-        for canonical in SHEETS:
+        present_sheets = [name for name in SHEETS if name.casefold() in by_name]
+        for canonical in present_sheets:
             sheet_rows, sheet_issues = _read_sheet(
                 path, workbook[by_name[canonical.casefold()]], canonical
             )
@@ -568,6 +602,14 @@ def _rows(architecture: Architecture) -> dict[str, list[dict[str, Any]]]:
             {"timeline": timeline.id, "milestone": milestone}
             for timeline in architecture.timelines or []
             for milestone in timeline.milestones
+        ],
+        "Settings": [
+            {"setting": f"theme.kinds.{kind}", "value": value}
+            for kind, value in (
+                architecture.theme.kinds.items()
+                if architecture.theme is not None
+                else ()
+            )
         ],
     }
     for sheet, collection in COLLECTIONS.items():
@@ -728,6 +770,26 @@ def _canonical_sheet(workbook: Workbook, canonical: str) -> Any:
     return workbook[matches[0]]
 
 
+def _create_settings_sheet(workbook: Workbook) -> None:
+    worksheet = workbook.create_sheet("Settings")
+    headers = list(HEADERS["Settings"])
+    worksheet.append(headers)
+    worksheet.append([None] * len(headers))
+    table = Table(
+        displayName=_table_name("Settings"),
+        ref=f"A1:{worksheet.cell(2, len(headers)).coordinate}",
+    )
+    table.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False,
+    )
+    worksheet.add_table(table)
+    worksheet.freeze_panes = "A2"
+
+
 def _update_workbook(workbook: Workbook, architecture: Architecture) -> None:
     if any(worksheet._charts or worksheet._images for worksheet in workbook.worksheets):
         raise WorkbookError(
@@ -746,7 +808,12 @@ def _update_workbook(workbook: Workbook, architecture: Architecture) -> None:
             ),
         )
     )
-    for sheet in SHEETS:
+    has_settings = any(name.casefold() == "settings" for name in workbook.sheetnames)
+    if architecture.theme is not None and not has_settings:
+        _create_settings_sheet(workbook)
+        has_settings = True
+    sheets = SHEETS if has_settings else REQUIRED_SHEETS
+    for sheet in sheets:
         worksheet = _canonical_sheet(workbook, sheet)
         tables = list(worksheet.tables.values())
         if len(tables) != 1:

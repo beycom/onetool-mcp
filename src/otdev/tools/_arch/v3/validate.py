@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from itertools import pairwise
 from typing import Literal
@@ -21,6 +22,8 @@ from .resolver import (
 from .yamlio import DataPath, format_data_path, source_location
 
 Severity = Literal["error", "warning"]
+THEME_KINDS = {"system", "subsystem", "container", "component", "code", "user"}
+COLOR_PATTERN = re.compile(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\Z")
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,35 @@ def _required_findings(architecture: Architecture) -> list[Finding]:
                             (kind, index, alias),
                         )
                     )
+    return findings
+
+
+def _theme_findings(architecture: Architecture) -> list[Finding]:
+    if architecture.theme is None:
+        return []
+    findings: list[Finding] = []
+    for key, value in architecture.theme.kinds.items():
+        path = ("theme", "kinds", key)
+        if key not in THEME_KINDS:
+            findings.append(
+                _finding(
+                    architecture,
+                    "error",
+                    "unknown_theme_key",
+                    f"theme kind {key!r} is not supported",
+                    path,
+                )
+            )
+        if not isinstance(value, str) or COLOR_PATTERN.fullmatch(value) is None:
+            findings.append(
+                _finding(
+                    architecture,
+                    "error",
+                    "invalid_color",
+                    f"theme color for {key!r} must be #RGB or #RRGGBB",
+                    path,
+                )
+            )
     return findings
 
 
@@ -347,6 +379,7 @@ def _resolution_warnings(architecture: Architecture) -> list[Finding]:
 def validate(architecture: Architecture) -> list[Finding]:
     """Return all structural errors and advisory warnings."""
     findings = _required_findings(architecture)
+    findings.extend(_theme_findings(architecture))
     findings.extend(_duplicate_findings(architecture))
     findings.extend(_reference_findings(architecture))
     findings.extend(_temporal_findings(architecture))

@@ -29,8 +29,8 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | D13c | Polish pass 3: graph elements | DONE, gate PASSED 2026-08-28 (797/1,600 lines) | — |
 | D14 | Subsystem level rename (schema + report + acme) | DONE, gate PASSED 2026-08-29 (293/1,100 lines) | — |
 | D13d | Polish pass 4: View / Info / Data | DONE, gate PASSED 2026-08-29 (630/1,500 lines) | — |
-| P11 | Canvas presentation: radial layout, labels, ports, color economy, theme | READY (authored 2026-08-29) | budget confirmed |
-| P12 | Map model: in-place C4 expansion | GENERATED 2026-08-29 — review + update at the P11 gate | P11 gate |
+| P11 | Canvas presentation: radial layout, labels, ports, color economy, theme | DONE, gate PASSED 2026-08-29 (736/2,400 lines + a small architect fix at the gate) | — |
+| P12 | Map model: in-place C4 expansion | READY (re-reviewed at the P11 gate 2026-08-29; showcase rows authored) | budget confirmed |
 | P21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
 | P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -595,7 +595,7 @@ acme dev payload via the CLI is byte-identical. STOP after the log entry
 — the architect reviews at the gate.
 ```
 
-## P11 — Canvas presentation: layout, edges, ports, color, theme (READY, authored 2026-08-29; run once the budget is confirmed)
+## P11 — Canvas presentation: layout, edges, ports, color, theme (DONE 2026-08-29, gate PASSED)
 
 ```text
 [standard rules + UI rule 9]
@@ -668,13 +668,27 @@ selection-accent, theme-kinds. Definition of done: rules 5-8, then
 STOP.
 ```
 
-## P12 — Map model: in-place C4 expansion (GENERATED 2026-08-29; REVIEW + UPDATE at the P11 gate before issuing)
+## P12 — Map model: in-place C4 expansion (READY — re-reviewed at the P11 gate 2026-08-29; run once the budget is confirmed)
 
 ```text
 [standard rules + UI rule 9]
 
 Prereq: the P11 gate commit is the baseline (prompt re-reviewed against
 it per the pipeline rule).
+Post-P11 integration notes (bind your work to the landed tree):
+- Interface ports expand to labeled pills ONLY at Full depth or when
+  selected/hovered (`expandPort` in App.tsx, separate from
+  `showLabel`); at-rest Read labels are the midpoint pills. Keep that
+  split — do not re-tie port expansion to showLabel.
+- `unionLayout(graph, key, sizes, aspectRatio, preferredHub)` takes the
+  projected star hub (App computes `projectedHub` via `starHub`);
+  preset relayouts must keep passing it so radial-vs-layered stays
+  stage-stable under your new `(timeline, expansion set)` layout key.
+- `edgeAnchors` throws RangeError when a side cannot fit its batch
+  (>= 14 px separation + corner clearance). Expansion concentrates
+  edges on boundary borders (large, fine) but compact user cards are
+  220 px wide with short sides — if a capacity error surfaces in the
+  walkthrough, stop and ask; do not silently relax the spacing.
 Authoritative contract — READ IN FULL, in this order:
 1. plans/arch/arch-v3/report.md "Map contract — in-place C4 expansion
    (P12)" — the normative spec; implement it exactly.
@@ -706,12 +720,29 @@ Scope — implement the map contract exactly:
    deterministic); collapse restores cached positions exactly; presets
    re-lay out fresh (P11 star rules decide radial vs layered); camera
    keeps the expanded entity's center fixed, zoom unchanged.
-5. Acme showcase delta: verify/enrich the four-level path Digital
-   Commerce Platform -> storefront-edge -> one container -> its
-   components (names/descriptions at every hop); add ONE interface
-   defined at subsystem level and ONE at component level (exact rows
-   specified at issue time after the P11-gate re-review); regenerate
-   the wip acme report.
+5. Acme showcase delta: the four-level path is commerce-platform ->
+   storefront-edge -> commerce-edge -> its components (edge-waf-cdn,
+   strangler-route-config); verify names/descriptions read well at
+   every hop and enrich only where thin. Add EXACTLY these two
+   interfaces (fixture rows in the interfaces list, matching the
+   existing row shape):
+   - id: edge-bot-defense, name: "Edge bot and abuse signals",
+     provider: storefront-edge (subsystem-level definition), consumer:
+     fraud-provider, call_direction: provider_to_consumer, start_in:
+     acme-2027-edge-foundation, tags [security, synchronous],
+     properties {technology: HTTPS, type: api}. Collapsed it renders
+     commerce-platform -> Fraud Decision Provider (derived); expanding
+     the system slides it to the Storefront and Edge boundary
+     (defined).
+   - id: strangler-route-cutover, name: "Strangler route cutover
+     control", provider: strangler-route-config (component-level
+     definition), consumer: commerce-monolith, call_direction:
+     provider_to_consumer, start_in: acme-2027-edge-foundation, tags
+     [strangler, internal], properties {technology: Config push, type:
+     control}. It demonstrates the full derived ladder: each expansion
+     hop (system -> subsystem -> container -> component) re-attaches
+     one level deeper.
+   Regenerate the wip acme report.
 Out of scope — do not touch: P11's radial/edge/color modules beyond
 consuming them, all Python except payload regeneration commands, Info/
 Data content (selection sync must keep working), the deps view,

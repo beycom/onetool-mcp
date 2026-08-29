@@ -44,6 +44,8 @@ export type Level = 'systems' | 'subsystems' | 'containers' | 'components'
 export type Aspect = 'ownership' | 'call-direction' | 'data-flow'
 export type Theme = 'light' | 'dark'
 export type CompareMode = 'off' | 'base' | 'position'
+export type ThemeKind = 'system' | 'subsystem' | 'container' | 'component' | 'code' | 'user'
+export type PresentationTheme = { kinds?: Partial<Record<ThemeKind, string>> }
 
 export type ReportPayload = {
   payload: 'arch-report/v1'
@@ -51,6 +53,7 @@ export type ReportPayload = {
   source: string
   milestones: Array<Omit<ReportRow, 'intervals'>>
   timelines: Timeline[]
+  theme: PresentationTheme
   rows: Record<RowKind, ReportRow[]>
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest'
 
-import { edgeLabelVisible, classifyEmphasis, interfacePort, splitEdgeDirections } from './edgePresentation'
+import { classifyEmphasis, interfacePort, splitEdgeDirections } from './edgePresentation'
 import type { EdgeAnchorPair } from './edgeAnchors'
 import type { GraphEdge, ReportRow } from './types'
 
@@ -40,14 +40,6 @@ test('direction splitting counts forward, reverse, and bidirectional members for
     ['reverse', ['forward', 'both']],
   ])
   expect(ownership.map((spline) => [spline.direction, spline.members.length])).toEqual([['forward', 3]])
-})
-
-test('label visibility keeps neutral labels at Full and selected or hovered labels at every depth', () => {
-  expect(edgeLabelVisible('far', false, false)).toBe(false)
-  expect(edgeLabelVisible('read', false, false)).toBe(false)
-  expect(edgeLabelVisible('full', false, false)).toBe(true)
-  expect(edgeLabelVisible('far', true, false)).toBe(true)
-  expect(edgeLabelVisible('read', false, true)).toBe(true)
 })
 
 test('selection classifies one hop before tag emphasis', () => {

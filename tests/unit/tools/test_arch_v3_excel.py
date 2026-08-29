@@ -22,6 +22,8 @@ from otdev.tools._arch.v3.model import (
     Subsystem,
     System,
 )
+from otdev.tools._arch.v3.payload import build_payload
+from otdev.tools._arch.v3.validate import validate
 from otdev.tools._arch.v3.yamlio import dump_architecture, load_architecture
 
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
@@ -129,3 +131,73 @@ def test_subsystem_yaml_and_excel_round_trip(tmp_path: Path) -> None:
 
     assert load_architecture(yaml_path) == architecture
     assert read_workbook(workbook_path) == architecture
+
+
+def test_theme_round_trips_yaml_excel_payload_and_reports_located_errors(
+    tmp_path: Path,
+) -> None:
+    theme_yaml = """\
+schema_version: 3
+milestones:
+  - id: m1
+    name: Milestone
+timelines:
+  - id: roadmap
+    milestones: [m1]
+theme:
+  kinds:
+    system: "#2e6f9b"
+systems: []
+subsystems: []
+containers: []
+components: []
+code: []
+users: []
+interfaces: []
+relationships: []
+"""
+    source_path = tmp_path / "source.yaml"
+    source_path.write_text(theme_yaml, encoding="utf-8")
+    workbook_path = tmp_path / "architecture.xlsx"
+    output_path = tmp_path / "output.yaml"
+
+    source = load_architecture(source_path)
+    write_workbook(source, workbook_path)
+    from_excel = read_workbook(workbook_path)
+    dump_architecture(from_excel, output_path)
+
+    assert from_excel == source
+    assert load_architecture(output_path) == source
+    output_yaml = output_path.read_text(encoding="utf-8")
+    assert output_yaml.index("timelines:") < output_yaml.index(
+        "theme:"
+    ) < output_yaml.index("systems:")
+    assert build_payload(source, source_path.name)["theme"] == {
+        "kinds": {"system": "#2e6f9b"}
+    }
+
+    invalid_path = tmp_path / "invalid.yaml"
+    invalid_path.write_text(theme_yaml.replace("#2e6f9b", "teal"), encoding="utf-8")
+    invalid = next(
+        finding
+        for finding in validate(load_architecture(invalid_path))
+        if finding.code == "invalid_color"
+    )
+    assert (invalid.file, invalid.path, invalid.line > 1, invalid.column > 0) == (
+        str(invalid_path),
+        "theme.kinds.system",
+        True,
+        True,
+    )
+
+    unknown_path = tmp_path / "unknown.yaml"
+    unknown_path.write_text(
+        theme_yaml.replace('    system: "#2e6f9b"', '    database: "#2e6f9b"'),
+        encoding="utf-8",
+    )
+    unknown = next(
+        finding
+        for finding in validate(load_architecture(unknown_path))
+        if finding.code == "unknown_theme_key"
+    )
+    assert unknown.path == "theme.kinds.database"

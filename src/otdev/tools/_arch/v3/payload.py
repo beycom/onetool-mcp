@@ -141,5 +141,10 @@ def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any
         "source": Path(source_name).name,
         "milestones": [_serialize(item) for item in architecture.milestones],
         "timelines": materialized,
+        "theme": (
+            architecture.theme.model_dump(mode="json")
+            if architecture.theme is not None
+            else {}
+        ),
         "rows": serialized_rows,
     }

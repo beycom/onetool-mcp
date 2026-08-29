@@ -1,7 +1,9 @@
 import type { EdgeAnchorPair, EdgePoint, EdgeRect, EdgeSide } from './edgeAnchors'
 
-type Point = { x: number; y: number }
-export type SplinePath = { labelPoint: Point; path: string }
+export type SplinePoint = { x: number; y: number }
+export type SplinePath = { labelPoint: SplinePoint; labelRect: EdgeRect; path: string; points: SplinePoint[] }
+
+type Point = SplinePoint
 
 const CLEARANCE = 8
 const OUTSET = 12
@@ -114,9 +116,9 @@ function simplify(points: Point[], obstacles: EdgeRect[]): Point[] {
   return result
 }
 
-function midpoint(points: Point[]): Point {
+function pointAt(points: Point[], ratio: number): Point {
   const lengths = points.slice(1).map((point, index) => distance(points[index], point))
-  const target = lengths.reduce((total, value) => total + value, 0) / 2
+  const target = lengths.reduce((total, value) => total + value, 0) * ratio
   let elapsed = 0
   for (let index = 0; index < lengths.length; index += 1) {
     if (elapsed + lengths[index] >= target) {
@@ -131,8 +133,33 @@ function midpoint(points: Point[]): Point {
   return points.at(-1)!
 }
 
-function cubicPath(points: Point[]): string {
-  const commands = [`M ${points[0].x} ${points[0].y}`]
+function intersects(left: EdgeRect, right: EdgeRect): boolean {
+  return left.x < right.x + right.width && left.x + left.width > right.x
+    && left.y < right.y + right.height && left.y + left.height > right.y
+}
+
+function labelPlacement(
+  points: Point[],
+  cardRects: EdgeRect[],
+  occupied: EdgeRect[],
+  width: number,
+  preferNegative: boolean,
+): { point: Point; rect: EdgeRect } {
+  const direction = preferNegative ? -1 : 1
+  const ratios = [0, 0.05, -0.05, 0.1, -0.1, 0.15, -0.15, 0.2, -0.2]
+    .map((offset) => 0.5 + offset * direction)
+  const candidates = ratios.map((ratio) => {
+    const point = pointAt(points, ratio)
+    return { point, rect: { x: point.x - width / 2, y: point.y - 12, width, height: 24 } }
+  })
+  return candidates.find(({ rect }) => (
+    cardRects.every((card) => !intersects(rect, card))
+    && occupied.every((label) => !intersects(rect, label))
+  )) ?? candidates[0]
+}
+
+function cubicCommands(points: Point[]): string[] {
+  const commands: string[] = []
   for (let index = 0; index < points.length - 1; index += 1) {
     const current = points[index]
     const next = points[index + 1]
@@ -146,10 +173,16 @@ function cubicPath(points: Point[]): string {
       : { x: next.x - (after.x - current.x) * 0.04, y: next.y - (after.y - current.y) * 0.04 }
     commands.push(`C ${first.x} ${first.y}, ${second.x} ${second.y}, ${next.x} ${next.y}`)
   }
-  return commands.join(' ')
+  return commands
 }
 
-export function splinePath(anchors: EdgeAnchorPair, rects: EdgeRect[]): SplinePath {
+export function splinePath(
+  anchors: EdgeAnchorPair,
+  rects: EdgeRect[],
+  occupiedLabels: EdgeRect[] = [],
+  labelWidth = 180,
+  preferNegativeNudge = false,
+): SplinePath {
   const obstacles = rects.filter((rect) => (
     !contains(rect, anchors.sourcePoint) && !contains(rect, anchors.targetPoint)
   )).map(inflate)
@@ -158,5 +191,12 @@ export function splinePath(anchors: EdgeAnchorPair, rects: EdgeRect[]): SplinePa
   const middle = simplify(shortestPath(sourceOutset, targetOutset, obstacles), obstacles)
   const points = [anchors.sourcePoint, ...middle, anchors.targetPoint]
     .filter((point, index, all) => index === 0 || distance(point, all[index - 1]) > 0.01)
-  return { labelPoint: midpoint(points), path: cubicPath(points) }
+  const path = [
+    `M ${anchors.sourcePoint.x} ${anchors.sourcePoint.y}`,
+    `L ${sourceOutset.x} ${sourceOutset.y}`,
+    ...cubicCommands(middle),
+    `L ${anchors.targetPoint.x} ${anchors.targetPoint.y}`,
+  ].join(' ')
+  const label = labelPlacement(points, rects, occupiedLabels, labelWidth, preferNegativeNudge)
+  return { labelPoint: label.point, labelRect: label.rect, path, points }
 }

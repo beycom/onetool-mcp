@@ -1,0 +1,131 @@
+// @vitest-environment jsdom
+
+import { cleanup, render, screen } from '@testing-library/react'
+import type { CSSProperties, ReactNode } from 'react'
+import { afterEach, expect, test, vi } from 'vitest'
+
+vi.mock('@xyflow/react', () => ({
+  BaseEdge: ({ className, id, style }: { className?: string; id: string; style?: CSSProperties }) => <path className={className} data-testid={id} style={style} />,
+  EdgeLabelRenderer: ({ children }: { children: ReactNode }) => children,
+  Handle: () => null,
+  MiniMap: () => null,
+  Position: { Left: 'left', Right: 'right' },
+  ReactFlow: () => null,
+}))
+
+import { ArchitectureNodeView, SemanticEdge } from './App'
+import { edgeLabelVisible, splitEdgeDirections, type EdgeEmphasis } from './edgePresentation'
+import { dataKindChip } from './GridPanel'
+import { DEFAULT_KIND_COLORS, themeStyle } from './theme'
+import type { GraphEdge, ReportRow } from './types'
+
+afterEach(cleanup)
+
+function relationship(id: string, action: string): ReportRow {
+  return { action, id, intervals: [], source: 'systems:hub', target: 'systems:peer' }
+}
+
+function graphEdge(rows: ReportRow[]): GraphEdge {
+  return {
+    a: 'systems:hub',
+    b: 'systems:peer',
+    interfaceRows: [],
+    interfaces: [],
+    key: 'systems:hub|systems:peer',
+    orientations: rows.map((row) => ({ from: 'systems:hub', id: row.id, kind: 'relationships', to: 'systems:peer' })),
+    relationshipRows: rows,
+    relationships: rows.map((row) => row.id),
+  }
+}
+
+function edgeElement(edge: GraphEdge, memberCount: number, emphasis: EdgeEmphasis | 'selected', showLabel: boolean, id = 'spline') {
+  const spline = splitEdgeDirections(edge, 'ownership')[0]
+  return SemanticEdge({
+    data: {
+      anchors: {
+        sourcePoint: { side: 'right', x: 10, y: 20 },
+        targetPoint: { side: 'left', x: 90, y: 20 },
+      },
+      direction: 'forward',
+      edge,
+      emphasis,
+      hovered: false,
+      label: spline.label,
+      labelPoint: { x: 50, y: 20 },
+      memberCount,
+      onHover: () => undefined,
+      onSelect: () => undefined,
+      path: 'M 10 20 L 90 20',
+      port: null,
+      selected: emphasis === 'selected',
+      showLabel,
+      statuses: [],
+      zoom: 1,
+    },
+    id,
+  } as never)
+}
+
+test('prescribed #3 renders single and aggregated labels at Read but hides neutral labels at Far', () => {
+  const single = graphEdge([relationship('calls', 'Calls catalog')])
+  const aggregate = graphEdge([relationship('publishes', 'Publishes orders'), relationship('audits', 'Audits orders')])
+  const { container, rerender } = render(edgeElement(single, 1, 'normal', edgeLabelVisible('read', false, false)))
+
+  expect(screen.getByRole('button', { name: 'Calls catalog' }).getAttribute('title')).toBe('Calls catalog')
+  expect(container.querySelector('.edge-label i')).toBeNull()
+
+  rerender(edgeElement(aggregate, 2, 'normal', edgeLabelVisible('read', false, false)))
+  expect(screen.getByRole('button', { name: 'Publishes orders2' }).getAttribute('title')).toBe('Publishes orders')
+  expect(container.querySelector('.edge-label i')?.textContent).toBe('2')
+
+  rerender(edgeElement(single, 1, 'normal', edgeLabelVisible('far', false, false)))
+  expect(container.querySelector('.edge-label')).toBeNull()
+})
+
+test('prescribed #5 applies a partial theme override while retaining default kind custom properties', () => {
+  render(<div data-testid="theme" style={themeStyle({ kinds: { system: '#123456' } })} />)
+  const style = screen.getByTestId('theme').style
+
+  expect(style.getPropertyValue('--kind-system')).toBe('#123456')
+  expect(style.getPropertyValue('--kind-subsystem')).toBe(DEFAULT_KIND_COLORS.subsystem)
+  expect(style.getPropertyValue('--kind-user')).toBe(DEFAULT_KIND_COLORS.user)
+})
+
+test('prescribed #6 keeps cards, pills, and splines non-accent at rest and accents selected one-hop artifacts only', () => {
+  const row = relationship('calls', 'Calls catalog')
+  const edge = graphEdge([row])
+  const nodeData = {
+    boundary: false,
+    childCount: 0,
+    connectionCount: 1,
+    context: 'System',
+    description: 'Hub',
+    drillable: false,
+    emphasis: 'normal',
+    facts: [],
+    kind: 'systems',
+    label: 'Hub',
+    members: [],
+    onDrill: () => undefined,
+    row: { id: 'hub', intervals: [], name: 'Hub' },
+    statuses: [],
+  }
+  const node = (selected: boolean) => ArchitectureNodeView({ data: nodeData, selected } as never)
+  const { container, rerender } = render(<>{node(false)}{edgeElement(edge, 1, 'normal', true)}</>)
+  const dataChip = dataKindChip('systems')
+  if (dataChip instanceof HTMLElement) container.append(dataChip)
+
+  const card = container.querySelector<HTMLElement>('.architecture-node')!
+  expect(card.style.getPropertyValue('--card-border')).toBe('var(--kind-color)')
+  expect(card.style.getPropertyValue('--kind-color')).toBe('var(--kind-system)')
+  expect(container.querySelector('.kind-pill')?.getAttribute('data-kind')).toBe('systems')
+  expect(container.querySelector('.data-kind-chip')?.getAttribute('data-kind')).toBe('systems')
+  expect(screen.getByTestId('spline').style.stroke).toBe('var(--edge)')
+
+  rerender(<>{node(true)}{edgeElement(edge, 1, 'outgoing', true)}{edgeElement(edge, 1, 'unrelated', true, 'unrelated')}</>)
+  expect(container.querySelector<HTMLElement>('.architecture-node')!.style.getPropertyValue('--card-border')).toBe('var(--accent)')
+  expect(screen.getByTestId('spline').style.stroke).toBe('var(--accent)')
+  expect(screen.getByTestId('unrelated').style.stroke).toBe('var(--edge)')
+  expect(container.querySelectorAll('.edge-port')).toHaveLength(4)
+  expect(container.querySelectorAll('.edge-port[data-accent="true"]')).toHaveLength(2)
+})

@@ -11,6 +11,8 @@ export const NODE_WIDTH = 250
 export const NODE_HEIGHT = 168
 
 const NODE_SPACING = 40
+const RADIAL_CLEARANCE = 48
+const RADIAL_LABEL_CLEARANCE = 180
 const LAYER_SPACING = 72
 const BOUNDARY_HEADER_HEIGHT = 38
 const BOUNDARY_PADDING = { top: BOUNDARY_HEADER_HEIGHT + 12, side: 20, bottom: 20 }
@@ -123,15 +125,209 @@ export function gridPack(graph: RolledGraph, sizes: NodeSizes): Positions {
   return positions
 }
 
+function nodeName(node: RolledGraph['nodes'][number]): string {
+  return node.row.name ?? node.row.id
+}
+
+function adjacency(graph: RolledGraph): Map<string, Set<string>> {
+  const result = new Map(graph.nodes.map((node) => [node.key, new Set<string>()]))
+  for (const edge of graph.edges) {
+    result.get(edge.a)?.add(edge.b)
+    result.get(edge.b)?.add(edge.a)
+  }
+  return result
+}
+
+export function starHub(graph: RolledGraph): string | null {
+  if (graph.boundaries.some((boundary) => !boundary.stub) || graph.nodes.length < 6 || !graph.edges.length) return null
+  const neighbors = adjacency(graph)
+  const eligible = graph.nodes.filter((node) => (neighbors.get(node.key)?.size ?? 0) / graph.edges.length >= 0.4)
+  eligible.sort((left, right) => (
+    (neighbors.get(right.key)?.size ?? 0) - (neighbors.get(left.key)?.size ?? 0)
+    || left.key.localeCompare(right.key)
+  ))
+  return eligible[0]?.key ?? null
+}
+
+type Bounds = { minX: number; minY: number; maxX: number; maxY: number }
+
+function positionBounds(positions: Positions, ids: Iterable<string> = positions.keys()): Bounds {
+  const selected = [...ids].flatMap((id) => {
+    const position = positions.get(id)
+    return position ? [position] : []
+  })
+  if (!selected.length) return { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+  return {
+    minX: Math.min(...selected.map((position) => position.x)),
+    minY: Math.min(...selected.map((position) => position.y)),
+    maxX: Math.max(...selected.map((position) => position.x + position.width)),
+    maxY: Math.max(...selected.map((position) => position.y + position.height)),
+  }
+}
+
+function rectClearance(left: LayoutPosition, right: LayoutPosition): number {
+  const x = Math.max(left.x - right.x - right.width, right.x - left.x - left.width, 0)
+  const y = Math.max(left.y - right.y - right.height, right.y - left.y - left.height, 0)
+  return Math.hypot(x, y)
+}
+
+function separated(positions: Positions, ids: string[]): boolean {
+  for (let left = 0; left < ids.length; left += 1) {
+    for (let right = left + 1; right < ids.length; right += 1) {
+      if (rectClearance(positions.get(ids[left])!, positions.get(ids[right])!) < RADIAL_CLEARANCE) return false
+    }
+  }
+  return true
+}
+
+function centeredPosition(id: string, center: { x: number; y: number }, sizes: NodeSizes): LayoutPosition {
+  const size = sizeFor(id, sizes)
+  return { x: center.x - size.width / 2, y: center.y - size.height / 2, ...size }
+}
+
+function radialNodeOrder(graph: RolledGraph, neighbors: Map<string, Set<string>>) {
+  const byKey = new Map(graph.nodes.map((node) => [node.key, node]))
+  return (leftKey: string, rightKey: string): number => {
+    const left = byKey.get(leftKey)!
+    const right = byKey.get(rightKey)!
+    return left.kind.localeCompare(right.kind)
+      || (neighbors.get(rightKey)?.size ?? 0) - (neighbors.get(leftKey)?.size ?? 0)
+      || nodeName(left).localeCompare(nodeName(right))
+      || leftKey.localeCompare(rightKey)
+  }
+}
+
+function ringAngles(
+  oneHop: string[],
+  graph: RolledGraph,
+  compareNodes: (left: string, right: string) => number,
+): Map<string, number> {
+  const byKey = new Map(graph.nodes.map((node) => [node.key, node]))
+  const slots = oneHop.map((_, index) => ({ angle: -Math.PI / 2 + index * Math.PI * 2 / oneHop.length, index }))
+  const topFirst = [...slots].sort((left, right) => {
+    const leftDistance = Math.min(left.index, oneHop.length - left.index)
+    const rightDistance = Math.min(right.index, oneHop.length - right.index)
+    return leftDistance - rightDistance || left.index - right.index
+  })
+  const users = oneHop.filter((key) => byKey.get(key)?.kind === 'users').sort(compareNodes)
+  const others = oneHop.filter((key) => byKey.get(key)?.kind !== 'users').sort(compareNodes)
+  const userSlots = new Set(topFirst.slice(0, users.length).map((slot) => slot.index))
+  const remainingSlots = slots.filter((slot) => !userSlots.has(slot.index)).sort((left, right) => left.index - right.index)
+  return new Map([
+    ...users.map((key, index) => [key, topFirst[index].angle] as const),
+    ...others.map((key, index) => [key, remainingSlots[index].angle] as const),
+  ])
+}
+
+function radialComponent(
+  graph: RolledGraph,
+  hub: string,
+  sizes: NodeSizes,
+  neighbors: Map<string, Set<string>>,
+): { positions: Positions; connected: Set<string> } {
+  const compareNodes = radialNodeOrder(graph, neighbors)
+  const oneHop = [...(neighbors.get(hub) ?? [])].sort(compareNodes)
+  const angles = ringAngles(oneHop, graph, compareNodes)
+  const connected = new Set([hub, ...oneHop])
+  const depth = new Map<string, number>([[hub, 0], ...oneHop.map((key) => [key, 1] as const)])
+  const anchor = new Map(oneHop.map((key) => [key, key]))
+  const queue = [...oneHop]
+  while (queue.length) {
+    const current = queue.shift()!
+    for (const next of [...(neighbors.get(current) ?? [])].sort(compareNodes)) {
+      if (connected.has(next)) continue
+      connected.add(next)
+      depth.set(next, depth.get(current)! + 1)
+      anchor.set(next, anchor.get(current)!)
+      queue.push(next)
+    }
+  }
+
+  const deeperByAnchorDepth = new Map<string, string[]>()
+  for (const key of [...connected].filter((item) => (depth.get(item) ?? 0) >= 2).sort(compareNodes)) {
+    const group = `${anchor.get(key)}:${depth.get(key)}`
+    deeperByAnchorDepth.set(group, [...(deeperByAnchorDepth.get(group) ?? []), key])
+  }
+  const maxDimension = Math.max(...[...connected].map((key) => {
+    const size = sizeFor(key, sizes)
+    return Math.hypot(size.width, size.height)
+  }))
+  const hubPosition = centeredPosition(hub, { x: 0, y: 0 }, sizes)
+
+  for (let ringRadius = maxDimension; ringRadius < 100_000; ringRadius += 1) {
+    const positions: Positions = new Map([[hub, hubPosition]])
+    for (const key of oneHop) {
+      const angle = angles.get(key)!
+      positions.set(key, centeredPosition(key, { x: Math.cos(angle) * ringRadius, y: Math.sin(angle) * ringRadius }, sizes))
+    }
+    for (const [group, keys] of [...deeperByAnchorDepth].sort(([left], [right]) => left.localeCompare(right))) {
+      const separator = group.lastIndexOf(':')
+      const anchorKey = group.slice(0, separator)
+      const nodeDepth = Number(group.slice(separator + 1))
+      const baseAngle = angles.get(anchorKey)!
+      const wedge = Math.PI * 1.4 / Math.max(1, oneHop.length)
+      for (const [index, key] of keys.entries()) {
+        const angle = baseAngle + (index - (keys.length - 1) / 2) * wedge / Math.max(1, keys.length)
+        let radius = ringRadius + (nodeDepth - 1) * (maxDimension + RADIAL_CLEARANCE + RADIAL_LABEL_CLEARANCE)
+        let candidate = centeredPosition(key, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }, sizes)
+        while ([...positions.values()].some((position) => rectClearance(position, candidate) < RADIAL_CLEARANCE)) {
+          radius += 1
+          candidate = centeredPosition(key, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius }, sizes)
+        }
+        positions.set(key, candidate)
+      }
+    }
+
+    const ringBounds = positionBounds(positions, oneHop)
+    const shiftX = -(ringBounds.minX + ringBounds.maxX) / 2
+    const shiftY = -(ringBounds.minY + ringBounds.maxY) / 2
+    for (const key of [...connected].filter((item) => item !== hub)) {
+      const position = positions.get(key)!
+      positions.set(key, { ...position, x: position.x + shiftX, y: position.y + shiftY })
+    }
+    if (!separated(positions, [...connected])) continue
+
+    const bounds = positionBounds(positions, connected)
+    for (const [key, position] of positions) {
+      positions.set(key, { ...position, x: position.x - bounds.minX, y: position.y - bounds.minY })
+    }
+    return { positions, connected }
+  }
+  throw new RangeError('Unable to construct a non-overlapping radial layout')
+}
+
+export function radialLayout(graph: RolledGraph, sizes: NodeSizes, preferredHub: string | null = null): Positions {
+  const hub = preferredHub ?? starHub(graph)
+  if (!hub) throw new RangeError('Radial layout requires an eligible star graph')
+  if (!graph.nodes.some((node) => node.key === hub)) throw new RangeError(`Radial hub ${hub} is not present in the graph`)
+  const neighbors = adjacency(graph)
+  const { positions, connected } = radialComponent(graph, hub, sizes, neighbors)
+  const disconnected = graph.nodes.filter((node) => !connected.has(node.key))
+  if (!disconnected.length) return positions
+
+  const disconnectedGraph = { ...graph, nodes: disconnected, edges: [], boundaries: [] }
+  const packed = gridPack(disconnectedGraph, sizes)
+  const connectedBounds = positionBounds(positions)
+  const packedBounds = positionBounds(packed)
+  const offsetX = (connectedBounds.minX + connectedBounds.maxX - packedBounds.minX - packedBounds.maxX) / 2
+  const offsetY = connectedBounds.maxY + RADIAL_CLEARANCE - packedBounds.minY
+  for (const [key, position] of packed) positions.set(key, { ...position, x: position.x + offsetX, y: position.y + offsetY })
+  return positions
+}
+
 export function unionLayout(
   graph: RolledGraph,
   cacheKey: string,
   sizes: NodeSizes = new Map(),
   aspectRatio = 1.6,
+  preferredHub: string | null = null,
 ): Promise<Positions> {
   const cached = cache.get(cacheKey)
   if (cached) return cached
-  const result = graph.edges.length === 0
+  const hub = preferredHub ?? starHub(graph)
+  const result = hub
+    ? Promise.resolve(radialLayout(graph, sizes, hub))
+    : graph.edges.length === 0
     ? Promise.resolve(gridPack(graph, sizes))
     : elk.layout(buildLayoutInput(graph, sizes, aspectRatio)).then((layout) => {
       const positions: Positions = new Map()

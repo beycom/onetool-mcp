@@ -39,8 +39,15 @@ def test_acme_payload_invariants() -> None:
     architecture = load_architecture(FIXTURE)
     payload = build_payload(architecture, FIXTURE.name)
     assert list(payload) == [
-        "payload", "schema_version", "source", "milestones", "timelines", "rows"
+        "payload",
+        "schema_version",
+        "source",
+        "milestones",
+        "timelines",
+        "theme",
+        "rows",
     ]
+    assert payload["theme"] == {}
     assert list(payload["rows"]) == list(KINDS)
     assert payload == build_payload(architecture, FIXTURE.name)
     known_ids = {row.id for kind in KINDS for row in getattr(architecture, kind)}

@@ -66,6 +66,12 @@ class Timeline(StrictModel):
     milestones: list[Identifier]
 
 
+class Theme(StrictModel):
+    """Authored presentation colors retained for located validation."""
+
+    kinds: dict[str, object]
+
+
 class System(TemporalNamedItem):
     """Highest-level software boundary."""
 
@@ -127,6 +133,7 @@ class Architecture(StrictModel):
     schema_version: Literal[3]
     milestones: list[Milestone]
     timelines: list[Timeline] | None = None
+    theme: Theme | None = None
     systems: list[System]
     subsystems: list[Subsystem]
     containers: list[Container]

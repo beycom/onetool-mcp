@@ -20,6 +20,7 @@ import { edgeAnchors, type EdgeAnchorPair, type EdgeRect } from './edgeAnchors'
 import {
   classifyEmphasis,
   edgeLabelVisible,
+  edgeStrokeToken,
   interfacePort,
   splitEdgeDirections,
   type DirectionalSpline,
@@ -31,12 +32,13 @@ import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
 import { InfoPanel, selectionKey, type Selection } from './InfoPanel'
 import { FitIcon, MapIcon, SearchIcon } from './Icons'
-import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, unionLayout, type Positions } from './layout'
+import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, starHub, unionLayout, type Positions } from './layout'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
 import { readPayload } from './payload'
 import { diffStates, legendEntries, projectState, unionGraph } from './projection'
 import { ResizablePanel } from './ResizablePanel'
 import { splinePath, type SplinePath } from './splinePath'
+import { kindPresentationStyle, themeStyle } from './theme'
 import {
   type Aspect,
   type GraphEdge,
@@ -81,6 +83,7 @@ type SemanticData = {
   direction: SplineDirection
   edge: GraphEdge
   emphasis: EdgeEmphasis | 'selected'
+  expandPort: boolean
   hovered: boolean
   label: string
   labelPoint: SplinePath['labelPoint']
@@ -103,17 +106,19 @@ function DrillIcon() {
   return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 3h5v2H5v6h6V8h2v5H3z" /><path d="M8 3h5v5h-2V6.4l-4.3 4.3-1.4-1.4L9.6 5H8z" /></svg>
 }
 
-function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
+export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
   return (
     <article
       className="architecture-node"
       data-boundary={data.boundary ? 'true' : 'false'}
       data-member-count={data.members.length}
       data-emphasis={data.emphasis}
+      data-kind={data.kind}
       data-selected={selected ? 'true' : 'false'}
       data-status={data.statuses.join(' ')}
+      style={kindPresentationStyle(data.kind, selected)}
     >
-      <div className="node-heading"><span className="kind-pill">{KIND_LABEL[data.kind]}</span>{data.boundary ? <span className="external-pill">External</span> : null}</div>
+      <div className="node-heading"><span className="kind-pill" data-kind={data.kind}>{KIND_LABEL[data.kind]}</span>{data.boundary ? <span className="external-pill">External</span> : null}</div>
       <strong className="node-name" title={data.label}>{data.label}</strong>
       <p className="node-description">{data.description}</p>
       <span className="node-context">{data.context}</span>
@@ -136,13 +141,13 @@ function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureNode>) {
 
 function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
   return (
-    <section className="containment-boundary" data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'}>
-      <header><span className="kind-pill">{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Drill into ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onDrill() }} type="button"><DrillIcon /></button></header>
+    <section className="containment-boundary" data-kind={data.boundary.kind} data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'} style={kindPresentationStyle(data.boundary.kind, selected)}>
+      <header><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Drill into ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onDrill() }} type="button"><DrillIcon /></button></header>
     </section>
   )
 }
 
-function SemanticEdge({
+export function SemanticEdge({
   data,
   id,
 }: EdgeProps<SemanticFlowEdge>) {
@@ -151,18 +156,20 @@ function SemanticEdge({
   const statuses = data?.statuses ?? []
   const emphasis = data?.emphasis ?? 'normal'
   const markerId = `arrow-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-  const arrowSize = Math.max(8, 8 / Math.max(data.zoom, 0.2))
+  const arrowSize = Math.max(6.4, 6.4 / Math.max(data.zoom, 0.2))
   const strokeWidth = Math.max(1.5, 1.5 / Math.max(data.zoom, 0.2))
   const emphasized = ['outgoing', 'incoming', 'neighbor', 'selected'].includes(emphasis)
+  const accented = ['outgoing', 'incoming', 'selected'].includes(emphasis)
   const diffIncrement = statuses.includes('added') || statuses.includes('changed') ? 0.25 : 0
-  const edgeStyle = { strokeWidth: strokeWidth + (emphasized ? 0.8 : diffIncrement) } as CSSProperties
+  const stroke = edgeStrokeToken(emphasis, statuses)
+  const edgeStyle = { stroke, strokeWidth: strokeWidth + (emphasized ? 0.8 : diffIncrement) } as CSSProperties
   const focusStyle = { strokeWidth: strokeWidth + 5 } as CSSProperties
-  const expandedPort = data.showLabel
+  const expandedPort = data.expandPort
   return (
     <>
       <defs>
-        <marker id={markerId} markerHeight={arrowSize} markerUnits="userSpaceOnUse" markerWidth={arrowSize} orient="auto" refX="9" refY="5" viewBox="0 0 10 10">
-          <path className={`semantic-arrow is-${emphasis} ${statuses.map((status) => `is-${status}`).join(' ')}`} d="M 0 0 L 10 5 L 0 10 z" />
+        <marker id={markerId} markerHeight={arrowSize} markerUnits="userSpaceOnUse" markerWidth={arrowSize} orient="auto" refX="10" refY="5" viewBox="0 0 10 10">
+          <path className={`semantic-arrow is-${emphasis} ${statuses.map((status) => `is-${status}`).join(' ')}`} d="M 0 0 L 10 5 L 0 10 z" style={{ fill: stroke }} />
         </marker>
       </defs>
       <BaseEdge className={`semantic-edge-focus is-${emphasis}`} id={`${id}:focus`} interactionWidth={0} path={path} style={focusStyle} />
@@ -175,12 +182,13 @@ function SemanticEdge({
         style={edgeStyle}
       />
       <EdgeLabelRenderer>
-        {data.showLabel ? <button className="edge-label" data-emphasis={emphasis} data-status={statuses.join(' ')} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.labelPoint.x}px,${data.labelPoint.y}px)` }} type="button">
+        {data.showLabel ? <button className="edge-label" data-emphasis={emphasis} data-status={statuses.join(' ')} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.labelPoint.x}px,${data.labelPoint.y}px)` }} title={data.label} type="button">
           {data.label}
           {data.memberCount > 1 ? <i>{data.memberCount}</i> : null}
           {statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
         </button> : null}
-        {data.port ? <button aria-label={`Interface port ${data.port.label}`} className="interface-port" data-expanded={expandedPort ? 'true' : 'false'} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.port.point.x}px,${data.port.point.y}px)` }} title={data.port.label} type="button">
+        {[data.anchors.sourcePoint, data.anchors.targetPoint].map((point, index) => <span aria-hidden="true" className="edge-port" data-accent={accented ? 'true' : 'false'} key={index} style={{ transform: `translate(-50%, -50%) translate(${point.x}px,${point.y}px)` }} />)}
+        {data.port ? <button aria-label={`Interface port ${data.port.label}`} className="interface-port" data-accent={accented ? 'true' : 'false'} data-expanded={expandedPort ? 'true' : 'false'} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.port.point.x}px,${data.port.point.y}px)` }} title={data.port.label} type="button">
           {expandedPort ? <>{data.port.label}{data.port.count > 1 ? <i>{data.port.count}</i> : null}</> : null}
         </button> : null}
       </EdgeLabelRenderer>
@@ -229,6 +237,7 @@ function flowEdge(
   selected: boolean,
   hovered: boolean,
   showLabel: boolean,
+  expandPort: boolean,
   zoom: number,
   onSelect: () => void = () => {},
   onHover: (hovered: boolean) => void = () => {},
@@ -239,6 +248,7 @@ function flowEdge(
       direction: spline.direction,
       edge,
       emphasis,
+      expandPort,
       hovered,
       label: spline.label || edge.key,
       labelPoint: route.labelPoint,
@@ -318,7 +328,7 @@ function DependencyView({
       <header><div><span className="panel-kicker">DEPENDENCY FOCUS</span><h2>{rowLabel(focus.row)}</h2><p>{incoming.length} incoming · {outgoing.length} outgoing · {new Set([...incoming, ...outgoing].flatMap(({ edge }) => [...edge.interfaces, ...edge.relationships])).size} connections</p><label>Focus <select aria-label="Dependency focus" onChange={(event) => { const node = projected.nodes.find((item) => item.key === event.target.value); if (node) { onFocus(node.key); onSelect(node.kind, node.row, node.members) } }} value={focusKey}>{projected.nodes.map((node) => <option key={node.key} value={node.key}>{rowLabel(node.row)}</option>)}</select></label></div><button aria-label="Close dependency view" onClick={onClose} type="button">×</button></header>
       <div className="dependency-columns">
         {column('Incoming', incoming)}
-        <button className="dependency-focus-node" onClick={() => onSelect(focus.kind, focus.row, focus.members)} type="button"><span className="kind-pill">{KIND_LABEL[focus.kind]}</span><strong>{rowLabel(focus.row)}</strong></button>
+        <button className="dependency-focus-node" data-kind={focus.kind} onClick={() => onSelect(focus.kind, focus.row, focus.members)} style={kindPresentationStyle(focus.kind, true)} type="button"><span className="kind-pill" data-kind={focus.kind}>{KIND_LABEL[focus.kind]}</span><strong>{rowLabel(focus.row)}</strong></button>
         {column('Outgoing', outgoing)}
       </div>
     </section>
@@ -397,6 +407,7 @@ export default function App() {
     ? null
     : projectState(payload, { ...view, position: previousPosition }), [previousPosition, view])
   const union = useMemo(() => unionGraph(payload, view.timeline, view.level, view.drill), [view.drill, view.level, view.timeline])
+  const projectedHub = useMemo(() => starHub(projected), [projected])
   const layoutKey = makeLayoutKey(view)
   const cardSizes = useMemo(() => new Map(union.nodes.map((node) => [node.key, cardSize(node, view.level, measureCardText)])), [union, view.level])
   // A layout computed for a different projection must never apply
@@ -444,11 +455,11 @@ export default function App() {
     let active = true
     const rect = canvasRef.current?.getBoundingClientRect()
     const aspectRatio = rect?.height ? rect.width / rect.height : 1.6
-    void unionLayout(union, layoutKey, cardSizes, aspectRatio)
+    void unionLayout(union, layoutKey, cardSizes, aspectRatio, projectedHub)
       .then((next) => { if (active) setLayoutResult({ key: layoutKey, positions: next }) })
       .catch(() => { if (active) setDiagnostic('Layout failed. The report remains available with fallback positions.') })
     return () => { active = false }
-  }, [cardSizes, layoutKey, union])
+  }, [cardSizes, layoutKey, projectedHub, union])
 
   const graphNodes = useMemo(() => {
     const merged = new Map(projected.nodes.map((node) => [node.key, { node, ghost: false }]))
@@ -560,17 +571,29 @@ export default function App() {
       if (hoveredKey) return spline.source === hoveredKey || spline.target === hoveredKey ? 'neighbor' : 'unrelated'
       return 'normal'
     }
-    return rendered.flatMap(({ edge, ghost, spline }, _index, all) => {
+    const routable = rendered.flatMap(({ edge, ghost, spline }) => {
       const sourceRect = absoluteRect(spline.source, positions)
       const targetRect = absoluteRect(spline.target, positions)
       if (!sourceRect || !targetRect) return []
-      const siblings = all.filter((item) => item.edge.key === edge.key)
-      const laneIndex = siblings.findIndex((item) => item.spline.id === spline.id)
-      const anchors = edgeAnchors(sourceRect, targetRect, laneIndex, siblings.length)
-      const route = splinePath(anchors, obstacleRects)
+      return [{ edge, ghost, sourceRect, spline, targetRect }]
+    })
+    const anchorsById = edgeAnchors(routable.map(({ sourceRect, spline, targetRect }) => ({
+      id: spline.id,
+      sourceId: spline.source,
+      sourceRect,
+      targetId: spline.target,
+      targetRect,
+    })))
+    const occupiedLabels: EdgeRect[] = []
+    return routable.map(({ edge, ghost, spline }, index) => {
+      const anchors = anchorsById.get(spline.id)!
       const isSelected = spline.id === selectedSplineId
       const isHovered = spline.id === hoveredEdgeId
-      return [flowEdge(
+      const showLabel = edgeLabelVisible(depth, isSelected, isHovered)
+      const labelWidth = Math.min(180, Math.max(48, spline.label.length * 6 + 20 + (spline.members.length > 1 ? 24 : 0)))
+      const route = splinePath(anchors, obstacleRects, occupiedLabels, labelWidth, index % 2 === 0)
+      if (showLabel) occupiedLabels.push(route.labelRect)
+      return flowEdge(
         edge,
         spline,
         anchors,
@@ -579,11 +602,12 @@ export default function App() {
         edgeEmphasis(spline),
         isSelected,
         isHovered,
-        edgeLabelVisible(depth, isSelected, isHovered),
+        showLabel,
+        depth === 'full' || isSelected || isHovered,
         zoom,
         () => revealInfo({ type: 'edge', direction: spline.direction, edge }),
         (hovered) => setHoveredEdgeId(hovered ? spline.id : null),
-      )]
+      )
     })
   }, [depth, diff, graphEdges, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedDisplayKey, selectedSplineId, view.aspect, view.lens, zoom])
 
@@ -755,7 +779,7 @@ export default function App() {
     drillCursor = parentKey(drillCursor)
   }
   return (
-    <div className="app" data-hover={hoveredKey || hoveredEdgeId ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selected ? 'active' : 'off'}>
+    <div className="app" data-hover={hoveredKey || hoveredEdgeId ? 'active' : 'off'} data-lens={view.lens.length ? 'active' : 'off'} data-selection={selected ? 'active' : 'off'} style={themeStyle(payload.theme)}>
       <header className="app-header">
         <div className="brand-lockup"><span className="brand-mark">OT</span><div><span>OneTool Architecture</span><strong>{payload.source}</strong></div></div>
         <button className="search-trigger" onClick={() => setSearchOpen(true)} ref={searchTrigger} type="button"><SearchIcon /><span>Search</span><kbd>⌘K</kbd></button>

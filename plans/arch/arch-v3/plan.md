@@ -203,10 +203,11 @@ docs):
 - **Subsystem level** (was the D14 interlude; gate PASSED 2026-08-29,
   293/1,100): System / Subsystem / Container / Component / Code chain,
   Subsystem entity kind, eleven-sheet Excel, acme fixture delta.
-- [ ] **P11 — canvas presentation** (added 2026-08-29 from the user's
+- [x] **P11 — canvas presentation** (added 2026-08-29 from the user's
   IcePanel comparison review; spec: report.md "Polish contract — pass 5:
-  canvas presentation (P11)"; prompt READY in delegation.md; proposed
-  budget 2,400 changed source lines — confirm before running).
+  canvas presentation (P11)"; DONE, gate PASSED 2026-08-29 at
+  736/2,400 changed source lines plus a small architect fix at the
+  gate — see the progress log).
   Topology-aware layout (hub-centered radial for star-shaped flat
   graphs, layered kept elsewhere), uniform spacing, edge termination
   stubs + distributed visible ports, at-rest edge label pills, quiet
@@ -218,9 +219,10 @@ docs):
   already unrestricted; systems structurally root-only.
 - [ ] **P12 — map model: in-place C4 expansion** (added 2026-08-29,
   user-directed; spec: report.md "Map contract — in-place C4 expansion
-  (P12)"; prompt GENERATED in delegation.md — review + update at the
-  P11 gate per the pipeline rule; proposed budget 2,600 changed source
-  lines — confirm before running). Expansion-set view state replacing
+  (P12)"; prompt READY in delegation.md — re-reviewed at the P11 gate
+  with post-P11 integration notes and the exact acme showcase rows;
+  proposed budget 2,600 changed source lines — confirm before
+  running). Expansion-set view state replacing
   level+drill, tree-based one-generation expand/collapse (mixed child
   kinds), persistent cumulative expansion, deepest-visible endpoint
   resolution (defined vs derived attachment), Detail dropdown as bulk
@@ -344,6 +346,78 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-29** — P11 architect gate PASSED (with one gate fix); tree
+  committed; P12 prompt re-reviewed and finalized per the pipeline rule.
+  Independently re-verified: frontend 45 passed, arch py 79 passed,
+  `just lint` clean, `just build-arch-report` (incl. `tsc --noEmit`)
+  reproduced the pre-fix template byte-for-byte, budget confirmed at
+  736/2,400 (697 tracked + 39 new theme.ts), CLI runs standalone
+  (acme validate: 0 errors / 24 warnings). Code review conforms to the
+  pass-5 contract: deterministic radial construction with 48 px
+  clearance and grid-packed disconnected nodes, bearing-ordered
+  distributed anchors (>= 14 px separation, centered groups respect
+  corner clearance), straight 12 px stubs with flush 0.8x arrows,
+  midpoint label pills with +/-20% alternating nudge and
+  card/pill-collision avoidance, neutral `--edge` strokes with accent
+  reserved for selection/one-hop, six `--kind-*` tokens shared across
+  canvas/Info/Data, theme round-trip (YAML/Excel Settings/payload) with
+  located `unknown_theme_key`/`invalid_color`, compact 220 px user
+  cards. GATE FIX (architect, in-scope): the executor tied interface-
+  port expansion to `showLabel`, which P11 widened to Read — so at Read
+  every interface also rendered an expanded port pill at its attachment
+  point; live Playwright check found all 14 clipping their cards and 9
+  pill-pill overlaps (the executor's "no overlaps" claim had only
+  checked midpoint labels; their own screenshots show the clutter).
+  Fixed by a separate `expandPort` flag (Full depth or
+  selected/hovered — D13c's original timing); at Read ports are now
+  dots, and the live re-check shows zero pill-card and zero pill-pill
+  overlaps at Read with a clean console. Bundle rebuilt, acme report
+  regenerated, labels-at-rest.png recaptured (the other four executor
+  screenshots predate the fix but their subjects are unaffected).
+  Watch item for P12: `edgeAnchors` fails fast (RangeError) when a
+  side cannot fit its batch — fine today, but expansion concentrates
+  edges, noted in the P12 prompt. P12 prompt finalized: post-P11
+  integration notes (expandPort split, `preferredHub` pass-through,
+  anchor-capacity stop-and-ask) and the exact acme showcase rows
+  (edge-bot-defense at subsystem level, strangler-route-cutover at
+  component level; four-level path commerce-platform -> storefront-edge
+  -> commerce-edge -> components verified live in the fixture). Next
+  action: user confirms the P12 budget (2,600) and runs the P12 prompt;
+  the Phase 1 exit gate follows the P12 gate.
+
+- **2026-08-29** — P11 canvas presentation implemented; left uncommitted for
+  the architect's gate review. Flat projected stars now seed a deterministic
+  radial union layout (centered hub, top-biased users, outward deeper nodes,
+  disconnected grid pack); non-stars retain the existing ELK input. Edges use
+  batched distributed ports, 12 px normal stubs, flush smaller arrows, and
+  collision-checked Read/Full label pills. Canvas colors are neutral at rest,
+  share six kind tokens across canvas/Info/Data, reserve accent for interaction,
+  and compact user cards. Optional `theme.kinds` now validates, round-trips in
+  canonical YAML and Excel `Settings`, and passes through the payload. Source
+  budget: **736 / 2,400 lines** (additions + deletions; tests/generated bundle
+  excluded). Tests: exactly six prescribed cases added or updated; frontend
+  **45 passed**, arch Python **79 passed / 540 deselected**, `just lint` and
+  `just build-arch-report` clean. CLI payload fixtures and the acme report were
+  regenerated. Rule-9 file verification passed at 1440×900 and 1024×720 with
+  zero console warnings/errors, local-file requests only, no card/label
+  overlaps, and the required five screenshots captured in `plans/arch/wip/`.
+  Assumptions resolved from the strongest explicit contracts: (1) the user's
+  final no-commit instruction and standard rule 8 override the prompt's generic
+  commit wording; (2) “ELK unchanged” preserves its existing 40/72 px options,
+  while radial layout alone guarantees the explicit 48 px clearance; (3) a
+  fixed side has finite 14 px port capacity, so impossible batches fail with a
+  clear `RangeError`; (4) equal hub candidates sort by incident count then node
+  key, and disconnected means outside the chosen hub component; (5) absent
+  payload theme serializes as `{}` because the payload schema explicitly names
+  the key; (6) the numbered Settings-sheet contract supersedes the stale
+  ten-sheet wording, with Settings optional on read and created when needed;
+  (7) theme keys and valid hex values preserve authored spelling/case without
+  normalization; (8) “rendered edges” means projected aggregated graph edges;
+  (9) hub center means the one-hop ring's bounding-box center, with deeper and
+  disconnected nodes allowed outside it; (10) the cold projected star chooses
+  the hub for the cached union layout, preserving stage-stable positions without
+  letting a future hidden node occupy the baseline center. Open questions: none.
 
 - **2026-08-29** — P11/P12 designed and authored (user-directed, from the
   IcePanel comparison review of the current acme report); tree committed.
