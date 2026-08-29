@@ -349,6 +349,39 @@ inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
 
+- **2026-08-29** — Phase 1 exit gate: architect half RUN (user half
+  outstanding) + one gate fix landed. Walkthrough at 1440×900 and
+  1024×720 under `file://` (light theme, state cleared for true cold
+  load): console clean at every step, the only network request is the
+  local HTML file, cold open reads (radial hub, at-rest pills, Read
+  framing), card select opens Info with one-hop accent and keeps the
+  selection visible, spline select shows connection Details with linked
+  endpoints/direction/member, Stage 5 renders the cutover story (new
+  hub + retired dashes), Data opens with four tabs and no empty
+  columns, at 1024×720 View auto-collapses when Info opens and the app
+  fills the viewport exactly (1024×720 doc size, zero scroll).
+  Evidence: `plans/arch/wip/test-results/exit-gate/*.png`.
+  GATE FIX (architect, mid-gate user finding): splines rendered dead
+  straight — the executor's cubic controls sat ON the chord (45% along
+  it), violating the pass-5 contract (report.md:1006 "control points
+  perpendicular to the card border"; :1318 "curve runs between stub
+  tips"). `splinePath.ts` now derives controls from the anchor-side
+  normals (reach 0.35×span clamped 24–140 px, waypoint tangent 0.12)
+  and places label pills by sampling the true curve; stubs, arrows,
+  obstacle routing, and the returned polyline are unchanged (45
+  frontend tests pass unmodified). Live re-check matches the IcePanel
+  reference: sweeping S-curves, perpendicular arrivals, pills on the
+  curve, one-hop accent intact, console clean. Bundle rebuilt, acme
+  report regenerated. Tooling note: Playwright MCP's screenshot tool
+  wedged mid-session (5 s timeouts with a quiescent page); fixed by
+  `ot_servers.restart(name='playwright')`. Not re-run this pass
+  (verified at the D13a–d gates, unaffected by the spline fix): dock
+  drag-resize, forced reduced-motion. Payload-viewer and sequence
+  acceptance checks are Phase 2 scope. Next action: user reviews the
+  regenerated `plans/arch/wip/acme-report.html` + the exit-gate
+  screenshots and confirms (or fails) the gate; on pass, wave 2 opens
+  with the attachments design → P21.
+
 - **2026-08-29** — P12 anchor-capacity blocker resolved (architect) and
   the P12 architect gate PASSED; tree committed. Design decision on open
   question 2: **perimeter overflow** — an over-full card side sheds its

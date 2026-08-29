@@ -7,6 +7,18 @@ type Point = SplinePoint
 
 const CLEARANCE = 8
 const OUTSET = 12
+const CURVE_MIN = 24
+const CURVE_MAX = 140
+const CURVE_RATIO = 0.35
+const WAYPOINT_TANGENT = 0.12
+const SAMPLE_STEPS = 12
+
+const SIDE_NORMALS: Record<EdgeSide, Point> = {
+  bottom: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+  top: { x: 0, y: -1 },
+}
 
 function distance(left: Point, right: Point): number {
   return Math.hypot(right.x - left.x, right.y - left.y)
@@ -158,22 +170,53 @@ function labelPlacement(
   )) ?? candidates[0]
 }
 
-function cubicCommands(points: Point[]): string[] {
-  const commands: string[] = []
+type CubicSegment = { start: Point; first: Point; second: Point; end: Point }
+
+function cubicSegments(points: Point[], sourceSide: EdgeSide, targetSide: EdgeSide): CubicSegment[] {
+  const sourceNormal = SIDE_NORMALS[sourceSide]
+  const targetNormal = SIDE_NORMALS[targetSide]
+  const segments: CubicSegment[] = []
   for (let index = 0; index < points.length - 1; index += 1) {
     const current = points[index]
     const next = points[index + 1]
     const previous = points[Math.max(0, index - 1)]
     const after = points[Math.min(points.length - 1, index + 2)]
+    const reach = Math.min(CURVE_MAX, Math.max(CURVE_MIN, distance(current, next) * CURVE_RATIO))
     const first = index === 0
-      ? { x: current.x + (next.x - current.x) * 0.45, y: current.y + (next.y - current.y) * 0.45 }
-      : { x: current.x + (next.x - previous.x) * 0.04, y: current.y + (next.y - previous.y) * 0.04 }
+      ? { x: current.x + sourceNormal.x * reach, y: current.y + sourceNormal.y * reach }
+      : {
+          x: current.x + (next.x - previous.x) * WAYPOINT_TANGENT,
+          y: current.y + (next.y - previous.y) * WAYPOINT_TANGENT,
+        }
     const second = index === points.length - 2
-      ? { x: next.x - (next.x - current.x) * 0.45, y: next.y - (next.y - current.y) * 0.45 }
-      : { x: next.x - (after.x - current.x) * 0.04, y: next.y - (after.y - current.y) * 0.04 }
-    commands.push(`C ${first.x} ${first.y}, ${second.x} ${second.y}, ${next.x} ${next.y}`)
+      ? { x: next.x + targetNormal.x * reach, y: next.y + targetNormal.y * reach }
+      : {
+          x: next.x - (after.x - current.x) * WAYPOINT_TANGENT,
+          y: next.y - (after.y - current.y) * WAYPOINT_TANGENT,
+        }
+    segments.push({ start: current, first, second, end: next })
   }
-  return commands
+  return segments
+}
+
+function cubicPoint(segment: CubicSegment, t: number): Point {
+  const u = 1 - t
+  return {
+    x: u * u * u * segment.start.x + 3 * u * u * t * segment.first.x
+      + 3 * u * t * t * segment.second.x + t * t * t * segment.end.x,
+    y: u * u * u * segment.start.y + 3 * u * u * t * segment.first.y
+      + 3 * u * t * t * segment.second.y + t * t * t * segment.end.y,
+  }
+}
+
+function sampleSegments(segments: CubicSegment[]): Point[] {
+  const samples: Point[] = segments.length ? [segments[0].start] : []
+  for (const segment of segments) {
+    for (let step = 1; step <= SAMPLE_STEPS; step += 1) {
+      samples.push(cubicPoint(segment, step / SAMPLE_STEPS))
+    }
+  }
+  return samples
 }
 
 export function splinePath(
@@ -191,12 +234,14 @@ export function splinePath(
   const middle = simplify(shortestPath(sourceOutset, targetOutset, obstacles), obstacles)
   const points = [anchors.sourcePoint, ...middle, anchors.targetPoint]
     .filter((point, index, all) => index === 0 || distance(point, all[index - 1]) > 0.01)
+  const segments = cubicSegments(middle, anchors.sourcePoint.side, anchors.targetPoint.side)
   const path = [
     `M ${anchors.sourcePoint.x} ${anchors.sourcePoint.y}`,
     `L ${sourceOutset.x} ${sourceOutset.y}`,
-    ...cubicCommands(middle),
+    ...segments.map((s) => `C ${s.first.x} ${s.first.y}, ${s.second.x} ${s.second.y}, ${s.end.x} ${s.end.y}`),
     `L ${anchors.targetPoint.x} ${anchors.targetPoint.y}`,
   ].join(' ')
-  const label = labelPlacement(points, rects, occupiedLabels, labelWidth, preferNegativeNudge)
+  const curve = [anchors.sourcePoint, ...sampleSegments(segments), anchors.targetPoint]
+  const label = labelPlacement(curve, rects, occupiedLabels, labelWidth, preferNegativeNudge)
   return { labelPoint: label.point, labelRect: label.rect, path, points }
 }
