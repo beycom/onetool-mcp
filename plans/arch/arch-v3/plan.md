@@ -29,7 +29,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Implementation | `src/otdev/tools/arch.py` facade + `src/otdev/tools/_arch/v3/`; report app source `frontend/arch-report/` (v1 deleted at cutover 2026-08-23) |
 | Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
-| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16 assigned to chunk P15; p24/p26–p29/p32 open, unassigned (wave-2 polish chunk, authored at wave-2 start; p27 needs a user decision — default remove); p3-* files feed P22/P43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
+| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16 assigned to chunk-15; p24/p26–p29/p32 open, unassigned (wave-2 polish chunk, authored at wave-2 start; p27 needs a user decision — default remove); p3-* files feed chunk-22/chunk-43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
 | Confirmed UI direction (decision source for all UI work) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
 | UI polish issue list (CLOSED 2026-08-29) | `plans/arch/arch-v3/ui-polish.md` — 27 itemized issues (2026-08-25 Playwright walkthrough + 2026-08-28 user screenshots), tagged D13a–D13d; every issue now carries a CLOSED/WAIVED/superseded annotation — the Phase 1 exit gate re-checks the walkthrough, not the list |
@@ -79,9 +79,18 @@ models the user runs with the prompts in [delegation.md](delegation.md):
   Prompts carry the contract; executors stop and ask rather than improvise.
 - **Rule:** no delegated chunk feeds the next wave until the architect has
   reviewed it at the gate. Remaining sequence (waves 0–1 build done —
-  see Phase 1): P11 → P12 → Phase 1 exit gate → wave 2 (P21 ∥ P22 ∥
-  P23 as their architect artifacts land) → wave 3 (P31 → sequence
+  see Phase 1): P11 → P12 → Phase 1 exit gate → wave 2 (chunk-21 ∥ chunk-22 ∥
+  chunk-23 as their architect artifacts land) → wave 3 (chunk-31 → sequence
   gate) → waves 4–5. Historical sequencing detail: log-archive.md.
+- **Issues are fixed only through chunks (made explicit 2026-08-30):**
+  the user never "fixes an issue" as a separate activity — an issue
+  file in `issues/` waits until a chunk absorbs it. The chunk's
+  delegation prompt names the exact issue files it resolves (with a
+  READ-them instruction) and the plan's chunk table repeats the issue
+  ids; at the gate the architect moves the resolved files to
+  `issues/resolved/` and annotates them with the resolving chunk. So
+  the user's whole job is: run the READY prompt in delegation.md,
+  answer any user-decision issues the plan flags — nothing else.
 - **Rolling prompt pipeline (user-directed 2026-08-29):** prompts are
   generated ahead — as many as make sense for the piece of work, no
   strict limit — and every queued prompt is REVIEWED AND UPDATED
@@ -144,14 +153,32 @@ it. Three rules keep iteration fast:
 
 ## Chunk numbering (reorg 2026-08-29)
 
-Executor chunks are numbered `Pxy`: `x` = wave (execution order), `y` =
-priority inside the wave (lower first; same-wave chunks may run in
-parallel once their architect inputs exist). Waves 0–1 are the completed
-build — their chunks keep their historical ids (D1–D14, D13a–D13d) in
-the progress log, the design docs, and delegation.md, because renaming
-finished work would break those references. Outstanding chunks carry the
-new ids, with the old id noted as `(was Dn)`; delegation.md headings
-carry both.
+Outstanding executor chunks are named `chunk-xy` (renamed 2026-08-30
+from `Pxy`, which collided case-insensitively with the `pxy-*` issue
+files — mapping is 1:1, `P21` → `chunk-21`): `x` = wave (execution
+order), `y` = priority inside the wave (lower first; same-wave chunks
+may run in parallel once their architect inputs exist). Completed
+chunks keep their historical ids — `D1`–`D14`, `D13a`–`D13d`, and
+`P11`–`P14` — in the progress log, the design docs, and delegation.md,
+because renaming finished work would break those references. Chunk
+evidence dirs under `plans/arch/wip/test-results/` follow the chunk id
+(`chunk-15/`; the older `p13/`, `p14/` dirs are frozen history).
+
+**Identifier registries (one line each, so no scheme is ever confused
+with another):**
+
+- `D1`–`D14` / `P11`–`P14` — completed executor chunks (frozen
+  historical ids).
+- `chunk-xy` — outstanding executor chunks (this table; prompts in
+  delegation.md).
+- `pxy-*.md` — issue files in `issues/` (x = wave; separate registry
+  from chunks — issue p15 and chunk-15 are unrelated).
+- `#1`–`#27` — ui-polish.md items (all closed 2026-08-29, frozen).
+- Phases 1–3 and waves 0–5 — plan structure. NOT called "stages":
+  **Stage** is reserved for the report UI's milestone positions
+  (the Stage dropdown).
+- Progress-log entries older than 2026-08-30 use the pre-rename `Pxy`
+  chunk ids; the log is append-only and was not rewritten.
 
 | New id | Was | Chunk |
 | --- | --- | --- |
@@ -159,15 +186,15 @@ carry both.
 | P12 | — | Map model: in-place C4 expansion, endpoint resolution, presets (added 2026-08-29) |
 | P13 | — | Report UI correctness fixes: issues p15, p17, p18, p19 (added 2026-08-30) |
 | P14 | — | Layout engines + config + A/B harness — layout-design.md; absorbs issue p13 (added 2026-08-30) |
-| P15 | — | Edge-label collision + collapse affordance — issues p14, p16 (added 2026-08-30) |
-| P21 | D12a | Sequence parser + payload + attachments (re-scoped 2026-08-30) |
-| P22 | D11 | Report definitions + guided views |
-| P23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
-| P31 | D12b | Sequence renderer frontend |
-| P41 | — | SharePoint transport |
-| P42 | — | v2 YAML migration converter (conditional) |
-| P43 | — | Edit mode (save-back + manual positions) |
-| P51 | Dn (backfill) | Test-breadth backfill |
+| chunk-15 | — | Edge-label collision + collapse affordance — issues p14, p16 (added 2026-08-30) |
+| chunk-21 | D12a | Sequence parser + payload + attachments (re-scoped 2026-08-30) |
+| chunk-22 | D11 | Report definitions + guided views |
+| chunk-23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
+| chunk-31 | D12b | Sequence renderer frontend |
+| chunk-41 | — | SharePoint transport |
+| chunk-42 | — | v2 YAML migration converter (conditional) |
+| chunk-43 | — | Edit mode (save-back + manual positions) |
+| chunk-51 | Dn (backfill) | Test-breadth backfill |
 
 ## Phase 1 — Core build, gate rework, UI polish (waves 0–1) — DONE except the exit gate
 
@@ -247,15 +274,15 @@ docs):
   hash + localStorage, shared invariant suite, dev-only ?layout= A/B
   harness. Default-method decision (architect, from the captures): the
   topology-aware default is retained (layout-design.md Decisions 0).
-- [ ] **P15 — edge-label collision + collapse affordance** (added
+- [ ] **chunk-15 — edge-label collision + collapse affordance** (added
   2026-08-30 when the user flagged that issues p14 and p16 were owned
-  by no chunk; specs: report.md "Collision invariant (P15)" under
+  by no chunk; specs: report.md "Collision invariant (chunk-15)" under
   At-rest edge labels — absorbs p18's deferred orphan-label clause —
-  and "Collapse-control placement (P15)" under the Map contract;
+  and "Collapse-control placement (chunk-15)" under the Map contract;
   prompt READY in delegation.md, proposed budget 500). Runs before the
   exit-gate user half: p14 reproduces in the gate's own select-card
   walkthrough step.
-- [ ] **Phase 1 exit gate (architect + user)** — runs after the P15
+- [ ] **Phase 1 exit gate (architect + user)** — runs after the chunk-15
   gate (label collision changes the rendered frame). The held 3P exit gate:
   open acme's report cold and the story reads without explanation and
   *looks* deliberate. Run ui-polish-direction.md "Acceptance checks" at
@@ -269,9 +296,9 @@ docs):
 
 ## Phase 2 — Sequence diagrams, saved views, exports (waves 2–3)
 
-Unlocks at the Phase 1 exit gate. Owner docs: sequence.md (P21/P31),
-report.md (P22/P23). Budgets are re-agreed when each prompt is issued
-(provisional: ~500 py for P21, ~2,200 TS/TSX for P31). Write-path
+Unlocks at the Phase 1 exit gate. Owner docs: sequence.md (chunk-21/chunk-31),
+report.md (chunk-22/chunk-23). Budgets are re-agreed when each prompt is issued
+(provisional: ~500 py for chunk-21, ~2,200 TS/TSX for chunk-31). Write-path
 decision (2026-08-24) still stands: the app has **view** mode
 (standalone `file://`, read-only) and **edit** mode (local server owning
 the YAML write path); edit-mode work stays in Phase 3.
@@ -279,19 +306,19 @@ the YAML write path); edit-mode work stays in Phase 3.
 Wave 2 — independent chunks, run in parallel once each chunk's architect
 inputs exist:
 
-- [x] **Architect (before P21):** message-file attachments design —
+- [x] **Architect (before chunk-21):** message-file attachments design —
       DONE 2026-08-30 (user request 2026-08-26). Landed as: schema.md
       "Attachments" (interface `attachments` path list, path grammar,
       shared finding codes invalid_path / unresolved_file /
       invalid_file / large_attachment), sequence.md `attach` statement
       + compilation additions, report.md payload `files` key +
       interface-row serialization + "Attachments and the Payload
-      viewer" (viewer ships with P31 — one bundled highlighter, real
+      viewer" (viewer ships with chunk-31 — one bundled highlighter, real
       data; covers interface attachments too), adapters.md Interfaces
       `attachments` column, and two new architect-authored parser
-      vectors (`flows/attachments*.md` + `files/` samples) in the P21
-      control fixture. The held P21 prompt was re-scoped the same day.
-- [ ] **P21 (was D12a)** — sequence parser, validation findings,
+      vectors (`flows/attachments*.md` + `files/` samples) in the chunk-21
+      control fixture. The held chunk-21 prompt was re-scoped the same day.
+- [ ] **chunk-21 (was D12a)** — sequence parser, validation findings,
       `sequences` payload, interface + message attachments (fields,
       resolution, `files` embedding, Excel column), CLI + facade
       wiring. Control mechanism: the parser-vector fixture
@@ -299,23 +326,23 @@ inputs exist:
       2026-08-25; attachments vectors added 2026-08-30). Prompt
       re-scoped 2026-08-30, READY (proposed budget 700) — runs at the
       Phase 1 exit gate.
-- [ ] **P22 (was D11)** — saved report definitions + guided views:
+- [ ] **chunk-22 (was D11)** — saved report definitions + guided views:
       `p3-report-definitions` (named reports, view-mode flow — starting
       point: export the config as a ready-to-paste `views:` YAML entry;
       persist-to-model rides the deferred edit path) and
       `p3-ui-guided-view` (authored, playable guided views; resolves
       the MAP/PATH/LENS placeholders left by D7). Gated on architect
       designs for both. Issues: `issues/p3-*`.
-- [ ] **P23 (was D8)** — client-side SVG / draw.io download from the
+- [ ] **chunk-23 (was D8)** — client-side SVG / draw.io download from the
       report (serialize the laid-out scene client-side — the v2
       `ArchitectureScene`-not-DOM rule applies) + SQLite adapter (one
       table/kind + properties side table, per adapters.md).
 
-Wave 3 — after the P21 gate:
+Wave 3 — after the chunk-21 gate:
 
-- [ ] **Architect (P31 control):** layout vectors + 2–3 acme flow docs
+- [ ] **Architect (chunk-31 control):** layout vectors + 2–3 acme flow docs
       (multi-scenario, interval-carrying, ad-hoc participant).
-- [ ] **P31 (was D12b)** — `seqlayout.ts`, SVG layer, entity-box header
+- [ ] **chunk-31 (was D12b)** — `seqlayout.ts`, SVG layer, entity-box header
       row, SEQ-* interactions, fragment keys.
 - [ ] **Sequence gate (architect + user):** open an acme flow from
       View's Sequences group, play it through, switch scenario via the
@@ -329,14 +356,14 @@ Wave 3 — after the P21 gate:
 
 Wave 4 — per-item budgets, ordered by demonstrated need:
 
-- [ ] **P41** — SharePoint transport reusing the Excel mapping.
-- [ ] **P42** — migration converter from v2 YAML — only if a real v2
+- [ ] **chunk-41** — SharePoint transport reusing the Excel mapping.
+- [ ] **chunk-42** — migration converter from v2 YAML — only if a real v2
       dataset exists to migrate; otherwise skip (throwaway tooling).
 - [ ] **Architect:** edit-mode design — the local-server write path
       (deferred until Schema, Report, and File Import were complete;
       those are done, so this unblocks whenever edit mode is
       prioritised).
-- [ ] **P43** — edit mode: `p3-edit-save-back` +
+- [ ] **chunk-43** — edit mode: `p3-edit-save-back` +
       `p3-ui-manual-positions` (after the edit-mode design).
 - [ ] Revisit deferred items against demonstrated need only: Confluence
       embedding, PDF, dark theme (ui-polish.md #24 evidence binds any
@@ -347,7 +374,7 @@ Wave 5 — speed-mode debt, once v3 is stable:
 - [ ] **Architect:** OpenSpec — author the v3 spec
       (`openspec/specs/.../tool-arch/`) from the shipped behavior;
       archive/replace v1 spec content.
-- [ ] **P51** — test breadth: validation codes with location
+- [ ] **chunk-51** — test breadth: validation codes with location
       assertions, YAML/Excel error locations, header-normalization
       cases, model field-rule cases, template generation (mechanical;
       prompt written then).
@@ -378,6 +405,29 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-30** — Identifier collision resolved (user decision):
+  outstanding executor chunks renamed `Pxy` → `chunk-xy` (chunk-15,
+  chunk-21, chunk-22, chunk-23, chunk-31, chunk-41/42/43, chunk-51);
+  issue files KEEP their `pxy-*` names (an interim `ixy` rename from
+  earlier today was reverted before commit). Completed chunks keep
+  historical ids (D1–D14, P11–P14) per the 2026-08-29 reorg precedent;
+  log entries below this one keep pre-rename ids (append-only — the
+  mapping is 1:1). "stage-x" was considered for plan waves and
+  REJECTED: **Stage** is reserved for the report UI's milestone
+  positions. The full registry legend now lives in plan.md "Chunk
+  numbering"; chunk evidence dirs follow the chunk id going forward
+  (`test-results/chunk-15/`). Also made explicit in the Delegation
+  model (user request): issues are fixed ONLY through chunks — each
+  chunk prompt names the exact `issues/pxy-*.md` files it resolves and
+  instructs the executor to read them; the architect moves them to
+  resolved/ at the gate; the user's whole job is running the READY
+  prompt and answering flagged user-decision issues (currently: p27,
+  Detail dropdown, default remove). Live-text updates across plan.md,
+  delegation.md, report.md, schema.md, adapters.md, issues/ index +
+  files. Next action unchanged: user confirms the chunk-15 budget
+  (500) and runs the chunk-15 prompt; architect gates it; then the
+  Phase 1 exit gate.
 
 - **2026-08-30** — Attachments design landed, chunk P15 authored (user
   flagged unowned issues p14/p16), issues/ cleaned up; tree committed.

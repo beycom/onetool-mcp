@@ -426,7 +426,7 @@ round-trip preserves the block; an absent sheet means no theme. The
 theme never affects resolution, diffing, or validation semantics — it is
 presentation only.
 
-## Attachments (sample payload files — added 2026-08-30, lands with P21)
+## Attachments (sample payload files — added 2026-08-30, lands with chunk-21)
 
 An interface may link sample request/response payload files stored beside
 the model:

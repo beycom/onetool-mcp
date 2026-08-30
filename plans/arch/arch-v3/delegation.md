@@ -14,10 +14,14 @@ Status legend: **READY** — paste and run now (respect the "after" column).
 **GATED** — the architect must produce an input artifact first; the prompt
 below is the template it will be issued from.
 
-**Numbering note (reorg 2026-08-29):** plan.md renumbered outstanding
-chunks to `Pxy` wave ids (x = wave, y = priority — mapping table in
-plan.md "Chunk numbering"). Completed chunks keep their historical ids;
-outstanding headings below carry both (`P21 (was D12a)` etc.).
+**Numbering note (reorg 2026-08-29, renamed 2026-08-30):** outstanding
+chunks are `chunk-xy` (x = wave, y = priority — registry legend and
+mapping table in plan.md "Chunk numbering"; renamed from `Pxy`, which
+collided case-insensitively with the `pxy-*` issue files). Completed
+chunks keep their historical ids (D1–D14, P11–P14); outstanding
+headings below carry the lineage (`chunk-21 (was D12a)` etc.). A chunk
+that resolves issues NAMES the exact `issues/pxy-*.md` files in its
+prompt — executors read them as part of the contract.
 
 | Prompt | Chunk | Status | Run after |
 | --- | --- | --- | --- |
@@ -33,11 +37,11 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
 | P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
 | P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
-| P15 | Edge-label collision + collapse affordance (issues p14, p16) | READY (authored 2026-08-30) | now — pre-exit-gate |
-| P21 (was D12a) | Sequence parser + payload + attachments | READY (re-scoped 2026-08-30 for the attachments design) | Phase 1 exit gate |
-| P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
-| P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
-| P31 (was D12b) | Sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | P21 gate |
+| chunk-15 | Edge-label collision + collapse affordance (issues p14, p16) | READY (authored 2026-08-30) | now — pre-exit-gate |
+| chunk-21 (was D12a) | Sequence parser + payload + attachments | READY (re-scoped 2026-08-30 for the attachments design) | Phase 1 exit gate |
+| chunk-22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
+| chunk-23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
+| chunk-31 (was D12b) | Sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | chunk-21 gate |
 
 ## Standard rules — prepend to EVERY prompt
 
@@ -127,12 +131,12 @@ Report scaffold: payload compiler, vite single-file bundle, template injection. 
 
 Client projection + union layout, time slider + diff, tables, fragment views. (The first phase-3 gate on the result produced the issues/ set.) Full prompt in git history.
 
-## P23 (was D8) — GATED (template to be issued at wave-2 start)
+## chunk-23 (was D8) — GATED (template to be issued at wave-2 start)
 
-- **P23:** SQLite adapter per adapters.md and client-side SVG/
+- **chunk-23:** SQLite adapter per adapters.md and client-side SVG/
   draw.io download; prompts written after the Phase 1 exit gate.
 
-## D9–D10 + P22 — gate rework and view-mode capabilities (issued per wave)
+## D9–D10 + chunk-22 — gate rework and view-mode capabilities (issued per wave)
 
 Same delegation model as D1–D8. Requirements live in
 `plans/arch/arch-v3/issues/` (index `issues.md`); the architect folds each
@@ -150,30 +154,30 @@ from issue files.
   report.md "Wave-2 UI contract (v1)" — the single authoritative input.
   Split per the scoping note: D10a chrome/panels/tables, D10b canvas
   semantics + visuals. UI rule 9 applies to both.
-- **P22 (was D11 — view-mode capabilities):** `p3-report-definitions`
+- **chunk-22 (was D11 — view-mode capabilities):** `p3-report-definitions`
   (view-mode flow; `views:` YAML export starting point) and
   `p3-ui-guided-view` (resolves MAP/PATH/LENS). Gated on the Phase 1
   exit gate plus architect designs for both. `p3-edit-save-back` and
-  `p3-ui-manual-positions` are NOT delegated — edit mode (P43) is
+  `p3-ui-manual-positions` are NOT delegated — edit mode (chunk-43) is
   deferred and gets its own prompts when the local-server write path is
   designed.
 
-## P21/P31 (were D12a/D12b) — sequence diagrams (GATED; issued per chunk)
+## chunk-21/chunk-31 (were D12a/D12b) — sequence diagrams (GATED; issued per chunk)
 
 Design doc: sequence.md (2026-08-25). Prompts are issued when the
 architect artifacts exist; executors work from sequence.md + the prompt.
 
-- **P21 (was D12a — Python):** ISSUED 2026-08-25 (below) — flow-doc
+- **chunk-21 (was D12a — Python):** ISSUED 2026-08-25 (below) — flow-doc
   parser, validation findings, `sequences` payload section, CLI +
   `arch.validate`/`arch.generate` wiring. The parser-vector fixture
   (`tests/unit/tools/fixtures/arch/sequence/`) is committed and is the
   control mechanism. ON HOLD until the Phase 1 exit gate (user
   directive 2026-08-25); re-scope for message-file refs before running;
   no frontend files.
-- **P31 (was D12b — frontend):** `seqlayout.ts` + SVG layer + entity-box
+- **chunk-31 (was D12b — frontend):** `seqlayout.ts` + SVG layer + entity-box
   header row + the SEQ-* interaction contract. Gated on the architect's
-  layout vectors and the acme flow docs; runs after the P21 gate, may
-  run parallel with P22/P23.
+  layout vectors and the acme flow docs; runs after the chunk-21 gate, may
+  run parallel with chunk-22/chunk-23.
 
 ## D9a — Phase 3R wave 1a: model/resolver/validation rework (DONE 2026-08-25, committed)
 
@@ -534,7 +538,7 @@ pytest run unchanged by this chunk), then STOP — D13d is a separate
 prompt.
 ```
 
-## P21 (was D12a) — sequence parser + payload + attachments (re-scoped 2026-08-30; READY, runs once the Phase 1 exit gate passes)
+## chunk-21 (was D12a) — sequence parser + payload + attachments (re-scoped 2026-08-30; READY, runs once the Phase 1 exit gate passes)
 
 ```text
 [standard rules]
@@ -977,7 +981,7 @@ interior packing conflicts with the P12 anchor-stability contract
 rather than improvising.
 ```
 
-## P15 — Edge-label collision + boundary collapse affordance (READY, authored 2026-08-30)
+## chunk-15 — Edge-label collision + boundary collapse affordance (READY, authored 2026-08-30)
 
 ```text
 [standard rules incl. rule 9]
@@ -986,8 +990,8 @@ Context: two open canvas defects block the Phase 1 exit gate — issues
 p14-ui-edge-labels-overlap and p16-ui-collapse-affordance. READ BOTH
 issue files in plans/arch/arch-v3/issues/ plus their v3-*.png evidence
 screenshots. The normative contracts are in report.md: "At-rest edge
-labels" -> "Collision invariant (P15)" + "Orphan suppression", and "Map
-contract — Interaction" -> "Collapse-control placement (P15)". Frontend
+labels" -> "Collision invariant (chunk-15)" + "Orphan suppression", and "Map
+contract — Interaction" -> "Collapse-control placement (chunk-15)". Frontend
 only (frontend/arch-report/): no Python, no payload changes, no layout
 engine changes (layout.ts engines are off-surface — this is
 presentation-pass work over the rendered frame). Budget: 500 changed
@@ -1033,7 +1037,7 @@ pill-card and zero pill-pill overlaps at every step; confirm the outer
 System boundary's collapse control sits beside its own title and
 nothing collapse-like renders adjacent to the focused child card;
 console clean throughout. Capture replacement evidence to
-plans/arch/wip/test-results/p15/. Rebuild the bundle and regenerate
+plans/arch/wip/test-results/chunk-15/. Rebuild the bundle and regenerate
 plans/arch/wip/acme-report.html via the CLI.
 
 Definition of done: rules 5–8 (lint, arch pytest, budget, log entry) +

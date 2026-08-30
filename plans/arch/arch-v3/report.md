@@ -91,7 +91,7 @@ payload.)
   components, code, users, interfaces, relationships), each in **authored
   order**. Row identity is `(collection, array index)`; revision rows share
   an `id` across indices.
-- `files` (added 2026-08-30, lands with P21) — present only when any
+- `files` (added 2026-08-30, lands with chunk-21) — present only when any
   interface or sequence message carries attachments (schema.md
   "Attachments"): an object keyed by relative path (sorted), each value
   `{"lang": "json" | "xml" | "csv" | "yaml" | "text", "text": "<file
@@ -1350,7 +1350,7 @@ semantics (P12), `projection.ts`, Info/Data content, drill behavior.
   of arc length) to clear card bodies; a pill never renders clipped by
   a card — overlap with another pill resolves by alternating the nudge
   direction deterministically.
-- **Collision invariant (P15, from issue p14 — supersedes any weaker
+- **Collision invariant (chunk-15, from issue p14 — supersedes any weaker
   reading above):** a pill never renders overlapping a card, a boundary
   header, or another pill, in ANY zoom / selection / expansion state —
   not just the at-rest layout. Selection- and hover-revealed pills
@@ -1489,7 +1489,7 @@ map; layered runs inside expanded boundaries). Grounded in
   icon-only control in the boundary header; collapsing prunes the
   entity and all its descendants from the set. Escape order is
   unchanged (Escape never collapses).
-- **Collapse-control placement (P15, from issue p16):** the collapse
+- **Collapse-control placement (chunk-15, from issue p16):** the collapse
   control renders **inline with the boundary's own title** — immediately
   after the name + kind pill group, inside the header chrome, visually
   part of the boundary (header tint behind it) — and uses a collapse
@@ -1552,11 +1552,11 @@ report.
    id is dropped with a diagnostic; a legacy `drill=` link resolves to
    the equivalent expansion + selection.
 
-## Attachments and the Payload viewer (design landed 2026-08-30; viewer ships with P31)
+## Attachments and the Payload viewer (design landed 2026-08-30; viewer ships with chunk-31)
 
 Un-defers D13d's Payload viewer with real data (schema.md "Attachments",
 sequence.md `attach`). The Python half (fields, parsing, resolution,
-embedding) lands with P21; the viewer ships with P31 — one highlighter,
+embedding) lands with chunk-21; the viewer ships with chunk-31 — one highlighter,
 one chunk — and covers interface attachments on the canvas side too, not
 just sequence messages.
 
@@ -1572,7 +1572,7 @@ just sequence messages.
   action, content rendered per format — `json` / `xml` / `yaml`
   syntax-highlighted by a **bundled** highlighter (ships inside the
   single-file bundle, zero external requests; Prism core + json/xml/
-  yaml components, MIT, is the working choice — final call at the P31
+  yaml components, MIT, is the working choice — final call at the chunk-31
   prompt), `csv` as a read-only AG Grid table (reusing the existing
   grid), `text` as plain monospace. Highlight colors come from the
   app's light-theme tokens, not a stock highlighter theme.
