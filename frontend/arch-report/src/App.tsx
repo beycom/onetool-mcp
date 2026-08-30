@@ -32,7 +32,8 @@ import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
 import { InfoPanel, selectionKey, type Selection } from './InfoPanel'
 import { FitIcon, MapIcon, SearchIcon } from './Icons'
-import { applyPositions, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, stableExpansionLayout, starHub, unionLayout, type Positions } from './layout'
+import { applyPositions, defaultLayoutMethod, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, stableExpansionLayout, starHub, unionLayout, type LayoutMethod, type Positions } from './layout'
+import { configuredLayoutMethod, layoutSettings, loadLayoutMethod, queryLayoutMethod, resolveLayoutMethod, saveLayoutMethod } from './layoutConfig'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
 import { readPayload } from './payload'
 import { diffStates, legendEntries, projectState, unionGraph } from './projection'
@@ -98,6 +99,7 @@ type SemanticData = {
 }
 type SemanticFlowEdge = Edge<SemanticData, 'semantic'>
 const payload = readPayload()
+const reportStorageId = `${globalThis.location?.pathname ?? ''}:${payload.source}`
 const STATUS_ORDER: DiffStatus[] = ['added', 'removed', 'changed']
 const STATUS_ICON: Record<DiffStatus, string> = { added: '+', removed: '−', changed: 'Δ' }
 
@@ -352,6 +354,13 @@ const EMPTY_POSITIONS: Positions = new Map()
 export default function App() {
   const [initial] = useState(() => decodeView(payload, globalThis.location?.hash ?? ''))
   const [view, setViewState] = useState<View>(initial.view)
+  const queryLayout = queryLayoutMethod(globalThis.location?.search ?? '', import.meta.env.DEV)
+  const [layoutMethod, setLayoutMethod] = useState<LayoutMethod | null>(() => resolveLayoutMethod({
+    query: queryLayout,
+    hash: initial.view.layout,
+    stored: loadLayoutMethod(window.localStorage, reportStorageId),
+    config: configuredLayoutMethod(payload.layout),
+  }))
   const [selected, setSelected] = useState<Selection | null>(null)
   const [selectionHistory, setSelectionHistory] = useState<Selection[]>([])
   const [restoreSelect, setRestoreSelect] = useState<string | null>(initial.select)
@@ -422,7 +431,10 @@ export default function App() {
     : projectState(payload, { ...view, position: previousPosition }), [previousPosition, view])
   const union = useMemo(() => unionGraph(payload, view.timeline, view.expand), [view.expand, view.timeline])
   const projectedHub = useMemo(() => starHub(projected), [projected])
-  const layoutKey = makeLayoutKey(view)
+  const engineSettings = useMemo(() => layoutSettings(payload.layout, layoutMethod), [layoutMethod])
+  const layoutConfigKey = JSON.stringify(engineSettings)
+  const layoutKey = `${makeLayoutKey(view)}|${layoutConfigKey}`
+  const displayedLayoutMethod = layoutMethod ?? defaultLayoutMethod(union, projectedHub)
   const cardSizes = useMemo(() => new Map(union.nodes.map((node) => [node.key, cardSize(node, levelForKind(node.kind), measureCardText)])), [union])
   // A layout computed for a different projection must never apply
   // (INT-STATE-06): stale positions carry parentIds for boundaries that no
@@ -471,12 +483,18 @@ export default function App() {
       const decoded = decodeView(payload, globalThis.location?.hash ?? '')
       for (const message of decoded.diagnostics) console.warn(message)
       setViewState(decoded.view)
+      setLayoutMethod(resolveLayoutMethod({
+        query: queryLayout,
+        hash: decoded.view.layout,
+        stored: loadLayoutMethod(window.localStorage, reportStorageId),
+        config: configuredLayoutMethod(payload.layout),
+      }))
       setRestoreSelect(decoded.select)
       if (!decoded.select) closeInfo()
     }
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
-  }, [closeInfo])
+  }, [closeInfo, queryLayout])
   useEffect(() => { saveLayout(window.localStorage, layout) }, [layout])
   useEffect(() => {
     let active = true
@@ -486,8 +504,8 @@ export default function App() {
     const cached = !intent?.preset ? positionCache.current.get(layoutKey) : undefined
     const request = cached
       ? Promise.resolve(cached)
-      : unionLayout(union, layoutKey, cardSizes, aspectRatio, projectedHub, intent?.preset ?? false)
-        .then((fresh) => intent && !intent.preset ? stableExpansionLayout(intent.previous, fresh, intent.anchor) : fresh)
+      : unionLayout(union, layoutKey, cardSizes, aspectRatio, projectedHub, intent?.preset ?? false, engineSettings)
+        .then((fresh) => intent && !intent.preset ? stableExpansionLayout(intent.previous, fresh, intent.anchor, engineSettings ?? undefined) : fresh)
     void request
       .then((next) => {
         if (!active) return
@@ -497,7 +515,7 @@ export default function App() {
       })
       .catch(() => { if (active) setDiagnostic('Layout failed. The report remains available with fallback positions.') })
     return () => { active = false }
-  }, [cardSizes, layoutKey, projectedHub, union])
+  }, [cardSizes, engineSettings, layoutKey, projectedHub, union])
 
   const changeExpansion = useCallback((key: string, expand: boolean) => {
     const next = new Set(view.expand)
@@ -513,20 +531,20 @@ export default function App() {
       }
     }
     const expansion = [...next].sort()
-    const target = makeLayoutKey({ timeline: view.timeline, expand: expansion })
+    const target = `${makeLayoutKey({ timeline: view.timeline, expand: expansion })}|${layoutConfigKey}`
     layoutIntent.current = { anchor: key, previous: positions, target, preset: false }
     framedLayout.current = target
     setView({ deps: null, expand: expansion }, true)
-  }, [positions, setView, view.expand, view.timeline])
+  }, [layoutConfigKey, positions, setView, view.expand, view.timeline])
 
   const applyPreset = useCallback((preset: import('./types').Level) => {
     const expand = presetExpansion(payload, preset)
-    const target = makeLayoutKey({ timeline: view.timeline, expand })
+    const target = `${makeLayoutKey({ timeline: view.timeline, expand })}|${layoutConfigKey}`
     layoutIntent.current = { anchor: '', previous: positions, target, preset: true }
     positionCache.current.delete(target)
     framedLayout.current = ''
     setView({ deps: null, expand }, true)
-  }, [positions, setView, view.timeline])
+  }, [layoutConfigKey, positions, setView, view.timeline])
 
   const graphNodes = useMemo(() => {
     const merged = new Map(projected.nodes.map((node) => [node.key, { node, ghost: false }]))
@@ -788,11 +806,18 @@ export default function App() {
   }, [projected.rawState.rows, selectById, setView])
   const copyLink = async () => {
     try {
-      await copyViewLink(view, selectedKey)
+      await copyViewLink({ ...view, layout: layoutMethod }, selectedKey)
       setCopyStatus('Link copied')
     } catch {
       setCopyStatus('Copy unavailable')
     }
+  }
+  const chooseLayout = (method: LayoutMethod) => {
+    if (queryLayout) return
+    saveLayoutMethod(window.localStorage, reportStorageId, method)
+    setLayoutMethod(method)
+    framedLayout.current = ''
+    setView({ layout: method }, true)
   }
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
@@ -841,7 +866,7 @@ export default function App() {
       <main className="workspace">
         <div className="dock-row">
           <ResizablePanel className="view-dock" label="View" layout={autoViewCollapsed ? { ...layout.docks.view, collapsed: true } : layout.docks.view} name="view" onChange={(dock) => { setAutoViewCollapsed(false); setDock('view', dock) }}>
-            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onPreset={applyPreset} onView={setView} payload={payload} view={view} />
+            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} layoutMethod={displayedLayoutMethod} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onLayout={chooseLayout} onPreset={applyPreset} onView={setView} payload={payload} view={view} />
           </ResizablePanel>
 
           <div className={`canvas-root depth-${depth}`} data-reading-depth={depth} ref={canvasRef}>

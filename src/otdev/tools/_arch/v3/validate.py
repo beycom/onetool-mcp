@@ -24,6 +24,10 @@ from .yamlio import DataPath, format_data_path, source_location
 Severity = Literal["error", "warning"]
 THEME_KINDS = {"system", "subsystem", "container", "component", "code", "user"}
 COLOR_PATTERN = re.compile(r"#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\Z")
+LAYOUT_METHODS = {"layered", "radial", "grid"}
+LAYOUT_DIRECTIONS = {"right", "down"}
+LAYOUT_KEYS = {"method", "direction", "spacing", "ranking", "user_choice"}
+LAYOUT_SPACING_KEYS = {"node", "layer", "boundary"}
 
 
 @dataclass(frozen=True)
@@ -104,6 +108,85 @@ def _theme_findings(architecture: Architecture) -> list[Finding]:
                     path,
                 )
             )
+    return findings
+
+
+def _layout_findings(architecture: Architecture) -> list[Finding]:
+    if architecture.layout is None:
+        return []
+    values = architecture.layout.model_dump(mode="python", exclude_none=True)
+    findings: list[Finding] = []
+
+    def warn(code: str, message: str, path: DataPath) -> None:
+        findings.append(_finding(architecture, "warning", code, message, path))
+
+    for key in values.keys() - LAYOUT_KEYS:
+        warn(
+            "unknown_layout_key",
+            f"layout key {key!r} is not supported",
+            ("layout", key),
+        )
+    method = values.get("method")
+    if method is not None and (
+        not isinstance(method, str) or method not in LAYOUT_METHODS
+    ):
+        warn(
+            "invalid_layout_value",
+            "layout method must be layered, radial, or grid",
+            ("layout", "method"),
+        )
+    direction = values.get("direction")
+    if direction is not None and (
+        not isinstance(direction, str) or direction not in LAYOUT_DIRECTIONS
+    ):
+        warn(
+            "invalid_layout_value",
+            "layout direction must be right or down",
+            ("layout", "direction"),
+        )
+    ranking = values.get("ranking")
+    if ranking is not None and not (
+        ranking == "auto"
+        or (
+            isinstance(ranking, str)
+            and ranking.startswith("property:")
+            and bool(ranking.removeprefix("property:"))
+        )
+    ):
+        warn(
+            "invalid_layout_value",
+            "layout ranking must be auto or property:<name>",
+            ("layout", "ranking"),
+        )
+    user_choice = values.get("user_choice")
+    if user_choice is not None and not isinstance(user_choice, bool):
+        warn(
+            "invalid_layout_value",
+            "layout user_choice must be a boolean",
+            ("layout", "user_choice"),
+        )
+    spacing = values.get("spacing")
+    if spacing is not None and not isinstance(spacing, dict):
+        warn(
+            "invalid_layout_value",
+            "layout spacing must be a mapping",
+            ("layout", "spacing"),
+        )
+    elif isinstance(spacing, dict):
+        for key in spacing.keys() - LAYOUT_SPACING_KEYS:
+            warn(
+                "unknown_layout_key",
+                f"layout spacing key {key!r} is not supported",
+                ("layout", "spacing", key),
+            )
+        for key in LAYOUT_SPACING_KEYS & spacing.keys():
+            value = spacing[key]
+            if type(value) is not int or value <= 0:
+                warn(
+                    "invalid_layout_value",
+                    f"layout spacing {key!r} must be a positive integer",
+                    ("layout", "spacing", key),
+                )
     return findings
 
 
@@ -380,6 +463,7 @@ def validate(architecture: Architecture) -> list[Finding]:
     """Return all structural errors and advisory warnings."""
     findings = _required_findings(architecture)
     findings.extend(_theme_findings(architecture))
+    findings.extend(_layout_findings(architecture))
     findings.extend(_duplicate_findings(architecture))
     findings.extend(_reference_findings(architecture))
     findings.extend(_temporal_findings(architecture))

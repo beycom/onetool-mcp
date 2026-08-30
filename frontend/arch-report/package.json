@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc --noEmit && vite build",
+    "capture-layouts": "uv run python scripts/capture_layouts.py",
     "dev": "vite --host 127.0.0.1",
     "test": "vitest run"
   },

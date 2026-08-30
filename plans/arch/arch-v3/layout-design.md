@@ -105,6 +105,14 @@ the architect).
 
 ## Decisions (user-confirmed 2026-08-30)
 
+0. **Default method (architect, from the P14 A/B captures, 2026-08-30)**:
+   the topology-aware default is retained — radial for star-shaped flat
+   graphs, layered when boundaries exist, grid for edgeless sets
+   (`defaultLayoutMethod`). The captures confirm radial is clearly best
+   for acme's flat star while layered/grid degrade it; no authored
+   `layout.method` is added to the acme fixture. An authored `method`
+   still overrides the default per this design.
+
 1. **Ranking source for FE→BE**: an explicit `layer` property on entities
    (round-trips through Excel), with call-direction inference as fallback
    when absent.

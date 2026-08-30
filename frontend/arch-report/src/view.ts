@@ -1,5 +1,6 @@
 import type {
   Aspect,
+  LayoutMethod,
   Level,
   ReportPayload,
   View,
@@ -8,6 +9,7 @@ import { ENTITY_KINDS } from './types'
 
 const LEVELS = new Set<Level>(['systems', 'subsystems', 'containers', 'components'])
 const ASPECTS = new Set<Aspect>(['ownership', 'call-direction', 'data-flow'])
+const LAYOUTS = new Set<LayoutMethod>(['layered', 'radial', 'grid'])
 const RETIRED_FRAGMENT_KEYS = new Set([
   'mode', 'scope', 'hops', 'compare', 'compare-at', 'theme',
   'x', 'y', 'zoom', 'width', 'height', 'side-size', 'table-size',
@@ -124,6 +126,11 @@ export function decodeView(payload: ReportPayload, fragment = ''): ViewDecodeRes
   }
   const legacyDrill = validatedEntityKey('drill')
   if (legacyDrill) expansionPath(payload, legacyDrill).forEach((key) => expand.add(key))
+  const layoutValue = params.get('layout')
+  const layout = layoutValue !== null && LAYOUTS.has(layoutValue as LayoutMethod)
+    ? layoutValue as LayoutMethod
+    : null
+  if (layoutValue !== null && layout === null) diagnostics.push(`view.fragment.layout.${layoutValue}: unknown layout method ignored`)
   return { diagnostics, select: legacyDrill ?? select, view: {
     timeline,
     position: integer(params.get('time'), 0, maximum),
@@ -135,6 +142,7 @@ export function decodeView(payload: ReportPayload, fragment = ''): ViewDecodeRes
     deps: validatedEntityKey('deps'),
     lens,
     theme: 'light',
+    layout,
   } }
 }
 
@@ -152,6 +160,7 @@ export function encodeView(view: View, select: string | null = null): string {
   if (view.deps) params.set('deps', view.deps)
   if (view.expand.length) params.set('expand', [...new Set(view.expand)].sort().join(','))
   if (view.lens.length) params.set('lens', view.lens.join(','))
+  if (view.layout) params.set('layout', view.layout)
   if (select) params.set('select', select)
   return params.toString()
 }

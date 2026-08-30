@@ -19,6 +19,7 @@ const view: View = {
   deps: null,
   lens: [],
   theme: 'light',
+  layout: null,
 }
 
 afterEach(cleanup)
@@ -28,8 +29,10 @@ test('Subsystem detail is hidden for empty datasets and shown when populated', (
     canvasActive: true,
     copyStatus: '',
     legend: [],
+    layoutMethod: 'layered' as const,
     onCanvas: () => undefined,
     onCopy: () => undefined,
+    onLayout: () => undefined,
     onPreset: () => undefined,
     onView: () => undefined,
     view,
@@ -48,4 +51,22 @@ test('Subsystem detail is hidden for empty datasets and shown when populated', (
 
   rerender(<ViewDock {...props} payload={populated} />)
   expect(screen.getByLabelText('Detail').textContent).toContain('Subsystem')
+})
+
+test.each([undefined, { user_choice: false }])('Layout is hidden when user_choice is absent or false', (layout) => {
+  render(<ViewDock {...{
+    canvasActive: true,
+    copyStatus: '',
+    layoutMethod: 'layered' as const,
+    legend: [],
+    onCanvas: () => undefined,
+    onCopy: () => undefined,
+    onLayout: () => undefined,
+    onPreset: () => undefined,
+    onView: () => undefined,
+    payload: { ...payload, layout },
+    view,
+  }} />)
+
+  expect(screen.queryByLabelText('Layout')).toBeNull()
 })

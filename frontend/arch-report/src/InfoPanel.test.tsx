@@ -11,7 +11,7 @@ import type { ReportPayload, RowKind, View } from './types'
 const payload = payloadFixture as unknown as ReportPayload
 const view: View = {
   aspect: 'call-direction', compare: 'off', comparePosition: 0, deps: null, expand: [],
-  lens: [], position: 0, scope: null, theme: 'light', timeline: 0,
+  lens: [], position: 0, scope: null, theme: 'light', timeline: 0, layout: null,
 }
 
 afterEach(cleanup)

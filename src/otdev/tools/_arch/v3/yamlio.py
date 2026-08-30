@@ -25,6 +25,7 @@ _ROOT_KEYS = (
     "milestones",
     "timelines",
     "theme",
+    "layout",
     "systems",
     "subsystems",
     "containers",
@@ -292,11 +293,49 @@ def _architecture_payload(architecture: Architecture) -> dict[str, Any]:
         if key not in raw:
             continue
         value = raw[key]
-        payload[key] = (
-            [_ordered_row(row, collection=key) for row in value]
-            if key in _ROW_KEYS
-            else value
-        )
+        if key in _ROW_KEYS:
+            payload[key] = [_ordered_row(row, collection=key) for row in value]
+        elif key == "layout" and isinstance(value, dict):
+            spacing = value.get("spacing")
+            ordered_spacing = (
+                {
+                    spacing_key: spacing[spacing_key]
+                    for spacing_key in (
+                        "node",
+                        "layer",
+                        "boundary",
+                        *sorted(set(spacing) - {"node", "layer", "boundary"}),
+                    )
+                    if spacing_key in spacing
+                }
+                if isinstance(spacing, dict)
+                else spacing
+            )
+            payload[key] = {
+                layout_key: ordered_spacing
+                if layout_key == "spacing"
+                else value[layout_key]
+                for layout_key in (
+                    "method",
+                    "direction",
+                    "spacing",
+                    "ranking",
+                    "user_choice",
+                    *sorted(
+                        set(value)
+                        - {
+                            "method",
+                            "direction",
+                            "spacing",
+                            "ranking",
+                            "user_choice",
+                        }
+                    ),
+                )
+                if layout_key in value
+            }
+        else:
+            payload[key] = value
     return payload
 
 

@@ -49,7 +49,7 @@ test('Data folds subsystems into raw Entities, hides empty columns, and auto-siz
   system.properties = { ...system.properties, empty_note: '', populated_note: 'Visible value' }
   const view: View = {
     aspect: 'call-direction', compare: 'off', comparePosition: 0, deps: null, expand: [],
-    lens: [], position: 5, scope: null, theme: 'light', timeline: 0,
+    lens: [], position: 5, scope: null, theme: 'light', timeline: 0, layout: null,
   }
 
   render(<GridPanel

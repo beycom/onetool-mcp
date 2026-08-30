@@ -449,6 +449,7 @@ def _architecture_raw(
     settings = sheets.get("Settings")
     if settings is not None and settings.rows:
         kinds: dict[str, object] = {}
+        layout: dict[str, object] = {}
         for row_index, (row_number, row) in enumerate(settings.rows):
             setting = row.get("setting")
             value = row.get("value")
@@ -464,24 +465,36 @@ def _architecture_raw(
             if setting is None or value is None:
                 continue
             setting_text = str(setting).strip()
-            prefix = "theme.kinds."
-            key = (
-                setting_text[len(prefix) :]
-                if setting_text.startswith(prefix)
-                else setting_text
-            )
-            kinds[key] = value
             location = settings.locations.get((row_index, "value"))
-            if location is not None:
-                sources[f"theme.kinds.{key}"] = location
+            if setting_text.startswith("layout."):
+                parts = setting_text.split(".")[1:]
+                if parts[:1] == ["spacing"] and len(parts) == 2:
+                    spacing = layout.setdefault("spacing", {})
+                    if isinstance(spacing, dict):
+                        spacing[parts[1]] = value
+                else:
+                    layout[".".join(parts)] = value
+                if location is not None:
+                    sources[setting_text] = location
+            else:
+                prefix = "theme.kinds."
+                key = (
+                    setting_text[len(prefix) :]
+                    if setting_text.startswith(prefix)
+                    else setting_text
+                )
+                kinds[key] = value
+                if location is not None:
+                    sources[f"theme.kinds.{key}"] = location
         if kinds:
             raw["theme"] = {"kinds": kinds}
+        if layout:
+            raw["layout"] = layout
     draft_values = {
         **raw,
         **{
             collection: [
-                ROW_MODELS[collection].model_construct(**row)
-                for row in raw[collection]
+                ROW_MODELS[collection].model_construct(**row) for row in raw[collection]
             ]
             for collection in ROW_MODELS
         },
@@ -596,6 +609,29 @@ def read_workbook(path: Path) -> Architecture:
 
 
 def _rows(architecture: Architecture) -> dict[str, list[dict[str, Any]]]:
+    layout_settings: list[dict[str, object]] = []
+    if architecture.layout is not None:
+        raw_layout = architecture.layout.model_dump(mode="python", exclude_none=True)
+        for key in ("method", "direction"):
+            if key in raw_layout:
+                layout_settings.append(
+                    {"setting": f"layout.{key}", "value": raw_layout[key]}
+                )
+        spacing = raw_layout.get("spacing")
+        if isinstance(spacing, dict):
+            for key in ("node", "layer", "boundary"):
+                if key in spacing:
+                    layout_settings.append(
+                        {
+                            "setting": f"layout.spacing.{key}",
+                            "value": spacing[key],
+                        }
+                    )
+        for key in ("ranking", "user_choice"):
+            if key in raw_layout:
+                layout_settings.append(
+                    {"setting": f"layout.{key}", "value": raw_layout[key]}
+                )
     result: dict[str, list[dict[str, Any]]] = {
         "Architecture": [{"schema_version": 3}],
         "Timelines": [
@@ -604,12 +640,15 @@ def _rows(architecture: Architecture) -> dict[str, list[dict[str, Any]]]:
             for milestone in timeline.milestones
         ],
         "Settings": [
-            {"setting": f"theme.kinds.{kind}", "value": value}
-            for kind, value in (
-                architecture.theme.kinds.items()
-                if architecture.theme is not None
-                else ()
-            )
+            *(
+                {"setting": f"theme.kinds.{kind}", "value": value}
+                for kind, value in (
+                    architecture.theme.kinds.items()
+                    if architecture.theme is not None
+                    else ()
+                )
+            ),
+            *layout_settings,
         ],
     }
     for sheet, collection in COLLECTIONS.items():
@@ -809,7 +848,9 @@ def _update_workbook(workbook: Workbook, architecture: Architecture) -> None:
         )
     )
     has_settings = any(name.casefold() == "settings" for name in workbook.sheetnames)
-    if architecture.theme is not None and not has_settings:
+    if (
+        architecture.theme is not None or architecture.layout is not None
+    ) and not has_settings:
         _create_settings_sheet(workbook)
         has_settings = True
     sheets = SHEETS if has_settings else REQUIRED_SHEETS

@@ -237,13 +237,15 @@ docs):
   selection emphasis with member scoping (p15/p19), whole-graph initial
   fit capped at 100% (p18 — report.md framing rule amended at the
   gate), member-level Info Connections grouping (p19).
-- [ ] **P14 — layout engines + config + A/B harness** (added
-  2026-08-30; design: layout-design.md, CONFIRMED; prompt READY in
-  delegation.md, proposed budget 2,000; absorbs issue p13). Engine
-  extraction (layered/radial/grid behind LayoutEngine), `layout:`
+- [x] **P14 — layout engines + config + A/B harness** (added
+  2026-08-30; design: layout-design.md; DONE, gate PASSED 2026-08-30 at
+  1,479/2,000 changed source lines including the architect's layered-
+  interior fix — see the progress log; absorbs issue p13, resolved).
+  Engine extraction (layered/radial/grid behind LayoutEngine), `layout:`
   config block on the theme precedent, method-only viewer control with
   hash + localStorage, shared invariant suite, dev-only ?layout= A/B
-  harness; default method decided by the architect from the captures.
+  harness. Default-method decision (architect, from the captures): the
+  topology-aware default is retained (layout-design.md Decisions 0).
 - [ ] **Phase 1 exit gate (architect + user)** — the held 3P exit gate:
   open acme's report cold and the story reads without explanation and
   *looks* deliberate. Run ui-polish-direction.md "Acceptance checks" at
@@ -363,6 +365,96 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-30** — P14 architect gate PASSED (with one gate fix); tree
+  committed; default-method decision recorded. Independently re-verified:
+  frontend tests, arch py 83 (+4 prescribed), `just lint`,
+  `just build-arch-report` reproduced the executor's template
+  byte-for-byte pre-fix, CLI standalone validate (0 errors / 25
+  warnings), budget confirmed at the executor's 1,450 (694 tracked + 756
+  new). Code review conforms to layout-design.md: pure engines behind
+  the registry, theme-precedent Python plumbing (raw-retaining Layout
+  model, located warn-only findings, canonical YAML/Excel Settings/
+  payload round-trip), DEV-only ?layout= override, query > hash >
+  stored > config restore priority, settings-aware layout cache keys,
+  and null-method fallback preserving today's topology default exactly.
+  GATE FIX (architect, in-scope): the executor's
+  `compactBoundaryInteriors` regridded ≥5-child boundary interiors
+  AFTER ELK placement, so a grown boundary overflowed its parent and
+  collided with siblings — the live Component preset on acme rendered
+  10 node overlaps (the invariant fixtures never nested a packed
+  boundary inside a small parent with siblings, so the suite passed).
+  Rewrote the layered engine: grid interiors are pre-planned bottom-up
+  (all-leaf-or-planned boundaries, ≥5 children), handed to ELK as
+  fixed-size leaves with hidden-endpoint edges reattached to the
+  planned ancestor, and children injected after ranking — parent growth
+  and sibling spacing are correct by construction; the defective
+  post-pass is deleted. Added the 'packed interior beside siblings'
+  fixture to the shared invariant suite (69 frontend tests pass, +3
+  engine cases). Live re-check: Component preset 43 nodes / 15 edges /
+  0 overlaps, Container preset 24 / 15 / 0, console clean, fresh hash
+  load frames 24/24 in view; evidence
+  plans/arch/wip/test-results/p14/component-preset-fixed.png. Budget
+  after fix: 1,479/2,000. All seven executor assumptions ACCEPTED.
+  Default-method decision from the A/B captures: topology-aware default
+  retained (radial for flat stars, layered with boundaries, grid for
+  edgeless) — layout-design.md Decisions 0; no authored method in acme.
+  Issue p13 RESOLVED → issues/resolved/. Watch item for the exit-gate
+  walkthrough (pre-existing, not P14): the initial-framing effect
+  excludes boundary nodes from its bounds, so a live preset switch can
+  leave a tall bottom boundary partially cut until a Fit; fresh loads
+  frame correctly. Ranking note: `property:` ranking currently
+  re-sequences a sibling group along the flow axis (rank ordering, not
+  true swimlanes — those stay a later engine per the design). Pipeline:
+  no executor prompt is queued next — the exit gate is architect+user,
+  and P21 stays ON HOLD behind the wave-2 attachments design
+  (architect). Next action: Phase 1 exit gate on this tree (rerun the
+  walkthrough — framing and layout both changed since the 2026-08-29
+  architect half).
+
+- **2026-08-30** — P14 layout engines, authored config, viewer control,
+  and A/B harness implemented; left uncommitted for architect review.
+  Layered, radial, and grid now implement one pure `LayoutEngine`
+  contract behind a registry; `unionLayout` owns dispatch/cache while
+  stable expansion and React Flow application remain shared
+  post-processing. Layered expansion wraps large child sets into compact
+  ranks, and radial expansion composes compact nested interiors with a
+  radial root graph. Optional `layout:` settings round-trip through
+  canonical YAML, Excel Settings, and payload; invalid/unknown knobs emit
+  located `invalid_layout_value` / `unknown_layout_key` warnings and the
+  viewer applies defaults. The View dock method control is gated by
+  `user_choice`, with query > hash > per-report localStorage > config
+  restore priority. The dev capture task wrote `layered.png`, `radial.png`,
+  and `grid.png` to `plans/arch/wip/layout-ab/`. Source budget:
+  **1,450 / 2,000 changed lines** (additions + deletions; tests and generated
+  bundle excluded). Tests: exactly 23 prescribed P14 cases (19 frontend,
+  4 Python); frontend **66 passed**, arch Python **83 passed / 540
+  deselected**, smoke **27 passed / 3,214 deselected**, `just lint`,
+  `just build-arch-report`, TypeScript, `git diff --check`, and acme CLI
+  regeneration all passed. Rule-9 verification at 1440x900: cold acme
+  rendered 14 nodes / 14 edges; the two-level expansion rendered 26 nodes
+  and all 14 projected edges; the configured viewer switched all three
+  methods live and persisted the method in hash + file-scoped storage. The
+  generated `file://` report had zero console warnings/errors and one local
+  request. The Vite check routed its pre-existing `/favicon.ico` 404 to a
+  local 204 so app-console errors remained visible; the final capture run
+  completed without console failures. Assumptions resolved from the ordered
+  sources: (1) P13's four issue files are the exact files now under
+  `issues/resolved/`, moved there by the P13 gate; (2) invalid layout values
+  must survive model loading so advisory validation can warn and the report
+  can fall back, matching the theme precedent's raw-value retention; (3) an
+  absent block keeps the current topology choice and 40/72/20 spacing,
+  while a present incomplete/invalid block falls back to
+  layered/right/40/72/20/auto with `user_choice` false; (4) `boundary` is a
+  minimum interior padding while the existing 50 px header and 48 px
+  description clearances remain floors, preserving the absent-block layout;
+  (5) per-report storage identity is pathname + payload source; (6) radial
+  layouts with expansions use compact grid-packed interiors and a radial
+  top-level composition, satisfying p13 without moving P12's shared anchor
+  post-processing; (7) P14's `excelio` surface name maps to the existing
+  `excel.py` adapter, the file that owns the theme Settings precedent.
+  Open questions: none. Next action: architect gate review
+  and default-method decision from the A/B captures.
 
 - **2026-08-30** — P13 architect gate PASSED; tree committed; P14 prompt
   authored per the pipeline rule. Independently re-verified: frontend 47

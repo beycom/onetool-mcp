@@ -1,11 +1,160 @@
 import { expect, test } from 'vitest'
 
 import payloadFixture from './fixture-payload.json'
-import { buildLayoutInput, gridPack, makeLayoutKey, stableExpansionLayout, starHub, unionLayout, type Positions } from './layout'
+import {
+  buildLayoutInput,
+  DEFAULT_LAYOUT_SETTINGS,
+  gridPack,
+  layoutEngines,
+  makeLayoutKey,
+  registeredLayoutMethods,
+  stableExpansionLayout,
+  starHub,
+  unionLayout,
+  type LayoutMethod,
+  type LayoutPosition,
+  type Positions,
+} from './layout'
 import { unionGraph } from './projection'
 import type { Aspect, GraphNode, ReportPayload, RolledGraph, View } from './types'
 
 const payload = payloadFixture as unknown as ReportPayload
+
+function fixtureGraph(
+  nodeKeys: string[],
+  pairs: Array<[number, number]>,
+  boundaries: RolledGraph['boundaries'] = [],
+  properties: Record<string, string>[] = [],
+): RolledGraph {
+  return {
+    nodes: nodeKeys.map((key, index) => ({
+      key,
+      kind: key.split(':')[0] as GraphNode['kind'],
+      row: { id: key.split(':').slice(1).join(':'), name: key, properties: properties[index] ?? {}, intervals: [] },
+      boundary: false,
+      members: [],
+    })),
+    edges: pairs.map(([left, right], index) => ({
+      key: `edge-${index}`,
+      a: nodeKeys[left],
+      b: nodeKeys[right],
+      interfaces: [],
+      relationships: [`relationship-${index}`],
+      interfaceRows: [],
+      relationshipRows: [],
+      orientations: [],
+    })),
+    boundaries,
+    state: {} as RolledGraph['state'],
+  }
+}
+
+const flatKeys = Array.from({ length: 6 }, (_, index) => `systems:node-${index}`)
+const nestedKeys = ['components:nested-a', 'components:nested-b', 'systems:outside']
+const nestedBoundaries: RolledGraph['boundaries'] = [
+  { key: 'systems:parent', nodeKey: 'systems:parent', kind: 'systems', row: { id: 'parent', intervals: [] }, parentKey: null, childKeys: ['containers:nested'], stub: false },
+  { key: 'containers:nested', nodeKey: 'containers:nested', kind: 'containers', row: { id: 'nested', intervals: [] }, parentKey: 'systems:parent', childKeys: ['components:nested-a', 'components:nested-b'], stub: false },
+]
+const expansionKeys = Array.from({ length: 11 }, (_, index) => `components:child-${index}`)
+const expansionBoundary: RolledGraph['boundaries'] = [{
+  key: 'containers:expanded',
+  nodeKey: 'containers:expanded',
+  kind: 'containers',
+  row: { id: 'expanded', intervals: [] },
+  parentKey: null,
+  childKeys: expansionKeys,
+  stub: false,
+}]
+const packedKeys = [
+  ...Array.from({ length: 6 }, (_, index) => `components:packed-${index}`),
+  'containers:beside',
+  'systems:outside',
+]
+const packedBoundaries: RolledGraph['boundaries'] = [
+  { key: 'systems:small-parent', nodeKey: 'systems:small-parent', kind: 'systems', row: { id: 'small-parent', intervals: [] }, parentKey: null, childKeys: ['containers:packed', 'containers:beside'], stub: false },
+  { key: 'containers:packed', nodeKey: 'containers:packed', kind: 'containers', row: { id: 'packed', intervals: [] }, parentKey: 'systems:small-parent', childKeys: packedKeys.slice(0, 6), stub: false },
+]
+const fixtureGraphs = {
+  'star hub': fixtureGraph(flatKeys, [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5]]),
+  chain: fixtureGraph(flatKeys, [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5]]),
+  'dense mesh': fixtureGraph(flatKeys, flatKeys.flatMap((_, left) => flatKeys.slice(left + 1).map((_item, offset) => [left, left + offset + 1] as [number, number]))),
+  'nested boundaries': fixtureGraph(nestedKeys, [[0, 2], [1, 2]], nestedBoundaries),
+  '11-child expansion': fixtureGraph(expansionKeys, expansionKeys.slice(1).map((_key, index) => [0, index + 1]), expansionBoundary),
+  'packed interior beside siblings': fixtureGraph(packedKeys, [[0, 6], [1, 7], [7, 6]], packedBoundaries),
+}
+
+function center(position: LayoutPosition) {
+  return { x: position.x + position.width / 2, y: position.y + position.height / 2 }
+}
+
+test.each(registeredLayoutMethods.flatMap((method) => Object.entries(fixtureGraphs).map(([name, graph]) => [method, name, graph] as const)))(
+  '%s engine satisfies shared invariants for %s',
+  async (method, name, graph) => {
+    const settings = { ...DEFAULT_LAYOUT_SETTINGS, method }
+    const sizes = new Map([
+      ...graph.nodes.map((node) => [node.key, { width: 120, height: 72 }] as const),
+      ...graph.boundaries.map((boundary) => [boundary.key, { width: 120, height: 72 }] as const),
+    ])
+    const context = { aspectRatio: 1.6, hub: starHub(graph) }
+    const first = await layoutEngines[method].layout(graph, sizes, settings, context)
+    const second = await layoutEngines[method].layout(graph, sizes, settings, context)
+
+    expect([...second]).toEqual([...first])
+    const siblings = new Map<string | undefined, LayoutPosition[]>()
+    for (const position of first.values()) siblings.set(position.parentId, [...(siblings.get(position.parentId) ?? []), position])
+    for (const positions of siblings.values()) {
+      for (let left = 0; left < positions.length; left += 1) {
+        for (let right = left + 1; right < positions.length; right += 1) {
+          expect(positions[left].x + positions[left].width <= positions[right].x
+            || positions[right].x + positions[right].width <= positions[left].x
+            || positions[left].y + positions[left].height <= positions[right].y
+            || positions[right].y + positions[right].height <= positions[left].y).toBe(true)
+        }
+      }
+    }
+    for (const [key, position] of first) {
+      if (!position.parentId) continue
+      const parent = first.get(position.parentId)!
+      expect(position.x).toBeGreaterThanOrEqual(settings.spacing.boundary)
+      expect(position.y).toBeGreaterThanOrEqual(settings.spacing.boundary)
+      expect(position.x + position.width).toBeLessThanOrEqual(parent.width - settings.spacing.boundary)
+      expect(position.y + position.height).toBeLessThanOrEqual(parent.height)
+      expect(key).not.toBe(position.parentId)
+    }
+    const anchorKey = graph.boundaries[0]?.key ?? graph.nodes[0].key
+    const freshAnchor = first.get(anchorKey)!
+    const previous = new Map(first)
+    previous.set(anchorKey, { ...freshAnchor, width: freshAnchor.width / 2, height: freshAnchor.height / 2 })
+    const stabilized = stableExpansionLayout(previous, first, anchorKey)
+    expect(center(stabilized.get(anchorKey)!)).toEqual(center(previous.get(anchorKey)!))
+
+    if (name === '11-child expansion') {
+      const children = expansionKeys.map((key) => first.get(key)!)
+      expect(new Set(children.map((position) => position.x)).size).toBeGreaterThan(1)
+      expect(new Set(children.map((position) => position.y)).size).toBeGreaterThan(1)
+    }
+  },
+)
+
+test('layered property ranking orders lanes and retains inference for missing properties', async () => {
+  const keys = ['systems:frontend', 'systems:inferred', 'systems:service', 'systems:data', 'systems:external']
+  const graph = fixtureGraph(keys, [[0, 1], [1, 2], [2, 3], [3, 4]], [ ], [
+    { layer: 'frontend' },
+    {},
+    { layer: 'service' },
+    { layer: 'data' },
+    { layer: 'external' },
+  ])
+  const settings = { ...DEFAULT_LAYOUT_SETTINGS, method: 'layered' as LayoutMethod, ranking: 'property:layer' as const }
+  const positions = await layoutEngines.layered.layout(graph, new Map(), settings, { aspectRatio: 1.6, hub: null })
+  const x = (key: string) => positions.get(key)!.x
+
+  expect(x(keys[0])).toBeLessThan(x(keys[2]))
+  expect(x(keys[2])).toBeLessThan(x(keys[3]))
+  expect(x(keys[3])).toBeLessThan(x(keys[4]))
+  expect(x(keys[1])).toBeGreaterThan(x(keys[0]))
+  expect(x(keys[1])).toBeLessThan(x(keys[4]))
+})
 
 test('stage, relationship, and lens changes leave the layout key and ELK input unchanged', () => {
   const base = {

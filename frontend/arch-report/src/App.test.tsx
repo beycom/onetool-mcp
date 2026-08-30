@@ -26,9 +26,12 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 vi.mock('./layout', () => ({
+  DEFAULT_LAYOUT_SETTINGS: { method: 'layered', direction: 'right', spacing: { node: 40, layer: 72, boundary: 20 }, ranking: 'auto' },
   NODE_HEIGHT: 112,
   NODE_WIDTH: 240,
   applyPositions: (nodes: unknown[]) => nodes,
+  defaultLayoutMethod: () => 'layered',
+  registeredLayoutMethods: ['layered', 'radial', 'grid'],
   makeLayoutKey: ({ timeline, expand }: { timeline: number; expand: string[] }) => `${timeline}:${expand.join(',')}`,
   stableExpansionLayout: (_previous: unknown, fresh: unknown) => fresh,
   starHub: () => null,

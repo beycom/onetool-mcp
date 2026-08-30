@@ -25,7 +25,9 @@ KINDS = (
 )
 
 
-def _points(segment: list[int | None] | dict[str, int | str | None], end: int) -> set[int]:
+def _points(
+    segment: list[int | None] | dict[str, int | str | None], end: int
+) -> set[int]:
     if isinstance(segment, list):
         start, stop = segment
     else:
@@ -45,9 +47,11 @@ def test_acme_payload_invariants() -> None:
         "milestones",
         "timelines",
         "theme",
+        "layout",
         "rows",
     ]
     assert payload["theme"] == {}
+    assert payload["layout"] == {}
     assert list(payload["rows"]) == list(KINDS)
     assert payload == build_payload(architecture, FIXTURE.name)
     known_ids = {row.id for kind in KINDS for row in getattr(architecture, kind)}

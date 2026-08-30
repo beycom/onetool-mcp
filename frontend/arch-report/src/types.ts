@@ -46,6 +46,15 @@ export type Theme = 'light' | 'dark'
 export type CompareMode = 'off' | 'base' | 'position'
 export type ThemeKind = 'system' | 'subsystem' | 'container' | 'component' | 'code' | 'user'
 export type PresentationTheme = { kinds?: Partial<Record<ThemeKind, string>> }
+export type LayoutMethod = 'layered' | 'radial' | 'grid'
+export type AuthoredLayout = {
+  method?: unknown
+  direction?: unknown
+  spacing?: unknown
+  ranking?: unknown
+  user_choice?: unknown
+  [key: string]: unknown
+}
 
 export type ReportPayload = {
   payload: 'arch-report/v1'
@@ -54,6 +63,7 @@ export type ReportPayload = {
   milestones: Array<Omit<ReportRow, 'intervals'>>
   timelines: Timeline[]
   theme: PresentationTheme
+  layout?: AuthoredLayout
   rows: Record<RowKind, ReportRow[]>
 }
 
@@ -128,6 +138,7 @@ export type View = {
   deps: string | null
   lens: string[]
   theme: Theme
+  layout: LayoutMethod | null
 }
 
 export type ProjectedView = RolledGraph & {

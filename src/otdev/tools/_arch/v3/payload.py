@@ -57,9 +57,7 @@ def _clip_segments(
     cause = positions[0][1]
     for position, next_cause in positions[1:]:
         if position != previous + 1 or next_cause != cause:
-            segments.append(
-                {"start": start, "end": previous, "by": cause}
-            )
+            segments.append({"start": start, "end": previous, "by": cause})
             start, cause = position, next_cause
         previous = position
     segments.append(
@@ -98,7 +96,9 @@ def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any
         selectors = ["base", *view.milestones]
         for payload_position, at in enumerate(selectors):
             state = resolve(architecture, StateSelector(at=at, timeline=view.id))
-            clip_causes = {(clip.kind, clip.id): clip.clipped_by for clip in state.clips}
+            clip_causes = {
+                (clip.kind, clip.id): clip.clipped_by for clip in state.clips
+            }
             effective = {
                 kind: {id(row) for row in state.entities[kind]} for kind in KINDS
             }
@@ -144,6 +144,11 @@ def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any
         "theme": (
             architecture.theme.model_dump(mode="json")
             if architecture.theme is not None
+            else {}
+        ),
+        "layout": (
+            architecture.layout.model_dump(mode="json", exclude_none=True)
+            if architecture.layout is not None
             else {}
         ),
         "rows": serialized_rows,

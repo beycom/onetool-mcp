@@ -72,6 +72,18 @@ class Theme(StrictModel):
     kinds: dict[str, object]
 
 
+class Layout(BaseModel):
+    """Raw authored layout settings retained for advisory validation."""
+
+    model_config = ConfigDict(extra="allow")
+
+    method: object | None = None
+    direction: object | None = None
+    spacing: object | None = None
+    ranking: object | None = None
+    user_choice: object | None = None
+
+
 class System(TemporalNamedItem):
     """Highest-level software boundary."""
 
@@ -134,6 +146,7 @@ class Architecture(StrictModel):
     milestones: list[Milestone]
     timelines: list[Timeline] | None = None
     theme: Theme | None = None
+    layout: Layout | None = None
     systems: list[System]
     subsystems: list[Subsystem]
     containers: list[Container]

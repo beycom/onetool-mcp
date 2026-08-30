@@ -32,7 +32,7 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | P11 | Canvas presentation: radial layout, labels, ports, color economy, theme | DONE, gate PASSED 2026-08-29 (736/2,400 lines + a small architect fix at the gate) | — |
 | P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
 | P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
-| P14 | Layout engines + config + A/B harness (layout-design.md) | READY (budget 2,000 proposed) | — |
+| P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
 | P21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
 | P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |

@@ -29,6 +29,21 @@ from otdev.tools._arch.v3.yamlio import dump_architecture, load_architecture
 pytestmark = [pytest.mark.unit, pytest.mark.tools]
 
 
+def _empty_architecture_payload() -> dict[str, object]:
+    return {
+        "schema_version": 3,
+        "milestones": [],
+        "systems": [],
+        "subsystems": [],
+        "containers": [],
+        "components": [],
+        "code": [],
+        "users": [],
+        "interfaces": [],
+        "relationships": [],
+    }
+
+
 def test_acme_model_round_trip(tmp_path: Path) -> None:
     fixture = Path("tests/unit/tools/fixtures/arch/acme.yaml")
     architecture = load_architecture(fixture)
@@ -73,9 +88,7 @@ def test_import_assigns_blank_ids_in_sheet_order(tmp_path: Path) -> None:
 
     result = import_workbook(workbook_path, yaml_path)
 
-    assert result["assigned_ids"] == {
-        "systems": [(0, "s-0008"), (2, "s-0009")]
-    }
+    assert result["assigned_ids"] == {"systems": [(0, "s-0008"), (2, "s-0009")]}
     assert [row.id for row in load_architecture(yaml_path).systems] == [
         "s-0008",
         "s-0007",
@@ -93,9 +106,7 @@ def test_code_and_container_round_trip(tmp_path: Path) -> None:
             Container(id="c-0001", name="Runtime", parent="s-0001"),
             Container(id="c-0002", name="Worker", parent="s-0001"),
         ],
-        components=[
-            Component(id="cp-0001", name="Handler", container="c-0002")
-        ],
+        components=[Component(id="cp-0001", name="Handler", container="c-0002")],
         code=[Code(id="cd-0001", name="Module", component="cp-0001")],
         users=[],
         interfaces=[],
@@ -113,9 +124,7 @@ def test_subsystem_yaml_and_excel_round_trip(tmp_path: Path) -> None:
         schema_version=3,
         milestones=[],
         systems=[System(id="s-0001", name="Platform")],
-        subsystems=[
-            Subsystem(id="ss-0001", name="Commerce", parent="s-0001")
-        ],
+        subsystems=[Subsystem(id="ss-0001", name="Commerce", parent="s-0001")],
         containers=[Container(id="c-0001", name="Storefront", parent="ss-0001")],
         components=[],
         code=[],
@@ -169,9 +178,11 @@ relationships: []
     assert from_excel == source
     assert load_architecture(output_path) == source
     output_yaml = output_path.read_text(encoding="utf-8")
-    assert output_yaml.index("timelines:") < output_yaml.index(
-        "theme:"
-    ) < output_yaml.index("systems:")
+    assert (
+        output_yaml.index("timelines:")
+        < output_yaml.index("theme:")
+        < output_yaml.index("systems:")
+    )
     assert build_payload(source, source_path.name)["theme"] == {
         "kinds": {"system": "#2e6f9b"}
     }
@@ -201,3 +212,97 @@ relationships: []
         if finding.code == "unknown_theme_key"
     )
     assert unknown.path == "theme.kinds.database"
+
+
+def test_layout_yaml_round_trip(tmp_path: Path) -> None:
+    source = Architecture.model_validate(
+        {
+            **_empty_architecture_payload(),
+            "layout": {
+                "method": "layered",
+                "direction": "down",
+                "spacing": {"node": 60, "layer": 120, "boundary": 40},
+                "ranking": "property:layer",
+                "user_choice": True,
+            },
+        }
+    )
+    path = tmp_path / "layout.yaml"
+
+    dump_architecture(source, path)
+
+    assert load_architecture(path) == source
+    text = path.read_text(encoding="utf-8")
+    assert text.index("layout:") < text.index("systems:")
+
+
+def test_layout_excel_settings_round_trip(tmp_path: Path) -> None:
+    source = Architecture.model_validate(
+        {
+            **_empty_architecture_payload(),
+            "layout": {
+                "method": "radial",
+                "direction": "right",
+                "spacing": {"node": 61, "layer": 121, "boundary": 41},
+                "ranking": "auto",
+                "user_choice": True,
+            },
+        }
+    )
+    path = tmp_path / "layout.xlsx"
+
+    write_workbook(source, path)
+
+    assert read_workbook(path) == source
+
+
+def test_layout_payload_passthrough() -> None:
+    source = Architecture.model_validate(
+        {
+            **_empty_architecture_payload(),
+            "layout": {"method": "grid", "spacing": {"boundary": 32}},
+        }
+    )
+
+    assert build_payload(source, "architecture.yaml")["layout"] == {
+        "method": "grid",
+        "spacing": {"boundary": 32},
+    }
+
+
+def test_layout_validation_reports_located_warnings(tmp_path: Path) -> None:
+    source = tmp_path / "invalid-layout.yaml"
+    source.write_text(
+        """\
+schema_version: 3
+milestones: []
+layout:
+  method: diagonal
+  mystery: value
+systems: []
+subsystems: []
+containers: []
+components: []
+code: []
+users: []
+interfaces: []
+relationships: []
+""",
+        encoding="utf-8",
+    )
+
+    findings = {
+        finding.code: finding
+        for finding in validate(load_architecture(source))
+        if finding.code in {"unknown_layout_key", "invalid_layout_value"}
+    }
+
+    assert set(findings) == {"unknown_layout_key", "invalid_layout_value"}
+    assert findings["unknown_layout_key"].severity == "warning"
+    assert findings["unknown_layout_key"].path == "layout.mystery"
+    assert findings["invalid_layout_value"].severity == "warning"
+    assert findings["invalid_layout_value"].path == "layout.method"
+    assert all(
+        finding.file == str(source) and finding.line > 1
+        for finding in findings.values()
+    )
