@@ -42,16 +42,23 @@ test('direction splitting counts forward, reverse, and bidirectional members for
   expect(ownership.map((spline) => [spline.direction, spline.members.length])).toEqual([['forward', 3]])
 })
 
-test('selection classifies one hop before tag emphasis', () => {
+test('a selected boundary set emphasizes children and classifies only touching edges', () => {
   const splines = [
-    { id: 'a-b', source: 'a', target: 'b' },
-    { id: 'c-a', source: 'c', target: 'a' },
-    { id: 'c-d', source: 'c', target: 'd' },
+    { id: 'child-a-peer', source: 'child-a', target: 'peer' },
+    { id: 'other-child-b', source: 'other', target: 'child-b' },
+    { id: 'other-peer', source: 'other', target: 'peer' },
   ]
-  const result = classifyEmphasis(['a', 'b', 'c', 'd'], splines, 'a', new Set(['d']))
+  const selected = new Set(['boundary', 'child-a', 'child-b'])
+  const result = classifyEmphasis(['boundary', 'child-a', 'child-b', 'peer', 'other'], splines, selected, new Set(['other']))
 
-  expect(result.nodes).toEqual({ a: 'emphasized', b: 'neighbor', c: 'neighbor', d: 'unrelated' })
-  expect(result.edges).toEqual({ 'a-b': 'outgoing', 'c-a': 'incoming', 'c-d': 'unrelated' })
+  expect(result.nodes).toEqual({
+    boundary: 'emphasized',
+    'child-a': 'emphasized',
+    'child-b': 'emphasized',
+    peer: 'neighbor',
+    other: 'neighbor',
+  })
+  expect(result.edges).toEqual({ 'child-a-peer': 'outgoing', 'other-child-b': 'incoming', 'other-peer': 'unrelated' })
 })
 
 test('a grouped interface port uses the provider anchor and reports one deterministic count', () => {

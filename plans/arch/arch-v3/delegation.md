@@ -31,6 +31,8 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | D13d | Polish pass 4: View / Info / Data | DONE, gate PASSED 2026-08-29 (630/1,500 lines) | — |
 | P11 | Canvas presentation: radial layout, labels, ports, color economy, theme | DONE, gate PASSED 2026-08-29 (736/2,400 lines + a small architect fix at the gate) | — |
 | P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
+| P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
+| P14 | Layout engines + config + A/B harness (layout-design.md) | READY (budget 2,000 proposed) | — |
 | P21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
 | P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -771,4 +773,173 @@ link and reload it (expansion restored) -> browser Back walks the
 expansion steps. Capture screenshots: map-collapsed, map-sys-expanded,
 map-four-levels, endpoint-slide, preset-container. Definition of done:
 rules 5-8, then STOP.
+```
+
+## P13 — Report UI correctness fixes (READY, added 2026-08-30)
+
+Fixes issues p15, p17, p18, p19 (files in plans/arch/arch-v3/issues/ —
+read all four before starting; they carry repro steps and expected
+behavior). Prepend the Standard rules.
+
+```text
+Task: fix four correctness defects in the report app
+(frontend/arch-report/src/). Issue files (READ FIRST):
+plans/arch/arch-v3/issues/p17-ui-boundary-edges-dropped.md,
+p15-ui-zoom-dimming.md, p18-ui-initial-framing.md,
+p19-ui-connections-undercount.md.
+
+Surface: frontend/arch-report/src/ only (App.tsx, edgePresentation.ts,
+camera.ts, InfoPanel.tsx, styles.css and their test files). Do not touch
+layout.ts beyond what a fix strictly needs — layout rework is chunk P14.
+
+1. p17 (do this first — everything else is judged on its result):
+   BoundaryNodeView renders no React Flow handles, so every edge whose
+   endpoint resolves to an expanded boundary is dropped with RF error
+   #008. Add hidden target/source Handles to BoundaryNodeView matching
+   ArchitectureNodeView (Position.Left target, Position.Right source).
+   Verify in the dev app: expanding systems:legacy-commerce then
+   containers:commerce-monolith on the acme fixture renders every
+   projected edge and logs zero React Flow warnings.
+
+2. p15: emphasis classification dims everything when a boundary is
+   selected, because classifyEmphasis compares spline endpoints against
+   the single selected key while edges anchor to deepest-visible child
+   keys. Change classifyEmphasis to take a Set of selected keys; in
+   App.tsx build that set as the selected display key PLUS, when it is a
+   boundary, all its descendant node keys (boundary.childKeys transitive,
+   via projected.boundaries). Selected set members render emphasized,
+   edges touching the set are outgoing/incoming, their far endpoints
+   neighbor, the rest unrelated. The selected element must never dim.
+
+3. p18: initial load must frame the whole graph (same result as Fit),
+   capped at 100% zoom. Adjust initialViewport in camera.ts (and its
+   call in App.tsx) — remove the reading-depth floor that currently
+   opens at 79% showing ~3 of 11 systems. Applies to hash-restored views
+   without an explicit camera too. (The orphan-label clause in p18 is
+   NOT in scope — it lands with the label work.)
+
+4. p19: the Info panel Connections tab must list interfaces by MEMBER
+   involvement, not spline-endpoint equality: an interface belongs to
+   the selection when its provider/consumer (or source/target) id is the
+   selected row id or any of its rolled-up member ids (same roll-up
+   App.tsx uses for connectionCount). Group incoming/outgoing per the
+   current aspect. Also scope edge emphasis the same way: selecting a
+   rolled-up member emphasizes only splines whose members involve it
+   (reuse the Set from item 2).
+
+Tests (vitest, existing patterns in *.test.tsx/ts — only these):
+- boundary node exposes handles (p17),
+- classifyEmphasis with a selected boundary set: children emphasized,
+  touching edges directional, nothing dims the selected set (p15),
+- initialViewport fits bounds and caps zoom at 1 (p18),
+- connections grouping for a fixture entity matches member-level
+  interface rows (p19).
+
+Verify: cd frontend/arch-report && npm run build (tsc clean) && npm test
+green. Then just build-arch-report and regenerate the acme report:
+uv run python -m otdev.tools._arch.v3 generate <acme yaml>
+plans/arch/wip/acme-report.html (find the acme YAML path used by the
+previous regeneration; STOP per rule 1 if ambiguous). Report actual
+command output. Budget: 600 source lines (expect far less).
+```
+
+## P14 — Layout engines + config + A/B harness (READY, authored 2026-08-30 at the P13 gate)
+
+Design authority: plans/arch/arch-v3/layout-design.md (CONFIRMED).
+Absorbs issue p13-ui-expansion-layout. Prepend the Standard rules.
+Proposed budget: 2,000 changed source lines.
+
+```text
+Task: extract the report's layout methods into engines behind one
+interface, add the authored `layout:` config block, expose a viewer
+Layout control, and build the A/B comparison harness. Design (READ
+FIRST, it is the contract): plans/arch/arch-v3/layout-design.md. Issue
+plans/arch/arch-v3/issues/p13-ui-expansion-layout.md is absorbed here —
+child packing inside expanded boundaries becomes engine-owned and its
+narrow-column defect must be gone.
+
+Surface: frontend/arch-report/src/ (layout work, viewer control, view
+state) and src/otdev/tools/_arch/v3/ (config block only:
+model/yamlio/excelio/validate/payload). Follow the `theme` block's
+plumbing as the exact precedent at every Python step.
+
+1. Engine extraction (refactor, no visual change yet). layout.ts holds
+   three entangled methods: ELK layered (buildLayoutInput/unionLayout),
+   radialLayout, gridPack. Extract each into a pure module under
+   src/layout/ (layered.ts, radial.ts, grid.ts) implementing the
+   LayoutEngine interface from layout-design.md section 1 (graph +
+   sizes + settings + context in, Positions out; no React, no view
+   state). Add a registry mapping method name -> engine; unionLayout
+   becomes dispatch + cache. stableExpansionLayout and applyPositions
+   stay engine-independent post-processing. With no `layout:` config
+   present, method selection keeps today's behavior exactly (radial for
+   star-shaped flat graphs per the P11 starHub rule, layered otherwise,
+   grid for edgeless sets) and the P11 spacing/clearance contract
+   (report.md pass 5) is unchanged. Existing layout tests must pass
+   without weakening; mechanical import updates are fine.
+2. Child packing (issue p13): expanded-boundary interiors are laid out
+   by the parent graph's engine (layered interior for layered, the
+   existing nested-ELK path refactored in). Fix the narrow-single-
+   column packing so an 11-child expansion fills the boundary in rows/
+   ranks with the `boundary` spacing padding; boundary edges still
+   route to the P12 anchors.
+3. `layout:` config block (Python, theme precedent): optional
+   `Layout` model on Architecture per layout-design.md section 2 —
+   method ('layered'|'radial'|'grid'), direction ('right'|'down'),
+   spacing {node, layer, boundary} (positive ints), ranking ('auto' |
+   'property:<name>'), user_choice (bool). Canonical YAML round-trip;
+   Excel Settings-sheet keys (layout.method, layout.direction,
+   layout.spacing.node, layout.spacing.layer, layout.spacing.boundary,
+   layout.ranking, layout.user_choice) beside the theme.* keys; payload
+   carries the block verbatim (absent -> {}); validation emits located
+   WARN findings unknown_layout_key / invalid_layout_value and the
+   report falls back to defaults — a bad knob must never kill the
+   report. Absent block = today's behavior. Presentation-only: never
+   touches resolution, diffing, or semantic validation.
+4. Settings consumption (TS): config method/direction/spacing/ranking
+   feed LayoutSettings; defaults when absent match today's constants.
+   `ranking: property:<name>` applies to layered only: rank entities by
+   that property's value on the entity row's properties (lane order
+   frontend|service|data|external when the property is `layer`),
+   falling back to call-direction inference (today's ELK ordering) for
+   entities without the property or when ranking is 'auto'.
+5. Viewer control: a Layout dropdown in the View dock listing the
+   registered methods, rendered only when config `user_choice` is true;
+   config method preselected. The choice rides the view hash
+   (`layout=<method>`, view.ts precedent) so shared links reproduce the
+   picture, and localStorage remembers the viewer's preference per
+   report. Spacing/direction/ranking stay config-only.
+6. A/B harness (dev only): the Vite dev app honors a `?layout=<method>`
+   query override (never in the built bundle's persisted state), plus a
+   small script (scripts/ or package.json task) that captures one
+   screenshot per registered method of the acme fixture into
+   plans/arch/wip/layout-ab/. Do NOT change the default method — the
+   architect picks it from these captures afterwards.
+
+Tests (only these):
+- Shared invariant suite parameterized over every registered engine ×
+  fixture graphs (star hub, chain, dense mesh, nested boundaries,
+  11-child expansion): no node overlaps, children inside their boundary
+  with padding, deterministic output across two runs, expansion keeps
+  the anchor within the existing drift budget.
+- Per-engine: layered honors `ranking` lane order with inference
+  fallback; radial keeps hub centrality (existing assertions may move,
+  not weaken).
+- Python: `layout:` YAML round-trip, Excel Settings round-trip,
+  payload passthrough, and the two located WARN findings (mirror the
+  theme test shapes).
+- Viewer: dropdown hidden when user_choice is false/absent; hash +
+  localStorage restore honors the priority query > hash > stored >
+  config.
+
+Verify: cd frontend/arch-report && npm run build && npm test; uv run
+pytest tests/unit/tools -k arch; just lint; just build-arch-report;
+regenerate plans/arch/wip/acme-report.html (same command as P13).
+Rule-9 dev-app pass at 1440x900: acme with no layout block renders
+identically to today (spot-check the cold radial star + one expansion,
+console clean); with user_choice on, switch each method live and
+capture the layout-ab screenshot set. Report actual command output.
+Budget: 2,000 source lines. STOP and ask per rule 1 if the layered
+interior packing conflicts with the P12 anchor-stability contract
+rather than improvising.
 ```

@@ -54,7 +54,7 @@ import {
 } from './types'
 import { containmentIndex, copyViewLink, decodeView, expansionPath, persistView, presetExpansion } from './view'
 import { ViewDock } from './ViewDock'
-import { READING_DEPTH, readingDepth } from './zoom'
+import { readingDepth } from './zoom'
 
 type DiffStatus = 'added' | 'removed' | 'changed'
 type ArchitectureData = {
@@ -138,11 +138,13 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
   )
 }
 
-function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
+export function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
   return (
     <section className="containment-boundary" data-kind={data.boundary.kind} data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'} style={kindPresentationStyle(data.boundary.kind, selected)}>
       <header><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Collapse ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onCollapse() }} title="Collapse" type="button">×</button></header>
       {data.description ? <p className="boundary-description">{data.description}</p> : null}
+      <Handle position={Position.Left} type="target" />
+      <Handle position={Position.Right} type="source" />
     </section>
   )
 }
@@ -436,6 +438,21 @@ export default function App() {
     if (exact) return exact
     return projected.nodes.find((node) => node.members.some((member) => `${member.kind}:${member.row.id}` === selectedKey))?.key ?? null
   }, [projected.boundaries, projected.nodes, selectedKey])
+  const selectedEmphasisKeys = useMemo(() => {
+    const keys = new Set<string>()
+    if (!selectedDisplayKey) return keys
+    keys.add(selectedDisplayKey)
+    const boundaryByKey = new Map(projected.boundaries.map((boundary) => [boundary.key, boundary]))
+    const addBoundaryChildren = (key: string) => {
+      for (const childKey of boundaryByKey.get(key)?.childKeys ?? []) {
+        keys.add(childKey)
+        if (boundaryByKey.has(childKey)) addBoundaryChildren(childKey)
+      }
+    }
+    if (boundaryByKey.has(selectedDisplayKey)) addBoundaryChildren(selectedDisplayKey)
+    if (selectedKey && selectedKey !== selectedDisplayKey) keys.add(selectedKey)
+    return keys
+  }, [projected.boundaries, selectedDisplayKey, selectedKey])
   const selectedSplineId = useMemo(() => {
     if (selected?.type === 'edge') return `${selected.edge.key}:${selected.direction}`
     if (selected?.type !== 'row' || !['interfaces', 'relationships'].includes(selected.kind)) return null
@@ -528,13 +545,13 @@ export default function App() {
     const lensMatched = new Set(graphNodes.filter(({ node }) => nodeTags(node).some((tag) => view.lens.includes(tag))).map(({ node }) => node.key))
     const directionalEdges = projected.edges.flatMap((edge) => splitEdgeDirections(edge, view.aspect))
     const visibleKeys = [...graphNodes.map(({ node }) => node.key), ...projected.boundaries.map((boundary) => boundary.key)]
-    const classified = classifyEmphasis(visibleKeys, directionalEdges, selectedDisplayKey, lensMatched)
+    const classified = classifyEmphasis(visibleKeys, directionalEdges, selectedEmphasisKeys, lensMatched)
     const neighborKeys = (keys: Set<string>) => new Set(projected.edges.flatMap((edge) => keys.has(edge.a) ? [edge.b] : keys.has(edge.b) ? [edge.a] : []))
     const selectedNodes = new Set(graphNodes.filter(({ node }) => selectedKey && memberKeys(node).has(selectedKey)).map(({ node }) => node.key))
     const hoverNodes = new Set(hoveredKey ? [hoveredKey] : [])
     const hoverNeighbors = neighborKeys(hoverNodes)
     const emphasis = (key: string): ArchitectureData['emphasis'] => {
-      if (selectedDisplayKey) return classified.nodes[key]
+      if (selectedEmphasisKeys.size) return classified.nodes[key]
       if (selected?.type === 'edge') return key === selected.edge.a || key === selected.edge.b ? 'neighbor' : 'unrelated'
       if (view.lens.length) return classified.nodes[key]
       if (hoverNodes.size) return hoverNodes.has(key) ? 'emphasized' : hoverNeighbors.has(key) ? 'neighbor' : 'unrelated'
@@ -596,7 +613,7 @@ export default function App() {
       type: 'boundary',
     }))
     return applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
-  }, [cardSizes, changeExpansion, diff, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedKey, view.aspect, view.lens])
+  }, [cardSizes, changeExpansion, diff, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedEmphasisKeys, selectedKey, view.aspect, view.lens])
 
   const graphEdges = useMemo(() => {
     const merged = new Map(projected.edges.map((edge) => [edge.key, { edge, ghost: false }]))
@@ -617,10 +634,10 @@ export default function App() {
     const classified = classifyEmphasis([
       ...projected.nodes.map((node) => node.key),
       ...projected.boundaries.map((boundary) => boundary.key),
-    ], rendered.map(({ spline }) => spline), selectedDisplayKey, lensMatched)
+    ], rendered.map(({ spline }) => spline), selectedEmphasisKeys, lensMatched)
     const edgeEmphasis = (spline: DirectionalSpline): SemanticData['emphasis'] => {
       if (selectedSplineId) return spline.id === selectedSplineId ? 'selected' : 'unrelated'
-      if (selectedDisplayKey || view.lens.length) return classified.edges[spline.id]
+      if (selectedEmphasisKeys.size || view.lens.length) return classified.edges[spline.id]
       if (hoveredEdgeId) return spline.id === hoveredEdgeId ? 'selected' : 'unrelated'
       if (hoveredKey) return spline.source === hoveredKey || spline.target === hoveredKey ? 'neighbor' : 'unrelated'
       return 'normal'
@@ -663,7 +680,7 @@ export default function App() {
         (hovered) => setHoveredEdgeId(hovered ? spline.id : null),
       )
     })
-  }, [depth, diff, graphEdges, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedDisplayKey, selectedSplineId, view.aspect, view.lens, zoom])
+  }, [depth, diff, graphEdges, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedEmphasisKeys, selectedSplineId, view.aspect, view.lens, zoom])
 
   const visibleCanvas = useCallback((): Rect | null => {
     const element = canvasRef.current
@@ -698,7 +715,7 @@ export default function App() {
         || !(node.data as ArchitectureData).statuses.includes('removed')).map((node) => node.id)
       if (!visible || !nodeIds.length) return
       framedLayout.current = layoutKey
-      void flow.setViewport(initialViewport(flow.getNodesBounds(nodeIds), visible, READING_DEPTH), { duration: 250 })
+      void flow.setViewport(initialViewport(flow.getNodesBounds(nodeIds), visible), { duration: 250 })
     })
     return () => cancelAnimationFrame(frame)
   }, [flow, layoutKey, positions, visibleCanvas])

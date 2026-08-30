@@ -7,19 +7,37 @@ import { afterEach, expect, test, vi } from 'vitest'
 vi.mock('@xyflow/react', () => ({
   BaseEdge: ({ className, id, style }: { className?: string; id: string; style?: CSSProperties }) => <path className={className} data-testid={id} style={style} />,
   EdgeLabelRenderer: ({ children }: { children: ReactNode }) => children,
-  Handle: () => null,
+  Handle: ({ position, type }: { position: string; type: string }) => <span data-position={position} data-type={type} />,
   MiniMap: () => null,
   Position: { Left: 'left', Right: 'right' },
   ReactFlow: () => null,
 }))
 
-import { ArchitectureNodeView, SemanticEdge } from './App'
+import { ArchitectureNodeView, BoundaryNodeView, SemanticEdge } from './App'
 import { edgeLabelVisible, splitEdgeDirections, type EdgeEmphasis } from './edgePresentation'
 import { dataKindChip } from './GridPanel'
 import { DEFAULT_KIND_COLORS, themeStyle } from './theme'
 import type { GraphEdge, ReportRow } from './types'
 
 afterEach(cleanup)
+
+test('boundary nodes expose hidden target and source handles', () => {
+  const { container } = render(BoundaryNodeView({
+    data: {
+      boundary: {
+        childKeys: ['containers:child'], key: 'systems:parent', kind: 'systems', nodeKey: 'systems:parent',
+        parentKey: null, row: { id: 'parent', intervals: [], name: 'Parent' }, stub: false,
+      },
+      description: '',
+      label: 'Parent',
+      onCollapse: () => undefined,
+    },
+    selected: false,
+  } as never))
+
+  expect(container.querySelector('[data-type="target"][data-position="left"]')).toBeTruthy()
+  expect(container.querySelector('[data-type="source"][data-position="right"]')).toBeTruthy()
+})
 
 function relationship(id: string, action: string): ReportRow {
   return { action, id, intervals: [], source: 'systems:hub', target: 'systems:peer' }

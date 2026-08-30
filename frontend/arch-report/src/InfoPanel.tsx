@@ -100,14 +100,28 @@ export function InfoPanel({
     && [item.row.parent, item.row.container, item.row.component].includes(row.id)
   )) : []
   const selectedNodeKey = entity && row ? `${kind}:${row.id}` : null
-  const selectedEdges = selectedNodeKey ? projected.edges.filter((item) => item.a === selectedNodeKey || item.b === selectedNodeKey) : []
-  const groupedConnections = { incoming: [] as ReportRow[], outgoing: [] as ReportRow[] }
-  for (const item of selectedEdges) {
-    for (const direction of splitEdgeDirections(item, aspect)) {
-      const interfaces = direction.members.filter((member) => member.kind === 'interfaces').map((member) => member.row)
-      if (direction.target === selectedNodeKey) groupedConnections.incoming.push(...interfaces)
-      if (direction.source === selectedNodeKey) groupedConnections.outgoing.push(...interfaces)
+  const selectedMemberIds = new Set(row && entity ? [row.id] : [])
+  let foundMember = true
+  while (foundMember) {
+    foundMember = false
+    for (const item of allRows) {
+      if (!(ENTITY_KINDS as readonly string[]).includes(item.kind) || selectedMemberIds.has(item.row.id)) continue
+      const parent = item.row.parent ?? item.row.container ?? item.row.component
+      if (parent && selectedMemberIds.has(parent)) {
+        selectedMemberIds.add(item.row.id)
+        foundMember = true
+      }
     }
+  }
+  const groupedConnections = { incoming: [] as ReportRow[], outgoing: [] as ReportRow[] }
+  for (const item of projected.rawState.rows.interfaces) {
+    const direction = connectionDirection(item, aspect)
+    if (!direction) continue
+    const fromSelected = selectedMemberIds.has(direction.from)
+    const toSelected = selectedMemberIds.has(direction.to)
+    if (fromSelected === toSelected) continue
+    if (direction.bidirectional || toSelected) groupedConnections.incoming.push(item)
+    if (direction.bidirectional || fromSelected) groupedConnections.outgoing.push(item)
   }
   const ordinaryFields = row && entity ? Object.entries(row).filter(([key, value]) => (
     !['id', 'name', 'action', 'description', 'tags', 'properties', 'intervals', 'parent', 'container', 'component'].includes(key)

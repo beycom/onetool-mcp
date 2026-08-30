@@ -22,6 +22,7 @@ export type EmphasisResult = {
   edges: Record<string, EdgeEmphasis>
   nodes: Record<string, NodeEmphasis>
 }
+type EmphasisSpline = Pick<DirectionalSpline, 'id' | 'source' | 'target'> & Partial<Pick<DirectionalSpline, 'members'>>
 export type InterfacePort = { count: number; label: string; point: EdgePoint }
 
 function rowLabel(row: ReportRow): string {
@@ -98,19 +99,34 @@ export function edgeStrokeToken(emphasis: EdgeEmphasis | 'selected', statuses: s
 
 export function classifyEmphasis(
   nodeKeys: string[],
-  splines: Array<Pick<DirectionalSpline, 'id' | 'source' | 'target'>>,
-  selectedKey: string | null,
+  splines: EmphasisSpline[],
+  selectedKeys: ReadonlySet<string>,
   tagMatches: ReadonlySet<string>,
 ): EmphasisResult {
   const nodes: Record<string, NodeEmphasis> = {}
   const edges: Record<string, EdgeEmphasis> = {}
-  if (selectedKey) {
-    const neighbors = new Set(splines.flatMap((spline) => spline.source === selectedKey
-      ? [spline.target] : spline.target === selectedKey ? [spline.source] : []))
-    for (const key of nodeKeys) nodes[key] = key === selectedKey
+  if (selectedKeys.size) {
+    const visibleKeys = new Set(nodeKeys)
+    const memberIds = new Set([...selectedKeys].filter((key) => !visibleKeys.has(key)).map((key) => key.slice(key.indexOf(':') + 1)))
+    const includesSelectedMember = (spline: EmphasisSpline) => !memberIds.size || (spline.members ?? []).some(({ row }) => (
+      [row.provider, row.consumer, row.source, row.target].some((id) => id !== undefined && memberIds.has(id))
+    ))
+    const selectedSides = (spline: EmphasisSpline) => ({
+      source: includesSelectedMember(spline) && selectedKeys.has(spline.source),
+      target: includesSelectedMember(spline) && selectedKeys.has(spline.target),
+    })
+    const neighbors = new Set(splines.flatMap((spline) => {
+      const selected = selectedSides(spline)
+      if (selected.source && !selected.target) return [spline.target]
+      if (selected.target && !selected.source) return [spline.source]
+      return []
+    }))
+    for (const key of nodeKeys) nodes[key] = selectedKeys.has(key)
       ? 'emphasized' : neighbors.has(key) ? 'neighbor' : 'unrelated'
-    for (const spline of splines) edges[spline.id] = spline.source === selectedKey
-      ? 'outgoing' : spline.target === selectedKey ? 'incoming' : 'unrelated'
+    for (const spline of splines) {
+      const selected = selectedSides(spline)
+      edges[spline.id] = selected.source ? 'outgoing' : selected.target ? 'incoming' : 'unrelated'
+    }
     return { edges, nodes }
   }
   if (tagMatches.size) {

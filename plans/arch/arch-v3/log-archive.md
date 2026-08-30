@@ -4,6 +4,144 @@ Older progress-log entries moved out of plan.md (reorg 2026-08-25).
 Same append-only content, newest first; plan.md keeps only recent
 entries. Continue archiving from plan.md as its log grows.
 
+- **2026-08-29** — D13d architect gate PASSED; tree committed. Independently
+  re-verified: 42 frontend tests (15 files) including exactly the six
+  prescribed D13d cases, `just lint`, 78 arch py tests,
+  `just build-arch-report` reproduces the tree's template byte-for-byte
+  (shasum match), budget confirmed at 630/1,500 changed source lines
+  (389 tracked + 241 new modules InfoPanel.tsx/display.ts). Code review
+  conforms to the pass-4 contract: viewport-filling html/body/#root with
+  the 1024 × 720 clamp; ResizablePanel title rows with icon-only chevrons
+  and icon rails (all floating pills/gutters gone from styles.css); Tags
+  capped at five control rows with internal scroll; InfoPanel humanized
+  collision-free details grid, kind-coloured Contains chips (cap 8 +
+  expand), "Changes at this stage" from the diff with the card
+  change-popover deleted (Escape handler updated), connection Details
+  with linked endpoints / aspect-aware direction / lifecycle from payload
+  intervals, entity-only Connections tab, bounded Back history (20),
+  persistent "View dependencies"; GridPanel at the four direction tabs
+  with rawState Entities across all six kinds, first-render auto-size
+  gated on no stored layout, all-empty columns hidden, humanized
+  min-width headers, Show on Canvas banner, two-way selection sync with
+  ensureNodeVisible keyed on rows; motion tokens + content-in animation
+  with the reduced-motion animation override. AG Grid conditional mount
+  verified safe (create effect depends on rows, early-returns without an
+  element). Screenshots confirm the connection Details, entity Details
+  chips, auto-sized headers, and collapsed rails. Acceptable deviations
+  noted: clip status reads "Retired at this stage" (drops the clipped-by
+  attribution — one-label-style simplification); a table-selected row not
+  rendered at the current level now gets the Show on Canvas banner
+  instead of silently highlighting an ancestor (that IS the direction's
+  flow); connection rows selected in Data/Info now also highlight their
+  containing spline (in-scope improvement). ui-polish.md annotated: #13,
+  #20, #21, #22, #25, #26, #27 CLOSED and #16 closed in full — every
+  issue in the file now carries a CLOSED/WAIVED/superseded note. Next
+  action: the Phase 3P exit gate (architect + user): the cold-open story
+  test, the direction's acceptance checks at 1440 × 900 and 1024 × 720
+  under `file://`, and the test-ui.md walkthrough re-run; after it passes,
+  D12a re-scope, D11, D12b, and D8 unlock.
+
+- **2026-08-29**: D13d View / Info / Data content and states complete;
+  worktree left dirty for architect review. The report now fills the viewport
+  at and above the 1024 x 720 floor. Each dock has a title row with an
+  icon-only collapse chevron and reopens from a reserved icon rail. View uses
+  compact diagram and link rows, hides controls without a choice, and limits
+  Tags to five internally scrolling rows. Info humanizes every field in a
+  collision-free grid, links contained entities as kind-coloured chips, moves
+  stage changes out of the removed card popover, gives interfaces and splines
+  linked endpoint, direction, value, interval, and member details, provides
+  internal Back, and keeps View dependencies in Details. Data now has the four
+  prescribed tabs; raw-state Entities includes every live kind, including
+  subsystems; empty columns hide by default, populated columns auto-size with
+  full headers, Show on Canvas changes to the row's detail, and canvas/table
+  selection stays synchronized after grid rebuilds. Empty states, diagnostics,
+  shared dock/Info/search motion, and reduced-motion overrides completed the
+  consistency sweep. Source budget: 630/1,500 changed TS/TSX/CSS lines,
+  counted as additions plus deletions with tests and the generated bundle
+  excluded.
+  Tests: exactly the six prescribed D13d cases added; frontend 42 passed across
+  15 files. `just lint`, smoke 27 passed / 3,209 deselected, arch Python 78
+  passed / 540 deselected, `just build-arch-report`, CLI acme regeneration,
+  and `git diff --check` passed. Rule-9 Playwright passed on the generated
+  `file://` report in light theme at 1440 x 900, 1024 x 720, and 1920 x 1080:
+  the app, document, and body matched each viewport exactly with zero scroll or
+  dead band; every console check was clean; the only request was the local HTML
+  file. The walkthrough covered entity Details and Contains chips, stage
+  changes, connection Details and Back, four Data tabs, auto-sized headers,
+  Show on Canvas, two-way selection, every dock's collapse/reopen path, and the
+  final Escape order. Forced reduced motion measured 0.01 ms dock/search timing
+  and no edge animation. Screenshots: `wip/test-results/d13d/info-entity-details.png`,
+  `info-connection.png`, `data-autosized.png`, `collapsed-rails.png`, and
+  `viewport-fill-1920.png`. Assumptions: the execution request confirms the
+  1,500-line budget; the final no-commit instruction controls; rule 8 permits
+  this progress entry as the sole design-doc write; Code rows use Component
+  detail and User rows use System detail because those are their deepest
+  renderable projections; Show on Canvas clears drill and scope so the chosen
+  row appears; interface direction follows the active Calls or Data flow field,
+  while relationship direction remains source to target; kind chips use
+  distinct light-theme colours derived from the existing token palette. Open
+  questions: none. Next action: architect gate review, then the Phase 3P exit
+  gate.
+
+- **2026-08-29** — D13d authored (architect); tree committed. Normative
+  spec "Polish contract — pass 4: View / Info / Data content and states
+  (D13d)" added to report.md, grounded in the post-D14 tree (SidePanel,
+  ResizablePanel, GridPanel, ViewDock): viewport-filling shell with dock
+  header rows / chevrons / icon rails replacing every floating pill and
+  gutter (#25, #26); no-choice View controls hide and Tags caps at 5
+  rows (#27); humanized non-overlapping Info kv with linked Contains
+  chips (#20); stage changes as a Details section with the card
+  change-popover removed (the D13c leftover); kind-appropriate
+  connection Details rendering endpoints, direction, values, and
+  lifecycle interval from the existing payload (#21, no Python);
+  internal Back + "View dependencies" in Details (#16 rest); final
+  Escape order (#13); Data at the direction's four tabs with the D14
+  subsystems tab folded into a rawState-sourced Entities, auto-size /
+  empty-collapse / untruncated headers (#22), Show on Canvas, two-way
+  sync; designed empty states and the motion/reduced-motion sweep. Six
+  prescribed tests. Architect decision: the read-only Payload viewer and
+  Attachments tabs are DEFERRED out of 3P to the Phase 3S attachments
+  chunk — no file refs exist in the payload until the schema.md/
+  sequence.md attachments design lands, and the syntax highlighter
+  should ship once, with real data (pass-4 bullet amended; the 3P exit
+  gate does not check a Payload viewer). D13d prompt READY in
+  delegation.md, proposed budget 1,500 changed source lines. Next
+  action: user confirms the D13d budget and passes the delegation.md
+  prompt to the executor; the architect gates the result, then runs the
+  3P exit gate (with the user) — after which D12a re-scope, D11, D12b,
+  and D8 unlock.
+
+- **2026-08-29** — D14 architect gate PASSED; #21 payload precheck PASSED;
+  tree committed. Independently re-verified: 78 arch py tests + `just lint`
+  clean, 36 frontend tests (12 files) including the five prescribed D14
+  cases, `just build-arch-report` reproduces the tree's template
+  byte-for-byte (shasum match), budget confirmed at 293/1,100 changed
+  source lines (203 py/TS + 90 acme fixture). Code review conforms to the
+  D14 contract: Subsystem kind with `ss` prefix and the strict
+  system→subsystem→container chain (model/ids/yamlio), resolver replaces
+  the container-nesting recursion with flat subsystem/container passes,
+  ambiguous-parent moves to systems×subsystems, the containment-cycle
+  check is correctly deleted (no cycle is constructible in the new chain),
+  eleven-sheet Excel with Subsystems as sheet 5; frontend Level rename
+  with the Subsystem option hidden for empty datasets, the rewritten
+  boundary-nesting table, and search/Info/Data wiring. Fixture verified:
+  six subsystems under commerce-platform, exactly the 19 prescribed
+  container rewires, zero clips at base. Because the executor's cold-load
+  screenshot showed only 3–4 subsystems, a live Playwright spot-check was
+  run: at the final stage the subsystem level renders all 6 Subsystem
+  cards plus 10 ungrouped container leaves (3 in-viewport — correct under
+  D13b's Read-capped cold framing); at Base the level shows none because
+  the subsystems arrive with the migration waves (correct liveness — note
+  for the exit-gate walkthrough); console clean. Minor, not gate-blocking:
+  Data gained a dedicated `subsystems` tab reading rawState rows — pass 4
+  owns Data-table shape and may fold or keep it. #21 precheck: interface
+  rows already carry provider/consumer/call_direction/name/tags/
+  properties/intervals and relationship rows source/target/action/
+  description/intervals — connection details render from the existing
+  payload, no plumbing, nothing escalates to the user. Log entries dated
+  2026-08-27 and older moved to log-archive.md (inline log was at 15).
+  Next action: author the D13d pass-4 spec + prompt.
+
 - **2026-08-28** — D14 subsystem level rename complete; worktree left dirty
   for architect review. Schema-v3 now models the strict System > Subsystem >
   Container > Component > Code chain: YAML, generated ids, resolver clipping,

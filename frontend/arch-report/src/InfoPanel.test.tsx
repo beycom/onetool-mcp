@@ -55,3 +55,25 @@ test('interface Info resolves endpoints, direction, and lifecycle without a Conn
   expect(screen.getByText('Base → 4 · Transaction Core')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Connections' })).toBeNull()
 })
+
+test('Connections groups interfaces involving members of an expanded fixture entity', () => {
+  const expanded = projectState(payload, { ...view, expand: ['systems:payment-provider'], position: 4 })
+  render(<InfoPanel
+    aspect="call-direction"
+    diff={null}
+    hasBack={false}
+    onBack={() => undefined}
+    onClose={() => undefined}
+    onDependencyView={() => undefined}
+    onSelect={() => undefined}
+    payload={payload}
+    projected={expanded}
+    selection={selection('systems', 'payment-provider')}
+    timeline={0}
+  />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Connections' }))
+
+  expect(screen.getByRole('button', { name: /Execute tokenized payment operation/ })).toBeTruthy()
+  expect(screen.getByText('No outgoing connections at this stage.')).toBeTruthy()
+})

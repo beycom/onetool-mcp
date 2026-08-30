@@ -1,17 +1,18 @@
 import { expect, test } from 'vitest'
 
-import { initialViewport, shiftViewport } from './camera'
+import { fitViewport, initialViewport, shiftViewport } from './camera'
 
-test('initial framing fits a small graph and caps a large graph at Read', () => {
+test('initial framing fits the whole graph and caps zoom at 1', () => {
   const visible = { x: 0, y: 0, width: 800, height: 600 }
-  const thresholds = { read: 0.8, full: 1.1 }
-  const small = initialViewport({ x: 100, y: 50, width: 400, height: 200 }, visible, thresholds)
-  const large = initialViewport({ x: 0, y: 0, width: 2000, height: 1000 }, visible, thresholds)
+  const smallBounds = { x: 100, y: 50, width: 400, height: 200 }
+  const largeBounds = { x: 0, y: 0, width: 2000, height: 1000 }
+  const small = initialViewport(smallBounds, visible)
+  const large = initialViewport(largeBounds, visible)
 
-  expect(small.zoom).toBeCloseTo(1.52)
+  expect(small.zoom).toBe(1)
   expect(small.x + (100 + 200) * small.zoom).toBeCloseTo(400)
   expect(small.y + (50 + 100) * small.zoom).toBeCloseTo(300)
-  expect(large).toEqual({ x: -400, y: -100, zoom: 0.8 })
+  expect(large).toEqual(fitViewport(largeBounds, visible))
 })
 
 test('camera shifting is unchanged inside and uses the minimum pan outside without changing zoom', () => {

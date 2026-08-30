@@ -157,6 +157,8 @@ carry both.
 | --- | --- | --- |
 | P11 | — | Canvas presentation: radial layout, edge labels/ports, color economy, theme (added 2026-08-29) |
 | P12 | — | Map model: in-place C4 expansion, endpoint resolution, presets (added 2026-08-29) |
+| P13 | — | Report UI correctness fixes: issues p15, p17, p18, p19 (added 2026-08-30) |
+| P14 | — | Layout engines + config + A/B harness — layout-design.md; absorbs issue p13 (added 2026-08-30) |
 | P21 | D12a | Sequence parser + payload (prompt ON HOLD, needs re-scope) |
 | P22 | D11 | Report definitions + guided views |
 | P23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
@@ -229,6 +231,19 @@ docs):
   position stability, boundary identity with description, acme
   showcase-path delta (four-level zoom path + subsystem- and
   component-level interfaces). Reverses answered question Q5.
+- [x] **P13 — report UI correctness fixes** (added 2026-08-30 from the
+  architect inspection pass; DONE, gate PASSED 2026-08-30 at 102/600
+  changed source lines). Boundary-node hidden handles (p17), set-based
+  selection emphasis with member scoping (p15/p19), whole-graph initial
+  fit capped at 100% (p18 — report.md framing rule amended at the
+  gate), member-level Info Connections grouping (p19).
+- [ ] **P14 — layout engines + config + A/B harness** (added
+  2026-08-30; design: layout-design.md, CONFIRMED; prompt READY in
+  delegation.md, proposed budget 2,000; absorbs issue p13). Engine
+  extraction (layered/radial/grid behind LayoutEngine), `layout:`
+  config block on the theme precedent, method-only viewer control with
+  hash + localStorage, shared invariant suite, dev-only ?layout= A/B
+  harness; default method decided by the architect from the captures.
 - [ ] **Phase 1 exit gate (architect + user)** — the held 3P exit gate:
   open acme's report cold and the story reads without explanation and
   *looks* deliberate. Run ui-polish-direction.md "Acceptance checks" at
@@ -348,6 +363,77 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-30** — P13 architect gate PASSED; tree committed; P14 prompt
+  authored per the pipeline rule. Independently re-verified: frontend 47
+  passed, `just build-arch-report` reproduces the tree's template
+  byte-for-byte (shasum match), budget confirmed at 102/600 changed
+  source lines (add+del; executor's 73 counted additions only); arch
+  pytest and lint not re-run — no Python source changed (template only,
+  regenerated). Code review conforms to the P13 prompt: BoundaryNodeView
+  handles match ArchitectureNodeView exactly and are hidden by the
+  existing `.react-flow__handle { opacity: 0 }` rule; classifyEmphasis
+  takes a ReadonlySet with transitive boundary children built in App.tsx
+  and member-row scoping for a hidden rolled-up selection;
+  initialViewport is now fit-capped-at-1 (ZoomThresholds deleted);
+  Connections iterates rawState interfaces by member-id fixpoint under
+  the current aspect. Screenshots verified: cold load fits all systems
+  at 26%, expanded Payment Service Provider lists the member-level
+  incoming interface. All four executor assumptions ACCEPTED (canonical
+  acme input; member vs boundary emphasis scoping; P13 framing rule
+  supersedes report.md — amendment landed at lines 868–875 and
+  verification vector 2; internal-interface omission matches the canvas
+  roll-up). The stored-table-layout toast in both screenshots is a
+  stale-localStorage diagnostic, not a defect. Issues p15/p17/p18/p19
+  RESOLVED and moved to issues/resolved/ (p18's orphan-label clause
+  explicitly rides the label work, issue p14). Pipeline: P14 prompt
+  authored in delegation.md (engine extraction, `layout:` block, viewer
+  control, invariant suite, A/B harness; proposed budget 2,000);
+  layout-design.md committed. Next action: user confirms the P14 budget
+  and runs the P14 prompt; the Phase 1 exit gate re-runs after the P14
+  gate (initial framing changed, so the walkthrough must be redone on
+  the post-layout tree).
+
+- **2026-08-30**: P13 report UI correctness fixes landed for issues p15,
+  p17, p18, and p19. Boundary nodes now expose hidden React Flow handles;
+  selection emphasis covers transitive boundary children and scopes a hidden
+  rolled-up member to its own interface rows; initial framing fits the whole
+  graph with a 1.0 zoom cap; Info Connections groups live interfaces by the
+  selected entity and its descendants under the current aspect. Source: 73 / 600
+  added lines across `App.tsx`, `edgePresentation.ts`, `camera.ts`, and
+  `InfoPanel.tsx`; no `layout.ts` or CSS changes. Tests: four prescribed
+  regression cases added or updated; targeted Vitest 12 passed, full Vitest 47
+  passed, frontend and embedded-bundle builds clean, acme regeneration `OK`,
+  `just lint` clean, and arch pytest 79 passed / 540 deselected. Rule-9 dev-app
+  verification at 1440x900: the required two expansions render 14 / 14 edges
+  with four boundary handles and zero React Flow warnings; selecting the outer
+  boundary keeps all 11 component cards emphasized; cold load fits all 14 nodes
+  at 0.262 zoom; expanded Payment Service Provider lists `payment-to-provider`
+  as incoming. Screenshots:
+  `plans/arch/wip/test-results/p13/{initial-fit-1440,connections-member-rollup-1440}.png`.
+  The console check found only two duplicate Vite `favicon.ico` 404s. Assumptions:
+  (1) `tests/unit/tools/fixtures/arch/acme.yaml` is the regeneration input because
+  plan.md and fixture-src/README.md name it as canonical; (2) when a hidden
+  rolled-up member is selected, the non-visible canonical key in the selected-key
+  set scopes splines by member-row endpoint, while a boundary's transitive visible
+  child keys intentionally select the whole expanded boundary; (3) P13's explicit
+  whole-graph initial-fit rule supersedes report.md's older Read-floor rule; (4)
+  interfaces wholly internal to the selected descendant set are omitted to match
+  the canvas roll-up, and a bidirectional interface belongs to both groups. Open
+  questions: none. Next action: architect gate review; no commit or push made.
+
+- **2026-08-30** — Architect inspection pass (Playwright, file:// + dev
+  server, 1440×900 and 1024×720). Filed issues p13–p19, p24, p26–p29,
+  p32 (see issues/issues.md); p25 closed as correct behavior; p15 updated
+  with confirmed root cause. Critical find: p17 — edges to an expanded
+  boundary are silently dropped (React Flow #008, BoundaryNodeView has no
+  handles). Layout design confirmed with user (layout-design.md): engine
+  abstraction, `layout:` config block (theme precedent), method-only
+  viewer control, explicit `layer` ranking property with inference
+  fallback. New chunks P13 (correctness fixes, READY) and P14 (layout
+  engines, gated on P13 gate); prompts in delegation.md. Note: issue
+  files `pxy-*.md` and chunk ids `Pxy` are separate registries — chunk
+  P13 fixes issue p17 et al., and chunk P14 absorbs issue p13.
 
 - **2026-08-29** — Phase 1 exit gate: architect half RUN (user half
   outstanding) + one gate fix landed. Walkthrough at 1440×900 and
@@ -598,143 +684,5 @@ inclusive `end_in` (Q7, 2026-08-24).
   gate), waves 4–5 (P41–P43; OpenSpec, P51, docs backfill). The nine
   2026-08-28 log entries moved to log-archive.md. Next action: run the
   Phase 1 exit gate with the user.
-
-- **2026-08-29** — D13d architect gate PASSED; tree committed. Independently
-  re-verified: 42 frontend tests (15 files) including exactly the six
-  prescribed D13d cases, `just lint`, 78 arch py tests,
-  `just build-arch-report` reproduces the tree's template byte-for-byte
-  (shasum match), budget confirmed at 630/1,500 changed source lines
-  (389 tracked + 241 new modules InfoPanel.tsx/display.ts). Code review
-  conforms to the pass-4 contract: viewport-filling html/body/#root with
-  the 1024 × 720 clamp; ResizablePanel title rows with icon-only chevrons
-  and icon rails (all floating pills/gutters gone from styles.css); Tags
-  capped at five control rows with internal scroll; InfoPanel humanized
-  collision-free details grid, kind-coloured Contains chips (cap 8 +
-  expand), "Changes at this stage" from the diff with the card
-  change-popover deleted (Escape handler updated), connection Details
-  with linked endpoints / aspect-aware direction / lifecycle from payload
-  intervals, entity-only Connections tab, bounded Back history (20),
-  persistent "View dependencies"; GridPanel at the four direction tabs
-  with rawState Entities across all six kinds, first-render auto-size
-  gated on no stored layout, all-empty columns hidden, humanized
-  min-width headers, Show on Canvas banner, two-way selection sync with
-  ensureNodeVisible keyed on rows; motion tokens + content-in animation
-  with the reduced-motion animation override. AG Grid conditional mount
-  verified safe (create effect depends on rows, early-returns without an
-  element). Screenshots confirm the connection Details, entity Details
-  chips, auto-sized headers, and collapsed rails. Acceptable deviations
-  noted: clip status reads "Retired at this stage" (drops the clipped-by
-  attribution — one-label-style simplification); a table-selected row not
-  rendered at the current level now gets the Show on Canvas banner
-  instead of silently highlighting an ancestor (that IS the direction's
-  flow); connection rows selected in Data/Info now also highlight their
-  containing spline (in-scope improvement). ui-polish.md annotated: #13,
-  #20, #21, #22, #25, #26, #27 CLOSED and #16 closed in full — every
-  issue in the file now carries a CLOSED/WAIVED/superseded note. Next
-  action: the Phase 3P exit gate (architect + user): the cold-open story
-  test, the direction's acceptance checks at 1440 × 900 and 1024 × 720
-  under `file://`, and the test-ui.md walkthrough re-run; after it passes,
-  D12a re-scope, D11, D12b, and D8 unlock.
-
-- **2026-08-29**: D13d View / Info / Data content and states complete;
-  worktree left dirty for architect review. The report now fills the viewport
-  at and above the 1024 x 720 floor. Each dock has a title row with an
-  icon-only collapse chevron and reopens from a reserved icon rail. View uses
-  compact diagram and link rows, hides controls without a choice, and limits
-  Tags to five internally scrolling rows. Info humanizes every field in a
-  collision-free grid, links contained entities as kind-coloured chips, moves
-  stage changes out of the removed card popover, gives interfaces and splines
-  linked endpoint, direction, value, interval, and member details, provides
-  internal Back, and keeps View dependencies in Details. Data now has the four
-  prescribed tabs; raw-state Entities includes every live kind, including
-  subsystems; empty columns hide by default, populated columns auto-size with
-  full headers, Show on Canvas changes to the row's detail, and canvas/table
-  selection stays synchronized after grid rebuilds. Empty states, diagnostics,
-  shared dock/Info/search motion, and reduced-motion overrides completed the
-  consistency sweep. Source budget: 630/1,500 changed TS/TSX/CSS lines,
-  counted as additions plus deletions with tests and the generated bundle
-  excluded.
-  Tests: exactly the six prescribed D13d cases added; frontend 42 passed across
-  15 files. `just lint`, smoke 27 passed / 3,209 deselected, arch Python 78
-  passed / 540 deselected, `just build-arch-report`, CLI acme regeneration,
-  and `git diff --check` passed. Rule-9 Playwright passed on the generated
-  `file://` report in light theme at 1440 x 900, 1024 x 720, and 1920 x 1080:
-  the app, document, and body matched each viewport exactly with zero scroll or
-  dead band; every console check was clean; the only request was the local HTML
-  file. The walkthrough covered entity Details and Contains chips, stage
-  changes, connection Details and Back, four Data tabs, auto-sized headers,
-  Show on Canvas, two-way selection, every dock's collapse/reopen path, and the
-  final Escape order. Forced reduced motion measured 0.01 ms dock/search timing
-  and no edge animation. Screenshots: `wip/test-results/d13d/info-entity-details.png`,
-  `info-connection.png`, `data-autosized.png`, `collapsed-rails.png`, and
-  `viewport-fill-1920.png`. Assumptions: the execution request confirms the
-  1,500-line budget; the final no-commit instruction controls; rule 8 permits
-  this progress entry as the sole design-doc write; Code rows use Component
-  detail and User rows use System detail because those are their deepest
-  renderable projections; Show on Canvas clears drill and scope so the chosen
-  row appears; interface direction follows the active Calls or Data flow field,
-  while relationship direction remains source to target; kind chips use
-  distinct light-theme colours derived from the existing token palette. Open
-  questions: none. Next action: architect gate review, then the Phase 3P exit
-  gate.
-
-- **2026-08-29** — D13d authored (architect); tree committed. Normative
-  spec "Polish contract — pass 4: View / Info / Data content and states
-  (D13d)" added to report.md, grounded in the post-D14 tree (SidePanel,
-  ResizablePanel, GridPanel, ViewDock): viewport-filling shell with dock
-  header rows / chevrons / icon rails replacing every floating pill and
-  gutter (#25, #26); no-choice View controls hide and Tags caps at 5
-  rows (#27); humanized non-overlapping Info kv with linked Contains
-  chips (#20); stage changes as a Details section with the card
-  change-popover removed (the D13c leftover); kind-appropriate
-  connection Details rendering endpoints, direction, values, and
-  lifecycle interval from the existing payload (#21, no Python);
-  internal Back + "View dependencies" in Details (#16 rest); final
-  Escape order (#13); Data at the direction's four tabs with the D14
-  subsystems tab folded into a rawState-sourced Entities, auto-size /
-  empty-collapse / untruncated headers (#22), Show on Canvas, two-way
-  sync; designed empty states and the motion/reduced-motion sweep. Six
-  prescribed tests. Architect decision: the read-only Payload viewer and
-  Attachments tabs are DEFERRED out of 3P to the Phase 3S attachments
-  chunk — no file refs exist in the payload until the schema.md/
-  sequence.md attachments design lands, and the syntax highlighter
-  should ship once, with real data (pass-4 bullet amended; the 3P exit
-  gate does not check a Payload viewer). D13d prompt READY in
-  delegation.md, proposed budget 1,500 changed source lines. Next
-  action: user confirms the D13d budget and passes the delegation.md
-  prompt to the executor; the architect gates the result, then runs the
-  3P exit gate (with the user) — after which D12a re-scope, D11, D12b,
-  and D8 unlock.
-
-- **2026-08-29** — D14 architect gate PASSED; #21 payload precheck PASSED;
-  tree committed. Independently re-verified: 78 arch py tests + `just lint`
-  clean, 36 frontend tests (12 files) including the five prescribed D14
-  cases, `just build-arch-report` reproduces the tree's template
-  byte-for-byte (shasum match), budget confirmed at 293/1,100 changed
-  source lines (203 py/TS + 90 acme fixture). Code review conforms to the
-  D14 contract: Subsystem kind with `ss` prefix and the strict
-  system→subsystem→container chain (model/ids/yamlio), resolver replaces
-  the container-nesting recursion with flat subsystem/container passes,
-  ambiguous-parent moves to systems×subsystems, the containment-cycle
-  check is correctly deleted (no cycle is constructible in the new chain),
-  eleven-sheet Excel with Subsystems as sheet 5; frontend Level rename
-  with the Subsystem option hidden for empty datasets, the rewritten
-  boundary-nesting table, and search/Info/Data wiring. Fixture verified:
-  six subsystems under commerce-platform, exactly the 19 prescribed
-  container rewires, zero clips at base. Because the executor's cold-load
-  screenshot showed only 3–4 subsystems, a live Playwright spot-check was
-  run: at the final stage the subsystem level renders all 6 Subsystem
-  cards plus 10 ungrouped container leaves (3 in-viewport — correct under
-  D13b's Read-capped cold framing); at Base the level shows none because
-  the subsystems arrive with the migration waves (correct liveness — note
-  for the exit-gate walkthrough); console clean. Minor, not gate-blocking:
-  Data gained a dedicated `subsystems` tab reading rawState rows — pass 4
-  owns Data-table shape and may fold or keep it. #21 precheck: interface
-  rows already carry provider/consumer/call_direction/name/tags/
-  properties/intervals and relationship rows source/target/action/
-  description/intervals — connection details render from the existing
-  payload, no plumbing, nothing escalates to the user. Log entries dated
-  2026-08-27 and older moved to log-archive.md (inline log was at 15).
-  Next action: author the D13d pass-4 spec + prompt.
 
 - **(older entries)** — see [log-archive.md](log-archive.md).

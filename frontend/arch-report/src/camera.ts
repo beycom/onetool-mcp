@@ -1,6 +1,5 @@
 export type Rect = { x: number; y: number; width: number; height: number }
 export type Viewport = { x: number; y: number; zoom: number }
-export type ZoomThresholds = { read: number; full: number }
 
 const VIEW_PADDING = 0.12
 const MIN_ZOOM = 0.2
@@ -21,11 +20,9 @@ export function fitViewport(bounds: Rect, visible: Rect): Viewport {
   return centeredViewport(bounds, visible, zoom)
 }
 
-export function initialViewport(bounds: Rect, visible: Rect, thresholds: ZoomThresholds): Viewport {
+export function initialViewport(bounds: Rect, visible: Rect): Viewport {
   const fitted = fitViewport(bounds, visible)
-  return fitted.zoom >= thresholds.read
-    ? fitted
-    : centeredViewport(bounds, visible, thresholds.read)
+  return fitted.zoom <= 1 ? fitted : centeredViewport(bounds, visible, 1)
 }
 
 export function shiftViewport(viewport: Viewport, visible: Rect, focus: Rect): Viewport {

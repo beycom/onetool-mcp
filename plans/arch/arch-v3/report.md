@@ -865,14 +865,13 @@ edge rendering, or selection emphasis (pass 3), nor dock content
   (#8, #9). The D13a shell already reserves dock space, so React
   Flow's `fitView` rect is correct by construction; this pass asserts
   it and removes any use of the full window.
-- **Cold load / projection change:** compute the whole-graph fit zoom.
-  If it lands at or above the Read threshold, fit the whole graph.
-  Otherwise cap zoom at the Read threshold and center the graph —
-  offscreen context is Map's job (direction "Initial framing").
-- **The explicit Fit button** always fits the whole graph, even below
-  Read (Far is acceptable on user request).
+- **Cold load / projection change:** fit the whole graph, capped at
+  100% zoom — the first picture is always the complete landscape (P13
+  rule, 2026-08-30, supersedes the earlier Read-floor rule; issue p18).
+  Applies equally to hash-restored views without an explicit camera.
+- **The explicit Fit button** always fits the whole graph.
 - The framing decision is a pure function
-  (`initialViewport(graphBounds, visibleRect, thresholds)`) with tests.
+  (`initialViewport(graphBounds, visibleRect)`) with tests.
 
 ### Semantic-zoom thresholds (#11)
 
@@ -920,8 +919,8 @@ gate eyeballs it). No behavior change.
   tests that assert the old fixed card size or thresholds):
   (1) `cardSize`: a long name wraps to two lines and grows the box; no
   truncation while spare height remains (stub measurer);
-  (2) `initialViewport`: a small graph fits whole at ≥ Read; a large
-  graph caps at Read, centered;
+  (2) `initialViewport`: fits the whole graph, capped at 100% zoom
+  (recut by P13 — the historical Read-floor vector is superseded);
   (3) `shiftViewport`: focus inside → unchanged; focus outside →
   minimal pan, zoom unchanged;
   (4) layout stability: position/aspect/lens changes leave the layout
