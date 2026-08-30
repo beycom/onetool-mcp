@@ -1,0 +1,3 @@
+code,reason,retryable
+402,insufficient_funds,false
+429,rate_limited,true

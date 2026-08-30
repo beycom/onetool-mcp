@@ -12,6 +12,7 @@ decisions the vectors encode.
 | `model.yaml` | Minimal schema-v3 model the flows resolve against: one system, two containers, a component, a code row, a user, interface `i-0001`, timeline `program` = [m1, m2], plus `m-orphan` (declared on no timeline — the dangling-interval case). Its three `unused_milestone` model warnings are expected: milestones are referenced only by flow docs. |
 | `flows/*.md` | One vector doc per concern (see table below). Each parses independently against `model.yaml`. |
 | `crossdoc/*.md` | Two docs sharing a flow id — the cross-doc `duplicate_id` case (docs process in sorted filename order; the later file carries the error, anchored at its `id:` line). |
+| `files/*` | Sample attachment files beside `model.yaml` (added 2026-08-30): two JSON, one CSV, and `binary.bin` (deliberately invalid UTF-8 — the `invalid_file` case). Referenced by the `attachments*` vectors via `attach`. |
 | `expected.json` | Per-doc expected findings + compiled `sequences` entry. |
 
 | Flow doc | Covers |
@@ -24,6 +25,8 @@ decisions the vectors encode.
 | `warnings.md` | All four vector-pinned warnings: `dangling_interval` (interval never live → `"live": []`), `implicit_participant` (bare unresolved name; compiles id-only), `crossed_reply`, `unmatched_activation`. Doc still compiles. |
 | `errors.md` | All 15 reserved keywords (one error each, line skipped), unknown interface, declared-unresolved participant, headless arrow, `x` with a left head, activation markers on the wrong end, both `unpaired_defer` shapes, bare `end`, unclosed frame (anchored at its opening line), invalid heading slug, duplicate scenario slug. Compiles to nothing (`sequence: null`). |
 | `frontmatter-bad.md` | Missing required frontmatter key (anchored line 1), unresolved interval milestone. |
+| `attachments.md` | Zero findings (added 2026-08-30, P21 re-scope): `attach` statements — two files stacking on one message, attach to a reply inside a frame, the same path attached twice in one doc (per-message lists keep authored order; payload-level dedup is the `files` map's job, tested by a P21-listed unit test, not here). Resolves against `files/` beside `model.yaml`. |
+| `attachments-bad.md` | Every `attach` error (added 2026-08-30): attach before any message in the scenario (`parse_error`), missing file (`unresolved_file`), `..` escape and whitespace in path (`invalid_path` ×2), non-UTF-8 file (`invalid_file`, `files/binary.bin`). Compiles to nothing (`sequence: null`). |
 
 ## Driver contract
 
@@ -82,6 +85,19 @@ listed findings. A doc-set with any error fails `generate` atomically.
   line; frontmatter findings anchor at the offending key's line, or
   line 1 for a missing key; duplicate scenario slugs anchor at the later
   heading.
+- **`attach` statements** (added 2026-08-30 with the attachments design;
+  schema.md "Attachments" owns the path rules): the whole rest of the
+  line after `attach ` is the path — grammar `[A-Za-z0-9._/-]+`, no
+  leading `/`, no `..` or empty segments (`invalid_path`); resolved
+  against the model YAML's directory (`unresolved_file` when missing,
+  `invalid_file` when not UTF-8 text). Binds to the **most recent
+  message item in the current scenario** in document order (frames and
+  notes don't reset recency); `attach` with no preceding message is
+  `parse_error`, line skipped. Multiple attaches stack in authored
+  order onto the message's `attachments` list (omitted when empty —
+  drop-defaults); duplicates within a doc are legal. The
+  `large_attachment` warning threshold (> 256 KB) is pinned by a
+  P21-listed unit test, not a vector.
 
 Provenance (2026-08-25): architect-authored. `expected.json` is assembled
 by scratch tooling (not kept) that hand-carries the compiled objects and

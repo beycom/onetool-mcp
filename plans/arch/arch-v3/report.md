@@ -91,13 +91,23 @@ payload.)
   components, code, users, interfaces, relationships), each in **authored
   order**. Row identity is `(collection, array index)`; revision rows share
   an `id` across indices.
+- `files` (added 2026-08-30, lands with P21) — present only when any
+  interface or sequence message carries attachments (schema.md
+  "Attachments"): an object keyed by relative path (sorted), each value
+  `{"lang": "json" | "xml" | "csv" | "yaml" | "text", "text": "<file
+  content>"}` — each referenced file embedded exactly once at generate
+  time, `lang` derived from the extension. Follows `sequences` in key
+  order; omitted entirely when no attachments exist, so payloads without
+  them stay byte-identical.
 
 ### Row serialization
 
 Model fields dumped as authored (`start_in`/`end_in` carry the authored
 milestone id or `base` — kept for the passport panel), omitting `null`s,
 empty `tags`/`properties`, and `call_direction`/`data_flow_direction` when
-equal to their schema defaults (the client applies the defaults). Plus one
+equal to their schema defaults (the client applies the defaults).
+Interface rows carry `attachments` as authored (path list, omitted when
+empty — the client joins to the top-level `files` map). Plus one
 derived field:
 
 - `intervals` — array **parallel to `timelines`**. Entry `k` describes the
@@ -1340,6 +1350,22 @@ semantics (P12), `projection.ts`, Info/Data content, drill behavior.
   of arc length) to clear card bodies; a pill never renders clipped by
   a card — overlap with another pill resolves by alternating the nudge
   direction deterministically.
+- **Collision invariant (P15, from issue p14 — supersedes any weaker
+  reading above):** a pill never renders overlapping a card, a boundary
+  header, or another pill, in ANY zoom / selection / expansion state —
+  not just the at-rest layout. Selection- and hover-revealed pills
+  (D13c's Far reveal, one-hop emphasis) participate in the same
+  collision pass as at-rest pills, evaluated against the current
+  frame's rendered rects (the selected/expanded card at its actual
+  rendered size). Resolution order: nudge along the spline (±20%),
+  then **hide** — hiding always beats stacking or clipping. A hidden
+  pill's label stays reachable: hovering or selecting its spline
+  reveals exactly that pill above everything else (a single direct
+  reveal is exempt from the pass — one pill can always show). The pass
+  re-runs on zoom-band, selection, and expansion changes.
+- **Orphan suppression (rides from issue p18):** a pill renders only
+  when at least one endpoint of its spline is in or near the viewport —
+  no chips floating in empty space.
 
 ### Color economy and per-kind theme
 
@@ -1463,6 +1489,14 @@ map; layered runs inside expanded boundaries). Grounded in
   icon-only control in the boundary header; collapsing prunes the
   entity and all its descendants from the set. Escape order is
   unchanged (Escape never collapses).
+- **Collapse-control placement (P15, from issue p16):** the collapse
+  control renders **inline with the boundary's own title** — immediately
+  after the name + kind pill group, inside the header chrome, visually
+  part of the boundary (header tint behind it) — and uses a collapse
+  glyph (chevron or minus), never **×** (which reads as a close button).
+  It never floats to a far corner and never repositions toward child
+  cards at any zoom: if the boundary header is off-screen, so is the
+  control. `aria-label` "Collapse <name>".
 - The **drill view, breadcrumb, and Up control retire**. The deps view
   is untouched. "Focus a scope" = expand + camera fit to the boundary.
 
@@ -1517,6 +1551,33 @@ report.
 6. Fragment round-trip: `expand` encodes/decodes losslessly; an unknown
    id is dropped with a diagnostic; a legacy `drill=` link resolves to
    the equivalent expansion + selection.
+
+## Attachments and the Payload viewer (design landed 2026-08-30; viewer ships with P31)
+
+Un-defers D13d's Payload viewer with real data (schema.md "Attachments",
+sequence.md `attach`). The Python half (fields, parsing, resolution,
+embedding) lands with P21; the viewer ships with P31 — one highlighter,
+one chunk — and covers interface attachments on the canvas side too, not
+just sequence messages.
+
+- **Info · Attachments.** An interface's Details (canvas spline, member
+  row, or table selection) and a sequence message's Info gain an
+  **Attachments section** — rendered only when files exist — listing
+  each file as a row: basename, format chip (json / xml / csv / yaml /
+  text), human-readable size (computed from the embedded text).
+  Clicking a row opens it in Data's Payload tab.
+- **Data · Payload tab.** Conditional tab, present only while a payload
+  file is open (the D13d conditional rule, now non-trivially
+  satisfied). Read-only: full relative path as the header, a copy
+  action, content rendered per format — `json` / `xml` / `yaml`
+  syntax-highlighted by a **bundled** highlighter (ships inside the
+  single-file bundle, zero external requests; Prism core + json/xml/
+  yaml components, MIT, is the working choice — final call at the P31
+  prompt), `csv` as a read-only AG Grid table (reusing the existing
+  grid), `text` as plain monospace. Highlight colors come from the
+  app's light-theme tokens, not a stock highlighter theme.
+- Content comes exclusively from the payload's embedded `files` map —
+  never from disk — so the viewer works under `file://` unchanged.
 
 ## Exports
 

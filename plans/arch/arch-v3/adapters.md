@@ -54,7 +54,8 @@ YAML  <──>  ┼── sqlite  (one table/kind)    later
 8. `Code` — + `component`.
 9. `Users` — as Systems.
 10. `Interfaces` — + `provider`, `consumer`, `call_direction`,
-    `data_flow_direction`.
+    `data_flow_direction`, `attachments` (list cell of relative paths —
+    schema.md "Attachments"; added 2026-08-30, lands with P21).
 11. `Relationships` — `id`, `source`, `action`, `target`, `start_in`,
     `end_in`, `description`, `tags`.
 12. `Settings` — key/value columns `setting`, `value`; carries the

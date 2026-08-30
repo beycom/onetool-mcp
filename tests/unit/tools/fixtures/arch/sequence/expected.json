@@ -249,6 +249,107 @@
         ]
       }
     },
+    "attachments-bad.md": {
+      "findings": [
+        {
+          "severity": "error",
+          "code": "parse_error",
+          "line": 7
+        },
+        {
+          "severity": "error",
+          "code": "unresolved_file",
+          "line": 9
+        },
+        {
+          "severity": "error",
+          "code": "invalid_path",
+          "line": 10
+        },
+        {
+          "severity": "error",
+          "code": "invalid_path",
+          "line": 11
+        },
+        {
+          "severity": "error",
+          "code": "invalid_file",
+          "line": 12
+        }
+      ],
+      "sequence": null
+    },
+    "attachments.md": {
+      "findings": [],
+      "sequence": {
+        "id": "attachments",
+        "name": "Attachments",
+        "intervals": [
+          {
+            "live": [
+              [
+                0,
+                null
+              ]
+            ],
+            "clips": []
+          }
+        ],
+        "participants": [
+          {
+            "id": "customer",
+            "ref": "users:customer"
+          },
+          {
+            "id": "pay-api",
+            "ref": "containers:pay-api"
+          }
+        ],
+        "scenarios": [
+          {
+            "id": "order-placement",
+            "name": "Order placement",
+            "items": [
+              {
+                "kind": "sync",
+                "from": "customer",
+                "to": "pay-api",
+                "text": "Place order",
+                "interface": "i-0001",
+                "attachments": [
+                  "files/place-order-request.json",
+                  "files/place-order-response.json"
+                ]
+              },
+              {
+                "frame": "alt",
+                "label": "Declined",
+                "items": [
+                  {
+                    "kind": "reply",
+                    "from": "pay-api",
+                    "to": "customer",
+                    "text": "402 Declined",
+                    "attachments": [
+                      "files/declines.csv"
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "reply",
+                "from": "pay-api",
+                "to": "customer",
+                "text": "202 Accepted",
+                "attachments": [
+                  "files/place-order-response.json"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
     "deferred-external.md": {
       "findings": [],
       "sequence": {

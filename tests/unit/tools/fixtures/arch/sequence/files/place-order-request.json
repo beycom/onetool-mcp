@@ -1,0 +1,8 @@
+{
+  "order_id": "ord-1042",
+  "customer": "cust-77",
+  "lines": [
+    {"sku": "SKU-1", "qty": 2, "unit_price": "19.90"}
+  ],
+  "currency": "EUR"
+}

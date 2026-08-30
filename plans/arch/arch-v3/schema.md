@@ -426,6 +426,48 @@ round-trip preserves the block; an absent sheet means no theme. The
 theme never affects resolution, diffing, or validation semantics — it is
 presentation only.
 
+## Attachments (sample payload files — added 2026-08-30, lands with P21)
+
+An interface may link sample request/response payload files stored beside
+the model:
+
+```yaml
+interfaces:
+  - id: i-0031
+    name: Place order
+    provider: payments-api
+    consumer: storefront
+    attachments:
+      - files/place-order-request.json
+      - files/place-order-response.json
+```
+
+Rules:
+
+- `attachments` is an optional list of **relative POSIX paths** from the
+  model YAML's directory. Path grammar: `[A-Za-z0-9._/-]+` — no leading
+  `/`, no `..` or empty segments; anything else is `invalid_path`
+  (error, located at the list entry).
+- Every path must resolve to a file under the model directory
+  (`unresolved_file` error) that decodes as UTF-8 (`invalid_file`
+  error). Text formats only; the format derives from the extension —
+  `.json`, `.xml`, `.csv`, `.yaml`/`.yml`; any other extension renders
+  as plain text. A file over 256 KB draws a `large_attachment` warning
+  (it still embeds).
+- Sequence messages link the same files with the `attach` statement
+  (sequence.md "DSL") — one shared mechanism: identical path rules,
+  finding codes, and embedding.
+- The report is a single offline file: `arch.generate` embeds each
+  referenced file's text in the payload once, deduplicated by path
+  (report.md payload `files` key). Attachment errors fail `generate`
+  atomically, like every other error.
+- Attachments are documentation only — they never affect resolution,
+  diffing, or interface semantics. Deterministic dumps keep authored
+  order and omit an empty list.
+- Excel transport: an `attachments` list cell on the Interfaces sheet
+  (adapters.md). Sequence-message attachments ride the flow docs, which
+  Excel deliberately never carries.
+
 ## Validation
 
 Structural (errors): unique ids per collection (revision rows excepted per
@@ -435,11 +477,13 @@ container `parent` naming another container (containers no longer nest),
 the reserved milestone id `base`, required fields,
 interval ordering (`start_in` after `end_in` when both are milestones on
 one timeline; equality is legal), timeline rules, ID/text/property rules
-inherited from v2, theme rules (`unknown_theme_key`, `invalid_color`).
+inherited from v2, theme rules (`unknown_theme_key`, `invalid_color`),
+attachment rules (`invalid_path`, `unresolved_file`, `invalid_file` —
+shared with sequence `attach` statements).
 
 Advisory (warnings): identical adjacent revisions, authored intervals that
 exceed clipping, milestones referenced by no row, entities live on no
-timeline.
+timeline, attachments over 256 KB (`large_attachment`).
 
 Endpoint and parent references must resolve to an entity whose *identity*
 exists (any revision) — liveness overlap is checked by clipping, not by

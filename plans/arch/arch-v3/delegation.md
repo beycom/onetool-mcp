@@ -33,7 +33,8 @@ outstanding headings below carry both (`P21 (was D12a)` etc.).
 | P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
 | P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
 | P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
-| P21 (was D12a) | Sequence parser + payload | ISSUED 2026-08-25, ON HOLD (re-scope for message-file refs) | Phase 1 exit gate + attachments design |
+| P15 | Edge-label collision + collapse affordance (issues p14, p16) | READY (authored 2026-08-30) | now — pre-exit-gate |
+| P21 (was D12a) | Sequence parser + payload + attachments | READY (re-scoped 2026-08-30 for the attachments design) | Phase 1 exit gate |
 | P22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | P23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
 | P31 (was D12b) | Sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | P21 gate |
@@ -533,54 +534,74 @@ pytest run unchanged by this chunk), then STOP — D13d is a separate
 prompt.
 ```
 
-## P21 (was D12a) — sequence parser + payload (issued 2026-08-25, ON HOLD until the Phase 1 exit gate; re-scope for message-file refs first)
+## P21 (was D12a) — sequence parser + payload + attachments (re-scoped 2026-08-30; READY, runs once the Phase 1 exit gate passes)
 
 ```text
 [standard rules]
 
-Context: v3 gains sequence diagrams. plans/arch/arch-v3/sequence.md is the
-owner doc — READ IT IN FULL first (source-doc format, DSL, compilation,
-payload shape, finding codes). This chunk is the Python half only: parse
-and validate Markdown flow docs, compile the `sequences` payload section,
-and wire discovery into validate/generate. NO frontend files, no bundle
-rebuild (the payload of every existing fixture/report is unchanged — see
-"omit when empty" below).
+Context: v3 gains sequence diagrams and file attachments. plans/arch/
+arch-v3/sequence.md is the owner doc — READ IT IN FULL first (source-doc
+format, DSL incl. the `attach` statement, compilation, payload shape,
+finding codes) — plus schema.md "Attachments" (interface `attachments`
+field, path rules, shared finding codes) and report.md "Payload contract"
+(`files` key, interface-row serialization). This chunk is the Python half
+only: parse and validate Markdown flow docs, compile the `sequences`
+payload section, add the interface `attachments` field end to end (YAML,
+Excel, payload), resolve + embed attachment files, and wire discovery
+into validate/generate. NO frontend files, no bundle rebuild (the payload
+of every existing fixture/report is unchanged — see "omit when empty"
+below).
 
 Control mechanism: tests/unit/tools/fixtures/arch/sequence/ — architect-
 authored parser vectors. READ ITS README FIRST; it pins the driver
 contract, finding codes, anchor rules, and every decision the vectors
-encode (pairing rule, marker placement, drop-defaults, ordering).
-Vectors are READ-ONLY: one that looks wrong is a rule-1 stop, never an
-edit. Budget: 500 changed source lines (excluding tests and fixtures).
+encode (pairing rule, marker placement, drop-defaults, ordering, the
+`attach` rules). Vectors are READ-ONLY: one that looks wrong is a rule-1
+stop, never an edit. Budget: 700 changed source lines (excluding tests
+and fixtures).
 
 Task:
 1. New module src/otdev/tools/_arch/v3/sequence.py: parse one flow doc
    (frontmatter, doc-level participant lines, `##` scenario headings with
-   prose, ```seq fences) and compile the doc set against an Architecture
-   per sequence.md "DSL" + "Compilation". Findings use the existing
-   Finding dataclass (file = the flow doc path, line/column per the
-   README anchor rules; columns are your choice but must be >= 1).
+   prose, ```seq fences, `attach` statements) and compile the doc set
+   against an Architecture per sequence.md "DSL" + "Compilation".
+   Findings use the existing Finding dataclass (file = the flow doc
+   path, line/column per the README anchor rules; columns are your
+   choice but must be >= 1).
 2. Discovery: <model-dir>/sequences/*.md beside the model YAML, sorted
    filename order. arch.validate / CLI validate include flow-doc
    findings; any flow-doc error fails generate atomically, exactly like
    model errors.
-3. Payload: build_payload gains the top-level `sequences` key (after the
+3. Interface `attachments` (schema.md "Attachments"): optional path-list
+   field on the Interface model, canonical YAML round-trip (authored
+   order, omit empty), Excel Interfaces-sheet `attachments` list cell
+   (`[a;b]`, adapters.md), located findings for both interface rows
+   (anchored at the YAML list entry) and flow-doc `attach` lines:
+   errors invalid_path / unresolved_file / invalid_file, warning
+   large_attachment (> 256 KB; the file still embeds).
+4. Payload: build_payload gains the top-level `sequences` key (after the
    entity collections), sorted by flow id, compiled per sequence.md —
-   intervals reuse the existing segment machinery (clips always []).
-   OMIT the key when there are no flow docs: existing checked-in
-   payloads (projection fixture, acme dev payload) and the generated
-   report must stay byte-identical — that is what keeps this chunk off
-   D10's surface.
-4. Facade/CLI: no new subcommands; validate/generate/payload pick the
+   intervals reuse the existing segment machinery (clips always []) —
+   and the `files` key after it (report.md): every path referenced by
+   any interface row or message, embedded once, sorted by path, value
+   {"lang", "text"} with lang from the extension (json/xml/csv/yaml,
+   else text). Interface rows serialize `attachments` as authored;
+   message items carry `attachments` per sequence.md. OMIT `sequences`
+   when there are no flow docs and `files` when nothing carries
+   attachments: existing checked-in payloads (projection fixture, acme
+   dev payload) and the generated report must stay byte-identical —
+   that is what keeps this chunk off D10's surface.
+5. Facade/CLI: no new subcommands; validate/generate/payload pick the
    flows up via the shared load path in api.py.
 
 Tests (exactly these):
 1. tests/unit/tools/test_arch_v3_sequence.py — the vector driver per the
-   fixture README: for each flows/*.md compare (severity, code, line)
-   triples sorted by (line, code) and deep-compare the compiled entry
-   against expected.json ("sequence": null = doc must produce >= 1 error
-   and no compiled entry); plus the crossdoc/ set producing exactly the
-   listed duplicate_id finding.
+   fixture README: for each flows/*.md (attachments vectors included)
+   compare (severity, code, line) triples sorted by (line, code) and
+   deep-compare the compiled entry against expected.json
+   ("sequence": null = doc must produce >= 1 error and no compiled
+   entry); plus the crossdoc/ set producing exactly the listed
+   duplicate_id finding.
 2. large_scenario thresholds: synthetic docs with 31 participants (warn)
    / 30 (silent), and 301 items in one scenario (warn) / 300 (silent).
 3. Discovery + atomicity: a temp model dir whose sequences/ holds one
@@ -588,6 +609,18 @@ Tests (exactly these):
    generate fails atomically (no output file); with the erroring doc
    removed -> payload contains `sequences` sorted by flow id; and a
    model dir with no sequences/ -> payload has NO `sequences` key.
+4. Interface attachments round-trip: a model with two attachments on one
+   interface round-trips through canonical YAML and through Excel
+   (list cell; blank cell = no attachments) with model equality; an
+   interface path that is missing / escapes the model dir / has an
+   invalid character produces the three located errors at the YAML
+   entry.
+5. Embedding: a model dir where an interface and a flow message
+   reference the same file -> payload `files` has ONE entry for it,
+   sorted paths, correct lang for .json/.xml/.csv/.yaml/other; a file
+   at exactly 256 KB is silent and one byte over warns
+   large_attachment; a model with no attachments anywhere has NO
+   `files` key.
 
 Definition of done: rules 5–8, plus: all existing arch tests stay green,
 `uv run python -m otdev.tools._arch.v3 validate
@@ -942,4 +975,68 @@ capture the layout-ab screenshot set. Report actual command output.
 Budget: 2,000 source lines. STOP and ask per rule 1 if the layered
 interior packing conflicts with the P12 anchor-stability contract
 rather than improvising.
+```
+
+## P15 — Edge-label collision + boundary collapse affordance (READY, authored 2026-08-30)
+
+```text
+[standard rules incl. rule 9]
+
+Context: two open canvas defects block the Phase 1 exit gate — issues
+p14-ui-edge-labels-overlap and p16-ui-collapse-affordance. READ BOTH
+issue files in plans/arch/arch-v3/issues/ plus their v3-*.png evidence
+screenshots. The normative contracts are in report.md: "At-rest edge
+labels" -> "Collision invariant (P15)" + "Orphan suppression", and "Map
+contract — Interaction" -> "Collapse-control placement (P15)". Frontend
+only (frontend/arch-report/): no Python, no payload changes, no layout
+engine changes (layout.ts engines are off-surface — this is
+presentation-pass work over the rendered frame). Budget: 500 changed
+source lines (additions + deletions; tests and the generated bundle
+excluded).
+
+Task:
+1. Label collision pass per report.md: one pass over the current
+   frame's rendered rects — cards at actual rendered size (including
+   the selected/expanded card), boundary headers, and other pills —
+   covering at-rest AND selection-/hover-revealed pills together.
+   Resolution: nudge along the spline (±20% arc length), then hide;
+   never stack or clip. A single direct hover/selection reveal is
+   exempt and renders above everything. Re-run the pass on zoom-band,
+   selection, and expansion changes. Orphan suppression: a pill renders
+   only when at least one endpoint of its spline is in or near the
+   viewport.
+2. Collapse control per report.md: rendered inline with the boundary's
+   own title (immediately after the name + kind pill group, inside the
+   header chrome), collapse glyph (chevron/minus — never ×), no
+   floating/repositioning toward child cards at any zoom, `aria-label`
+   "Collapse <name>". Keep the existing collapse semantics and Escape
+   order untouched.
+
+Tests (exactly these four, plus keeping every existing test green):
+1. Collision: a synthetic scene where selecting a hub reveals pills
+   whose midpoints collide with the hub card -> every rendered pill
+   rect is disjoint from all card rects and all other pill rects, and
+   the overflow pills are hidden (not stacked).
+2. Hover reveal: hovering a spline whose pill is hidden renders exactly
+   that one pill.
+3. Orphan suppression: a spline with both endpoints far outside the
+   viewport renders no pill; moving one endpoint into the viewport
+   restores it.
+4. Boundary header: the collapse control renders inside the header row
+   adjacent to the title (DOM order + geometry assertion) with the
+   prescribed aria-label, and its glyph is not "×".
+
+Rule-9 verification at 1440x900 (dev app AND regenerated file://
+report): reproduce both issue screenshots' setups — expand to the
+Container preset, select the hub card, zoom close — and confirm zero
+pill-card and zero pill-pill overlaps at every step; confirm the outer
+System boundary's collapse control sits beside its own title and
+nothing collapse-like renders adjacent to the focused child card;
+console clean throughout. Capture replacement evidence to
+plans/arch/wip/test-results/p15/. Rebuild the bundle and regenerate
+plans/arch/wip/acme-report.html via the CLI.
+
+Definition of done: rules 5–8 (lint, arch pytest, budget, log entry) +
+rule 9 above; frontend vitest suite green; `just build-arch-report`
+clean. STOP after the log entry — the architect reviews at the gate.
 ```

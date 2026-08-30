@@ -133,6 +133,7 @@ Other statements:
 | `group <label>` / `end` | plain labeled frame around a run of messages — annotation only, no alt/opt/loop semantics. (Not Mermaid's `box`: that is *horizontal* participant grouping, which stays reserved — the viewer renders no participant grouping; containment shows as muted parent context in headers and Info.) Frames of every kind nest |
 | `divider: label` / `divider <type>: label` | full-width divider row ("3 days later"); `<type>` ∈ `line` (default rule) / `space` (blank gap) / `delay` (time gap) / `tear` (torn-edge elision) picks the rendering |
 | `… [i-0031]` | optional trailing interface link on any message — ties it to a modelled Interface id (error if unknown) |
+| `attach <path>` | links a sample payload file to the **most recent message** in the current scenario (added 2026-08-30; schema.md "Attachments" owns the path rules — grammar, model-dir resolution, UTF-8, formats). The whole rest of the line is the path. Frames and notes don't reset recency; `attach` with no preceding message in the scenario is a `parse_error`. Multiple `attach` lines stack in authored order |
 | `%% comment` / `# comment` | comment line |
 
 **Multiline text:** every label and note is one physical line in the doc;
@@ -187,9 +188,11 @@ Finding codes (2026-08-25, pinned by the parser vectors) — reused from
 model validation: `missing_required`, `duplicate_id`,
 `unresolved_milestone`, `invalid_interval`. New errors:
 `reserved_keyword`, `parse_error`, `invalid_id`, `unresolved_participant`,
-`unresolved_interface`, `unpaired_defer`. New warnings:
+`unresolved_interface`, `unpaired_defer`, and the attachment codes shared
+with model validation (`invalid_path`, `unresolved_file`, `invalid_file` —
+schema.md "Attachments", anchored at the `attach` line). New warnings:
 `implicit_participant`, `dangling_interval`, `crossed_reply`,
-`unmatched_activation`, `large_scenario`. An errored line is skipped
+`unmatched_activation`, `large_scenario`, `large_attachment`. An errored line is skipped
 (opens nothing, pairs with nothing); an unclosed frame anchors its error
 at the opening line; frontmatter findings anchor at the offending key's
 line (line 1 for a missing key). Docs are processed in sorted filename
@@ -238,7 +241,11 @@ each with the completion later in the same scenario. Frame kinds are
 `alt` / `opt` / `loop` / `group` (aliases normalized away — `if` becomes
 `alt`, `repeat` becomes `loop`); notes carry `placement: "over" | "left" |
 "right"` and `at` (one or two participant ids); divider `style` is
-`line` / `space` / `delay` / `tear`. Label text reaches the payload with
+`line` / `space` / `delay` / `tear`. A message with `attach` statements
+carries `"attachments": ["files/…", …]` (authored order, omitted when
+empty); the referenced files' text embeds once, deduplicated by path, in
+the payload's top-level `files` map (report.md payload contract —
+shared with interface attachments). Label text reaches the payload with
 line breaks already unescaped (`\n` / `<br/>` → newline). Omitted keys
 follow the payload contract's drop-defaults rule. Model-backed
 participants carry `ref` (`kind:id` node key — the client joins to the

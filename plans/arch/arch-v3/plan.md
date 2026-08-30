@@ -29,7 +29,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Implementation | `src/otdev/tools/arch.py` facade + `src/otdev/tools/_arch/v3/`; report app source `frontend/arch-report/` (v1 deleted at cutover 2026-08-23) |
 | Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
-| Open issues (Phase 2 wave 2) | `plans/arch/arch-v3/issues/` — p3-* files + index (feed P22/P43); resolved p1/p2 files in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
+| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16 assigned to chunk P15; p24/p26–p29/p32 open, unassigned (wave-2 polish chunk, authored at wave-2 start; p27 needs a user decision — default remove); p3-* files feed P22/P43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
 | Confirmed UI direction (decision source for all UI work) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
 | UI polish issue list (CLOSED 2026-08-29) | `plans/arch/arch-v3/ui-polish.md` — 27 itemized issues (2026-08-25 Playwright walkthrough + 2026-08-28 user screenshots), tagged D13a–D13d; every issue now carries a CLOSED/WAIVED/superseded annotation — the Phase 1 exit gate re-checks the walkthrough, not the list |
@@ -159,7 +159,8 @@ carry both.
 | P12 | — | Map model: in-place C4 expansion, endpoint resolution, presets (added 2026-08-29) |
 | P13 | — | Report UI correctness fixes: issues p15, p17, p18, p19 (added 2026-08-30) |
 | P14 | — | Layout engines + config + A/B harness — layout-design.md; absorbs issue p13 (added 2026-08-30) |
-| P21 | D12a | Sequence parser + payload (prompt ON HOLD, needs re-scope) |
+| P15 | — | Edge-label collision + collapse affordance — issues p14, p16 (added 2026-08-30) |
+| P21 | D12a | Sequence parser + payload + attachments (re-scoped 2026-08-30) |
 | P22 | D11 | Report definitions + guided views |
 | P23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
 | P31 | D12b | Sequence renderer frontend |
@@ -246,7 +247,16 @@ docs):
   hash + localStorage, shared invariant suite, dev-only ?layout= A/B
   harness. Default-method decision (architect, from the captures): the
   topology-aware default is retained (layout-design.md Decisions 0).
-- [ ] **Phase 1 exit gate (architect + user)** — the held 3P exit gate:
+- [ ] **P15 — edge-label collision + collapse affordance** (added
+  2026-08-30 when the user flagged that issues p14 and p16 were owned
+  by no chunk; specs: report.md "Collision invariant (P15)" under
+  At-rest edge labels — absorbs p18's deferred orphan-label clause —
+  and "Collapse-control placement (P15)" under the Map contract;
+  prompt READY in delegation.md, proposed budget 500). Runs before the
+  exit-gate user half: p14 reproduces in the gate's own select-card
+  walkthrough step.
+- [ ] **Phase 1 exit gate (architect + user)** — runs after the P15
+  gate (label collision changes the rendered frame). The held 3P exit gate:
   open acme's report cold and the story reads without explanation and
   *looks* deliberate. Run ui-polish-direction.md "Acceptance checks" at
   1440 × 900 and 1024 × 720 under `file://` (light theme) —
@@ -269,23 +279,26 @@ the YAML write path); edit-mode work stays in Phase 3.
 Wave 2 — independent chunks, run in parallel once each chunk's architect
 inputs exist:
 
-- [ ] **Architect (before P21):** message-file attachments design (user
-      request 2026-08-26): sequence messages AND model interfaces can
-      link to sample request/response payload files (xml, json, csv)
-      stored beside the model; the report renders them
-      syntax-highlighted (highlighter ships in the offline bundle, no
-      external requests). Lands as amendments to schema.md
-      (interface-level field), sequence.md (DSL reference + `sequences`
-      payload), and report.md (viewer contract) BEFORE P21 runs; the
-      held P21 prompt is re-scoped to parse/emit the refs. The
-      read-only Payload viewer deferred out of D13d (2026-08-29) ships
-      with this design.
+- [x] **Architect (before P21):** message-file attachments design —
+      DONE 2026-08-30 (user request 2026-08-26). Landed as: schema.md
+      "Attachments" (interface `attachments` path list, path grammar,
+      shared finding codes invalid_path / unresolved_file /
+      invalid_file / large_attachment), sequence.md `attach` statement
+      + compilation additions, report.md payload `files` key +
+      interface-row serialization + "Attachments and the Payload
+      viewer" (viewer ships with P31 — one bundled highlighter, real
+      data; covers interface attachments too), adapters.md Interfaces
+      `attachments` column, and two new architect-authored parser
+      vectors (`flows/attachments*.md` + `files/` samples) in the P21
+      control fixture. The held P21 prompt was re-scoped the same day.
 - [ ] **P21 (was D12a)** — sequence parser, validation findings,
-      `sequences` payload, CLI + facade wiring. Control mechanism: the
-      parser-vector fixture
+      `sequences` payload, interface + message attachments (fields,
+      resolution, `files` embedding, Excel column), CLI + facade
+      wiring. Control mechanism: the parser-vector fixture
       (`tests/unit/tools/fixtures/arch/sequence/`, committed
-      2026-08-25). Prompt issued 2026-08-25, ON HOLD — re-scope for
-      message-file refs before running.
+      2026-08-25; attachments vectors added 2026-08-30). Prompt
+      re-scoped 2026-08-30, READY (proposed budget 700) — runs at the
+      Phase 1 exit gate.
 - [ ] **P22 (was D11)** — saved report definitions + guided views:
       `p3-report-definitions` (named reports, view-mode flow — starting
       point: export the config as a ready-to-paste `views:` YAML entry;
@@ -365,6 +378,53 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-30** — Attachments design landed, chunk P15 authored (user
+  flagged unowned issues p14/p16), issues/ cleaned up; tree committed.
+  ATTACHMENTS (the wave-2 architect artifact, done ahead of the gate —
+  it doesn't depend on the gate outcome): interfaces gain an optional
+  `attachments` path list (schema.md "Attachments": relative POSIX
+  paths under the model dir, grammar-checked, UTF-8 text only, format
+  by extension json/xml/csv/yaml/text; errors invalid_path /
+  unresolved_file / invalid_file, warning large_attachment > 256 KB;
+  generate embeds atomically); sequence messages link the same files
+  via the new `attach <path>` DSL statement binding to the most recent
+  message (sequence.md); the payload gains a top-level `files` map
+  (path → {lang, text}, deduplicated, after `sequences`, omitted when
+  empty so existing payloads stay byte-identical — report.md payload
+  contract) and interface rows serialize `attachments` as authored;
+  Excel Interfaces sheet gains an `attachments` list cell
+  (adapters.md); the viewer contract (report.md "Attachments and the
+  Payload viewer") un-defers D13d's Payload tab — Info Attachments
+  rows + Data Payload tab, bundled Prism working choice, csv via the
+  existing AG Grid, ships with P31. Control fixture extended
+  (architect-authored): vectors flows/attachments.md (clean compile
+  with per-message attachment lists) and flows/attachments-bad.md (all
+  five attach findings), files/ samples incl. a deliberate non-UTF-8
+  binary, expected.json +101 lines, README rules pinned. P21 prompt
+  re-scoped in delegation.md (attachments end to end; budget 500→700;
+  READY, runs at the Phase 1 exit gate). P15 (user-flagged gap: p14
+  edge-label pileup — which reproduces in the exit gate's select-card
+  step — and p16 collapse-× ambiguity were owned by no chunk):
+  contracts added to report.md ("Collision invariant (P15)" — one
+  screen-space pass over rendered rects covering at-rest AND revealed
+  pills, nudge-then-hide, single-reveal exemption, orphan suppression
+  riding from p18; "Collapse-control placement (P15)" — inline with
+  the boundary title, collapse glyph never ×, no repositioning toward
+  children); prompt READY in delegation.md (frontend only, proposed
+  budget 500, four prescribed tests); the exit-gate user half now
+  follows the P15 gate. ISSUES CLEANUP (user-directed): p14/p16
+  annotated with their P15 assignment; p32's dev-console bullet marked
+  satisfied (p17 landed; gates verify console-clean); p25 already
+  closed; provider-consumer.md moved to resolved/ (absorbed into
+  schema.md) with links fixed; index updated — wave-2 items
+  p24/p26–p29/p32 remain open and unassigned pending a wave-2 polish
+  chunk, and p27 (Detail dropdown, default remove) awaits a user
+  decision, cheap enough to ride P15 if confirmed before it runs.
+  Next action: user confirms the P15 budget (500) and runs the P15
+  prompt (and answers p27 if they want it folded in); architect gates
+  P15; then the Phase 1 exit gate (architect re-run + user half); on
+  pass, wave 2 opens with P21 ∥ P22/P23 design work.
 
 - **2026-08-30** — Phase 1 exit gate: architect half RE-RUN on the
   post-P14 tree and PASSED, with one gate fix landed and committed; the
@@ -567,255 +627,5 @@ inclusive `end_in` (Q7, 2026-08-24).
   engines, gated on P13 gate); prompts in delegation.md. Note: issue
   files `pxy-*.md` and chunk ids `Pxy` are separate registries — chunk
   P13 fixes issue p17 et al., and chunk P14 absorbs issue p13.
-
-- **2026-08-29** — Phase 1 exit gate: architect half RUN (user half
-  outstanding) + one gate fix landed. Walkthrough at 1440×900 and
-  1024×720 under `file://` (light theme, state cleared for true cold
-  load): console clean at every step, the only network request is the
-  local HTML file, cold open reads (radial hub, at-rest pills, Read
-  framing), card select opens Info with one-hop accent and keeps the
-  selection visible, spline select shows connection Details with linked
-  endpoints/direction/member, Stage 5 renders the cutover story (new
-  hub + retired dashes), Data opens with four tabs and no empty
-  columns, at 1024×720 View auto-collapses when Info opens and the app
-  fills the viewport exactly (1024×720 doc size, zero scroll).
-  Evidence: `plans/arch/wip/test-results/exit-gate/*.png`.
-  GATE FIX (architect, mid-gate user finding): splines rendered dead
-  straight — the executor's cubic controls sat ON the chord (45% along
-  it), violating the pass-5 contract (report.md:1006 "control points
-  perpendicular to the card border"; :1318 "curve runs between stub
-  tips"). `splinePath.ts` now derives controls from the anchor-side
-  normals (reach 0.35×span clamped 24–140 px, waypoint tangent 0.12)
-  and places label pills by sampling the true curve; stubs, arrows,
-  obstacle routing, and the returned polyline are unchanged (45
-  frontend tests pass unmodified). Live re-check matches the IcePanel
-  reference: sweeping S-curves, perpendicular arrivals, pills on the
-  curve, one-hop accent intact, console clean. Bundle rebuilt, acme
-  report regenerated. Tooling note: Playwright MCP's screenshot tool
-  wedged mid-session (5 s timeouts with a quiescent page); fixed by
-  `ot_servers.restart(name='playwright')`. Not re-run this pass
-  (verified at the D13a–d gates, unaffected by the spline fix): dock
-  drag-resize, forced reduced-motion. Payload-viewer and sequence
-  acceptance checks are Phase 2 scope. Next action: user reviews the
-  regenerated `plans/arch/wip/acme-report.html` + the exit-gate
-  screenshots and confirms (or fails) the gate; on pass, wave 2 opens
-  with the attachments design → P21.
-
-- **2026-08-29** — P12 anchor-capacity blocker resolved (architect) and
-  the P12 architect gate PASSED; tree committed. Design decision on open
-  question 2: **perimeter overflow** — an over-full card side sheds its
-  outermost endpoints around the nearest corner to the adjacent side,
-  bearing-recomputed so perimeter order holds, cascading
-  deterministically; cards never grow for edge count, aggregation
-  unchanged, RangeError only when total demand exceeds the whole
-  perimeter (report.md "Perimeter overflow" under the pass-5 edge
-  termination rules is the authority; enlarging cards and cross-pair
-  aggregation were rejected — the former couples geometry to edge
-  count, the latter is semantically impossible for distinct visible
-  pairs). Implemented in `edgeAnchors.ts` (+120 architect lines outside
-  the executor budget) with a spill + true-impossible test added.
-  Previously blocked walkthrough steps then verified live: the
-  Container preset at stage 1 renders (20 cards / 13 boundaries, the
-  monolith's edges distributed with zero converged ports), all four
-  presets apply, browser Back walks preset history, link reload
-  restores the full Component expansion (33 cards / 28 boundaries,
-  dropdown "Custom"/preset detection correct), 1024×720 fills with no
-  scroll — console clean at every step; `preset-container.png` replaced
-  with passing evidence. Gate re-verification: frontend 45 passed
-  (16 files incl. all six prescribed P12 cases — three in
-  projectionWave2.test.ts, presets/stability/fragment in
-  App/layout/view tests), arch py 79 passed, `just lint`, `tsc
-  --noEmit`, `just build-arch-report`, acme regenerated; executor
-  budget confirmed at 710/2,600 (686 TS/CSS + 24 acme). Code review
-  conforms to the map contract: validated cumulative `expand` fragment
-  with legacy level/drill mapping, authored-containment presets with
-  Custom detection, one history entry per action, recursive mixed-kind
-  boundary projection with deepest-visible endpoint resolution
-  (boundary attachment for definitions on expanded entities),
-  internal-edge suppression, drill/breadcrumb/Up retirement,
-  `stableExpansionLayout` minimal push-apart with cached collapse
-  restore, presets re-laying fresh under P11 star rules, boundary
-  identity with description, and the two showcase interfaces exactly
-  as authored. The executor's own live pass (center drift < 0.003 px,
-  15/15 position restore, four-level reattachment) plus the
-  map-four-levels screenshot confirm the showcase path. Next action:
-  the Phase 1 exit gate (architect + user).
-
-- **2026-08-29** — P12 rule-9 retry reached the prompt's explicit
-  anchor-capacity stop condition. Before the stop, the 1440×900 file pass
-  had a clean console and one local-file request; system expansion preserved
-  Digital Commerce Platform's screen center within 0.003 px and kept the
-  viewport transform unchanged, while only four overlapping neighbors moved.
-  The live four-level path rendered System → Storefront and Edge → Commerce
-  Edge → both components; the cutover edge reattached from subsystem to
-  container to `components:strangler-route-config`; collapse restored all 15
-  cold-layout node styles exactly; each tested expansion, collapse, and preset
-  added one history entry. Captured `map-collapsed.png`,
-  `map-sys-expanded.png`, `endpoint-slide.png`, and `map-four-levels.png`.
-  Applying the Container preset then raised `RangeError`: 11 anchors cannot
-  fit the 162 px right side of `containers:commerce-monolith` with 14 px
-  separation and corner clearance. `preset-container.png` records the failed
-  render, not passing evidence. Stopped without changing spacing. The
-  remaining presets, link reload/Back checks, 1024×720 pass, and successful
-  Container screenshot remain blocked on open question 2.
-
-- **2026-08-29** — P12 in-place C4 map expansion implemented; left
-  uncommitted for architect review. Fragment state now uses a validated,
-  cumulative `expand` set with legacy link mapping, Detail bulk presets,
-  Custom detection, one-entry history updates, subtree-pruning collapse,
-  and selection restoration. The map projects recursive mixed-kind
-  boundaries, resolves each connection endpoint to its deepest visible
-  ancestor, aggregates shared pairs, suppresses internal splines while
-  retaining connection facts, and attaches definitions on expanded
-  entities to their boundary. Expansion uses nested ELK interiors, caches
-  layouts by `(timeline, expansion set)`, grows locally with deterministic
-  48 px push-apart, restores cached collapse positions, and leaves camera
-  zoom unchanged. The Acme fixture adds `edge-bot-defense` and
-  `strangler-route-cutover`; payload, bundle, and wip report regenerated.
-  Source budget: **710 / 2,600 changed lines** (tests and generated files
-  excluded). Tests: exactly six prescribed P12 cases added or recut;
-  frontend **44 passed**, arch Python **79 passed / 540 deselected**, smoke
-  **27 passed / 3,210 deselected**, `just lint`, TypeScript, bundle build,
-  fixture validation (**0 errors / 25 warnings**), and `git diff --check`
-  passed. Live UI gate remains outstanding: OneTool Playwright stayed
-  locked by another browser profile after its proxy restart, and the
-  isolated in-app browser had no available backend, so no P12 screenshots,
-  console/network capture, or viewport walkthrough were claimed.
-  Assumptions resolved from the strongest explicit contracts: (1) the
-  user's final no-commit instruction and standard rule 8 override the
-  request's earlier commit wording; (2) expansion ids use the existing
-  canonical `kind:id` node keys; (3) fragment validation and presets use
-  authored containment rather than one stage's live children so expansion
-  survives stage changes, while affordances/counts use live children; (4)
-  an explicit `expand` value wins over legacy `level` when both exist, and
-  a legacy `drill` adds its expandable ancestor chain and selection; (5)
-  applying a preset deliberately replaces any cached target layout with a
-  fresh P11 radial-or-layered layout. Open questions: none. Next action:
-  architect review, then rerun the rule-9 live gate when the browser profile
-  is free.
-
-- **2026-08-29** — P11 architect gate PASSED (with one gate fix); tree
-  committed; P12 prompt re-reviewed and finalized per the pipeline rule.
-  Independently re-verified: frontend 45 passed, arch py 79 passed,
-  `just lint` clean, `just build-arch-report` (incl. `tsc --noEmit`)
-  reproduced the pre-fix template byte-for-byte, budget confirmed at
-  736/2,400 (697 tracked + 39 new theme.ts), CLI runs standalone
-  (acme validate: 0 errors / 24 warnings). Code review conforms to the
-  pass-5 contract: deterministic radial construction with 48 px
-  clearance and grid-packed disconnected nodes, bearing-ordered
-  distributed anchors (>= 14 px separation, centered groups respect
-  corner clearance), straight 12 px stubs with flush 0.8x arrows,
-  midpoint label pills with +/-20% alternating nudge and
-  card/pill-collision avoidance, neutral `--edge` strokes with accent
-  reserved for selection/one-hop, six `--kind-*` tokens shared across
-  canvas/Info/Data, theme round-trip (YAML/Excel Settings/payload) with
-  located `unknown_theme_key`/`invalid_color`, compact 220 px user
-  cards. GATE FIX (architect, in-scope): the executor tied interface-
-  port expansion to `showLabel`, which P11 widened to Read — so at Read
-  every interface also rendered an expanded port pill at its attachment
-  point; live Playwright check found all 14 clipping their cards and 9
-  pill-pill overlaps (the executor's "no overlaps" claim had only
-  checked midpoint labels; their own screenshots show the clutter).
-  Fixed by a separate `expandPort` flag (Full depth or
-  selected/hovered — D13c's original timing); at Read ports are now
-  dots, and the live re-check shows zero pill-card and zero pill-pill
-  overlaps at Read with a clean console. Bundle rebuilt, acme report
-  regenerated, labels-at-rest.png recaptured (the other four executor
-  screenshots predate the fix but their subjects are unaffected).
-  Watch item for P12: `edgeAnchors` fails fast (RangeError) when a
-  side cannot fit its batch — fine today, but expansion concentrates
-  edges, noted in the P12 prompt. P12 prompt finalized: post-P11
-  integration notes (expandPort split, `preferredHub` pass-through,
-  anchor-capacity stop-and-ask) and the exact acme showcase rows
-  (edge-bot-defense at subsystem level, strangler-route-cutover at
-  component level; four-level path commerce-platform -> storefront-edge
-  -> commerce-edge -> components verified live in the fixture). Next
-  action: user confirms the P12 budget (2,600) and runs the P12 prompt;
-  the Phase 1 exit gate follows the P12 gate.
-
-- **2026-08-29** — P11 canvas presentation implemented; left uncommitted for
-  the architect's gate review. Flat projected stars now seed a deterministic
-  radial union layout (centered hub, top-biased users, outward deeper nodes,
-  disconnected grid pack); non-stars retain the existing ELK input. Edges use
-  batched distributed ports, 12 px normal stubs, flush smaller arrows, and
-  collision-checked Read/Full label pills. Canvas colors are neutral at rest,
-  share six kind tokens across canvas/Info/Data, reserve accent for interaction,
-  and compact user cards. Optional `theme.kinds` now validates, round-trips in
-  canonical YAML and Excel `Settings`, and passes through the payload. Source
-  budget: **736 / 2,400 lines** (additions + deletions; tests/generated bundle
-  excluded). Tests: exactly six prescribed cases added or updated; frontend
-  **45 passed**, arch Python **79 passed / 540 deselected**, `just lint` and
-  `just build-arch-report` clean. CLI payload fixtures and the acme report were
-  regenerated. Rule-9 file verification passed at 1440×900 and 1024×720 with
-  zero console warnings/errors, local-file requests only, no card/label
-  overlaps, and the required five screenshots captured in `plans/arch/wip/`.
-  Assumptions resolved from the strongest explicit contracts: (1) the user's
-  final no-commit instruction and standard rule 8 override the prompt's generic
-  commit wording; (2) “ELK unchanged” preserves its existing 40/72 px options,
-  while radial layout alone guarantees the explicit 48 px clearance; (3) a
-  fixed side has finite 14 px port capacity, so impossible batches fail with a
-  clear `RangeError`; (4) equal hub candidates sort by incident count then node
-  key, and disconnected means outside the chosen hub component; (5) absent
-  payload theme serializes as `{}` because the payload schema explicitly names
-  the key; (6) the numbered Settings-sheet contract supersedes the stale
-  ten-sheet wording, with Settings optional on read and created when needed;
-  (7) theme keys and valid hex values preserve authored spelling/case without
-  normalization; (8) “rendered edges” means projected aggregated graph edges;
-  (9) hub center means the one-hop ring's bounding-box center, with deeper and
-  disconnected nodes allowed outside it; (10) the cold projected star chooses
-  the hub for the cached union layout, preserving stage-stable positions without
-  letting a future hidden node occupy the baseline center. Open questions: none.
-
-- **2026-08-29** — P11/P12 designed and authored (user-directed, from the
-  IcePanel comparison review of the current acme report); tree committed.
-  The review found the landscape layout, edge presentation, color usage,
-  and level navigation all short of the bar: corner-fan layered layout
-  for a star graph, no at-rest edge labels, teal-everywhere, endpoint
-  convergence at corners, and level-redraw navigation that loses the
-  user's place. Thirty agreed changes captured as two new wave-1 chunks
-  ahead of the Phase 1 exit gate: **P11 canvas presentation** (radial
-  hub layout for star-shaped flat graphs, uniform spacing, termination
-  stubs + distributed visible ports, at-rest white label pills, quiet
-  neutral strokes, strict one-accent color economy, per-kind color
-  identity user-definable via a new YAML `theme` block with Excel
-  Settings sheet, compact user cards) and **P12 map model** (expansion-
-  set view state replacing level+drill, tree-based one-generation
-  expansion with mixed child kinds, persistent cumulative expansion,
-  deepest-visible endpoint resolution with defined/derived attachment,
-  Detail dropdown as bulk presets, drill retirement, local push-apart
-  relayout, boundary identity, acme showcase-path delta) — P12
-  REVERSES Q5 (2026-08-24). Design landed as: schema.md normative
-  containment matrix + "Theme" section, adapters.md Settings sheet
-  (twelve sheets), report.md "Polish contract — pass 5 (P11)" and "Map
-  contract (P12)", ui-polish-direction.md Detail + canvas-language
-  amendments. Prechecks passed: elkjs 0.12.0 bundles
-  radial/stress/sporeOverlap; ENDPOINT_KINDS already spans all six
-  entity kinds (no Python for any-level interfaces); System/User have
-  no parent field (matrix structurally enforced). New process rule
-  recorded: rolling prompt pipeline — prompts generated ahead, each
-  reviewed/updated at the preceding gate. Prompts authored in
-  delegation.md: P11 READY (budget 2,400 proposed), P12 GENERATED
-  (budget 2,600 proposed; re-review at the P11 gate). Next action: user
-  confirms the P11 budget and runs the P11 prompt; architect gates it,
-  re-reviews P12, then P12 runs; the Phase 1 exit gate follows both.
-
-- **2026-08-29** — Plan reorganised (user-directed); tree committed.
-  Chunk ids move to `Pxy` wave numbering (x = wave, y = priority) and
-  the phases are renamed Phase 1 / 2 / 3. Completed work (old Phases
-  0–3, 3R waves 1–2, 3P passes, D14) is collapsed into the Phase 1 DONE
-  record; finished chunks keep their historical ids (D1–D14, D13a–D13d)
-  wherever already referenced. Outstanding chunks renumber: D12a→P21,
-  D11→P22, D8→P23, D12b→P31; newly numbered P41 SharePoint, P42
-  migration converter (conditional), P43 edit mode, P51 test-breadth
-  backfill — mapping table in "Chunk numbering"; delegation.md headings
-  carry both ids. Status at reorg: DONE — the whole Phase 1 build
-  (D1–D10, polish passes D13a–D13d, D14 subsystem level, all gates
-  PASSED), sequence.md v1, the sequence parser-vector fixture, and all
-  27 ui-polish.md issues closed/waived. OUTSTANDING — the Phase 1 exit
-  gate (architect + user, next action), then wave 2 (attachments
-  design → P21; P22; P23), wave 3 (layout vectors → P31 → sequence
-  gate), waves 4–5 (P41–P43; OpenSpec, P51, docs backfill). The nine
-  2026-08-28 log entries moved to log-archive.md. Next action: run the
-  Phase 1 exit gate with the user.
 
 - **(older entries)** — see [log-archive.md](log-archive.md).
