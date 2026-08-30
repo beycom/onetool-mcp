@@ -37,7 +37,7 @@ prompt — executors read them as part of the contract.
 | P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
 | P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
 | P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
-| chunk-15 | Edge-label collision + collapse affordance (issues p14, p16) | READY (authored 2026-08-30) | now — pre-exit-gate |
+| chunk-15 | Edge-label collision + collapse affordance + Detail-dropdown removal (issues p14, p16, p27) | READY (authored 2026-08-30) | now — pre-exit-gate |
 | chunk-21 (was D12a) | Sequence parser + payload + attachments | READY (re-scoped 2026-08-30 for the attachments design) | Phase 1 exit gate |
 | chunk-22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | chunk-23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -981,20 +981,23 @@ interior packing conflicts with the P12 anchor-stability contract
 rather than improvising.
 ```
 
-## chunk-15 — Edge-label collision + boundary collapse affordance (READY, authored 2026-08-30)
+## chunk-15 — Edge-label collision + collapse affordance + Detail-dropdown removal (READY, authored 2026-08-30; p27 added same day)
 
 ```text
 [standard rules incl. rule 9]
 
 Context: two open canvas defects block the Phase 1 exit gate — issues
-p14-ui-edge-labels-overlap and p16-ui-collapse-affordance. READ BOTH
-issue files in plans/arch/arch-v3/issues/ plus their v3-*.png evidence
-screenshots. The normative contracts are in report.md: "At-rest edge
-labels" -> "Collision invariant (chunk-15)" + "Orphan suppression", and "Map
-contract — Interaction" -> "Collapse-control placement (chunk-15)". Frontend
+p14-ui-edge-labels-overlap and p16-ui-collapse-affordance — plus the
+decided issue p27-ui-detail-dropdown (user decision 2026-08-30:
+remove). READ ALL THREE issue files in plans/arch/arch-v3/issues/ plus
+their v3-*.png evidence screenshots. The normative contracts are in
+report.md: "At-rest edge labels" -> "Collision invariant (chunk-15)" +
+"Orphan suppression", "Map contract — Interaction" ->
+"Collapse-control placement (chunk-15)", and the Map contract's
+"Detail dropdown: REMOVED" bullet. Frontend
 only (frontend/arch-report/): no Python, no payload changes, no layout
 engine changes (layout.ts engines are off-surface — this is
-presentation-pass work over the rendered frame). Budget: 500 changed
+presentation-pass work over the rendered frame). Budget: 700 changed
 source lines (additions + deletions; tests and the generated bundle
 excluded).
 
@@ -1015,8 +1018,18 @@ Task:
    floating/repositioning toward child cards at any zoom, `aria-label`
    "Collapse <name>". Keep the existing collapse semantics and Escape
    order untouched.
+3. Remove the Detail dropdown per the Map contract bullet: delete the
+   View-dock control, its "Custom" preset-detection display, and any
+   code reachable only from them. KEEP the preset expansion sets as
+   the internal mapping for legacy `level=` fragment links (a legacy
+   link still restores the equivalent bulk expansion in one history
+   push) and keep the `expand` fragment machinery untouched. The freed
+   slot hosts the chunk-14 Layout method control when configured;
+   update or remove ONLY the existing tests that exercise the dropdown
+   UI itself (preset-mapping tests stay, recut against the legacy-link
+   path if they went through the control).
 
-Tests (exactly these four, plus keeping every existing test green):
+Tests (exactly these five, plus keeping every existing test green):
 1. Collision: a synthetic scene where selecting a hub reveals pills
    whose midpoints collide with the hub card -> every rendered pill
    rect is disjoint from all card rects and all other pill rects, and
@@ -1029,14 +1042,19 @@ Tests (exactly these four, plus keeping every existing test green):
 4. Boundary header: the collapse control renders inside the header row
    adjacent to the title (DOM order + geometry assertion) with the
    prescribed aria-label, and its glyph is not "×".
+5. Detail removal: the View dock renders no Detail control; a legacy
+   `level=` fragment link still restores the equivalent bulk expansion
+   set in one history entry.
 
 Rule-9 verification at 1440x900 (dev app AND regenerated file://
-report): reproduce both issue screenshots' setups — expand to the
-Container preset, select the hub card, zoom close — and confirm zero
-pill-card and zero pill-pill overlaps at every step; confirm the outer
-System boundary's collapse control sits beside its own title and
-nothing collapse-like renders adjacent to the focused child card;
-console clean throughout. Capture replacement evidence to
+report): reproduce both issue screenshots' setups — restore the
+Container-level expansion via a legacy `level=` link (the dropdown is
+gone) or manual card expansion, select the hub card, zoom close — and
+confirm zero pill-card and zero pill-pill overlaps at every step;
+confirm the outer System boundary's collapse control sits beside its
+own title and nothing collapse-like renders adjacent to the focused
+child card; confirm View shows no Detail control and the dock layout
+has no gap; console clean throughout. Capture replacement evidence to
 plans/arch/wip/test-results/chunk-15/. Rebuild the bundle and regenerate
 plans/arch/wip/acme-report.html via the CLI.
 

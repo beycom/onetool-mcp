@@ -106,10 +106,16 @@ contract (P12)"; reverses Q5):** the canvas is one continuous C4 map.
 Entities expand **in place** to their direct children (a system may show
 subsystems and containers side by side), expansion is per-entity,
 persistent, and cumulative, and connections attach to the deepest
-visible node on each endpoint's ancestor chain. The Detail dropdown
-remains but becomes **bulk-expansion presets** (System / Subsystem /
-Container / Component; "Custom" when hand-modified; Subsystem hidden
-for subsystem-less models). The former rule below is superseded: the
+visible node on each endpoint's ancestor chain. **The Detail dropdown
+is REMOVED (issue p27, user decision 2026-08-30, lands with
+chunk-15):** in-place expansion affordances (card expand control,
+double-click, boundary collapse control) are the only level
+navigation — a second, global navigation model competed with the map
+and could explode large models. The preset expansion sets survive
+only as the internal mapping for legacy `level=` fragment links; there
+is no "Custom" display. The View-dock slot it occupied is freed (the
+configured Layout method control from chunk-14 renders there when
+present). The former rule below is superseded: the
 drill view, breadcrumb, and "does not expand in place" behavior are
 retired — the expand affordance (magnifier + child count) replaces the
 drill affordance on cards with children.

@@ -29,7 +29,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Implementation | `src/otdev/tools/arch.py` facade + `src/otdev/tools/_arch/v3/`; report app source `frontend/arch-report/` (v1 deleted at cutover 2026-08-23) |
 | Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
-| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16 assigned to chunk-15; p24/p26–p29/p32 open, unassigned (wave-2 polish chunk, authored at wave-2 start; p27 needs a user decision — default remove); p3-* files feed chunk-22/chunk-43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
+| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16/p27 assigned to chunk-15 (p27 decided: remove the Detail dropdown); p24/p26/p28/p29/p32 open, unassigned (wave-2 polish chunk, authored at wave-2 start); p3-* files feed chunk-22/chunk-43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
 | Confirmed UI direction (decision source for all UI work) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
 | UI polish issue list (CLOSED 2026-08-29) | `plans/arch/arch-v3/ui-polish.md` — 27 itemized issues (2026-08-25 Playwright walkthrough + 2026-08-28 user screenshots), tagged D13a–D13d; every issue now carries a CLOSED/WAIVED/superseded annotation — the Phase 1 exit gate re-checks the walkthrough, not the list |
@@ -186,7 +186,7 @@ with another):**
 | P12 | — | Map model: in-place C4 expansion, endpoint resolution, presets (added 2026-08-29) |
 | P13 | — | Report UI correctness fixes: issues p15, p17, p18, p19 (added 2026-08-30) |
 | P14 | — | Layout engines + config + A/B harness — layout-design.md; absorbs issue p13 (added 2026-08-30) |
-| chunk-15 | — | Edge-label collision + collapse affordance — issues p14, p16 (added 2026-08-30) |
+| chunk-15 | — | Edge-label collision + collapse affordance + Detail-dropdown removal — issues p14, p16, p27 (added 2026-08-30) |
 | chunk-21 | D12a | Sequence parser + payload + attachments (re-scoped 2026-08-30) |
 | chunk-22 | D11 | Report definitions + guided views |
 | chunk-23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
@@ -274,14 +274,15 @@ docs):
   hash + localStorage, shared invariant suite, dev-only ?layout= A/B
   harness. Default-method decision (architect, from the captures): the
   topology-aware default is retained (layout-design.md Decisions 0).
-- [ ] **chunk-15 — edge-label collision + collapse affordance** (added
-  2026-08-30 when the user flagged that issues p14 and p16 were owned
-  by no chunk; specs: report.md "Collision invariant (chunk-15)" under
-  At-rest edge labels — absorbs p18's deferred orphan-label clause —
-  and "Collapse-control placement (chunk-15)" under the Map contract;
-  prompt READY in delegation.md, proposed budget 500). Runs before the
-  exit-gate user half: p14 reproduces in the gate's own select-card
-  walkthrough step.
+- [ ] **chunk-15 — edge-label collision + collapse affordance +
+  Detail-dropdown removal** (added 2026-08-30 when the user flagged
+  that issues p14 and p16 were owned by no chunk; p27 added same day
+  by user decision: remove. Specs: report.md "Collision invariant
+  (chunk-15)" under At-rest edge labels — absorbs p18's deferred
+  orphan-label clause — "Collapse-control placement (chunk-15)" and
+  "Detail dropdown: REMOVED" under the Map contract; prompt READY in
+  delegation.md, proposed budget 700). Runs before the exit-gate user
+  half: p14 reproduces in the gate's own select-card walkthrough step.
 - [ ] **Phase 1 exit gate (architect + user)** — runs after the chunk-15
   gate (label collision changes the rendered frame). The held 3P exit gate:
   open acme's report cold and the story reads without explanation and
@@ -405,6 +406,29 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-30** — p27 DECIDED (user): the Detail dropdown is
+  **removed**, riding chunk-15; tree committed. Design landed as:
+  report.md Map contract "Detail dropdown: REMOVED" (supersedes the
+  P12 "becomes presets" rule — preset expansion sets survive only as
+  the internal mapping for legacy `level=` fragment links, one history
+  push, no "Custom" display; the freed View slot hosts the chunk-14
+  Layout control when configured), a REMOVED annotation on the D13a
+  Controls-conversion bullet, and the amended ui-polish-direction.md
+  "Detail" section. chunk-15 prompt updated: task 3 (remove the
+  control, keep legacy-link mapping, recut only dropdown-UI tests),
+  prescribed test 5 (no Detail control; legacy `level=` link restores
+  the bulk expansion in one history entry), rule-9 repro now uses a
+  legacy link or manual expansion instead of the dropdown; budget
+  raised 500 → 700. Issue p27 annotated DECIDED/ASSIGNED (index
+  updated). Side effect noted for the exit gate: the P14 watch item
+  ("LIVE preset switch leaves content outside the frame until Fit")
+  is mooted by the removal — bulk expansion now arrives only via
+  legacy-link loads, which frame correctly as fresh loads. The
+  test-ui.md walkthrough's preset step (untracked wip note) needs the
+  same substitution when the gate re-runs. Next action: user runs the
+  chunk-15 prompt (budget 700 confirmed by this decision's scope);
+  architect gates it; then the Phase 1 exit gate.
 
 - **2026-08-30** — Identifier collision resolved (user decision):
   outstanding executor chunks renamed `Pxy` → `chunk-xy` (chunk-15,

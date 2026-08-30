@@ -735,6 +735,9 @@ Per the direction's "App shell" table and defaults:
   level model renamed 2026-08-28; the Subsystem option is hidden when
   the model defines no subsystems) replacing the level control; the
   `level` fragment tokens are the level ids in the C4 zoom table.
+  **REMOVED 2026-08-30** (issue p27, user decision; lands with
+  chunk-15) — see the Map contract's "Detail dropdown" bullet for
+  what survives (legacy `level=` link mapping only).
 - **Stage dropdown** ("0 · Base", "1 · <name>", …) replacing both the
   time slider and the Compare control. Selecting a stage updates canvas,
   Data tables, counts, and Info together. Diff styling is driven by
@@ -1441,13 +1444,17 @@ map; layered runs inside expanded boundaries). Grounded in
   `expand=<that id's ancestor chain + itself>` plus `select`; a
   `level=` fragment maps to the equivalent preset. Copy view link and
   saved views carry `expand`.
-- **Detail dropdown becomes presets** (same control, new semantics):
-  System = collapse all; Subsystem = expand all systems;
-  Container = expand systems + subsystems; Component = expand systems +
-  subsystems + containers. A preset writes the bulk expansion set in
-  one history push. When the live set matches no preset the dropdown
-  displays "Custom". The Subsystem option still hides for
-  subsystem-less models.
+- **Detail dropdown: REMOVED** (issue p27, user decision 2026-08-30,
+  lands with chunk-15 — supersedes the P12 "becomes presets" rule that
+  previously stood here). In-place expansion affordances are the only
+  level navigation. The preset expansion sets (System = collapse all;
+  Subsystem = expand all systems; Container = expand systems +
+  subsystems; Component = expand systems + subsystems + containers)
+  survive **only** as the internal mapping for legacy `level=`
+  fragment links, which still restore the equivalent bulk expansion in
+  one history push. "Custom" detection and its display are deleted
+  with the control. The freed View-dock slot hosts the configured
+  Layout method control (chunk-14) when present.
 - Expansion is **persistent and cumulative**: it survives stage,
   relationship, and tag changes (the layout key becomes
   `(timeline, expansion set)` — those switches move nothing, D13b
