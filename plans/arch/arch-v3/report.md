@@ -285,6 +285,12 @@ architecture's states — ships as the **Stage dropdown** in the View dock
 - Layout stability across positions: layout the **union graph** (all rows,
   all positions) once with elkjs, then keep node positions fixed while
   filtering — absent nodes drop/ghost rather than trigger re-layout.
+  Ghosting composes with expansion (exit-gate fix 2026-08-30): an entity
+  removed at the current position while EXPANDED renders as a ghost
+  boundary (dashed, dimmed, no collapse control), so its removed children
+  keep their layout parent instead of orphaning at the boundary-relative
+  origin; ghost boundaries merge from the previous position's projection
+  exactly like ghost nodes.
   This sidesteps v2's roadmap-displacement quality gates by construction; a
   per-position re-layout is an explicit user action ("re-fit this state").
 

@@ -36,7 +36,7 @@ import { applyPositions, defaultLayoutMethod, makeLayoutKey, NODE_HEIGHT, NODE_W
 import { configuredLayoutMethod, layoutSettings, loadLayoutMethod, queryLayoutMethod, resolveLayoutMethod, saveLayoutMethod } from './layoutConfig'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
 import { readPayload } from './payload'
-import { diffStates, legendEntries, projectState, unionGraph } from './projection'
+import { diffStates, legendEntries, mergeRemovedBoundaries, projectState, unionGraph } from './projection'
 import { ResizablePanel } from './ResizablePanel'
 import { splinePath, type SplinePath } from './splinePath'
 import { kindPresentationStyle, themeStyle } from './theme'
@@ -75,7 +75,7 @@ type ArchitectureData = {
   statuses: DiffStatus[]
 }
 type ArchitectureNode = Node<ArchitectureData, 'architecture'>
-type BoundaryData = { boundary: GraphBoundary; description: string; label: string; onCollapse: () => void }
+type BoundaryData = { boundary: GraphBoundary; description: string; ghost: boolean; label: string; onCollapse: () => void }
 type BoundaryNode = Node<BoundaryData, 'boundary'>
 type CanvasNode = ArchitectureNode | BoundaryNode
 type SemanticData = {
@@ -142,8 +142,8 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
 
 export function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
   return (
-    <section className="containment-boundary" data-kind={data.boundary.kind} data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'} style={kindPresentationStyle(data.boundary.kind, selected)}>
-      <header><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong><button aria-label={`Collapse ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onCollapse() }} title="Collapse" type="button">×</button></header>
+    <section className="containment-boundary" data-ghost={data.ghost ? 'true' : 'false'} data-kind={data.boundary.kind} data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'} style={kindPresentationStyle(data.boundary.kind, selected)}>
+      <header><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong>{data.ghost ? null : <button aria-label={`Collapse ${data.label}`} onClick={(event) => { event.stopPropagation(); data.onCollapse() }} title="Collapse" type="button">×</button>}</header>
       {data.description ? <p className="boundary-description">{data.description}</p> : null}
       <Handle position={Position.Left} type="target" />
       <Handle position={Position.Right} type="source" />
@@ -554,6 +554,11 @@ export default function App() {
     }
     return [...merged.values()]
   }, [compared, diff, projected.nodes])
+  const graphBoundaries = useMemo(() => mergeRemovedBoundaries(
+    projected.boundaries,
+    compared?.boundaries ?? null,
+    new Set((diff?.removed ?? []).map((item) => `${item.kind}:${item.id}`)),
+  ), [compared, diff, projected.boundaries])
   const nodes = useMemo<CanvasNode[]>(() => {
     const byId = new Map(Object.entries(projected.rawState.rows).flatMap(([kind, rows]) => rows.map((row) => [row.id, { kind: kind as RowKind, row }] as const)))
     const propertyCounts = new Map<string, number>()
@@ -562,7 +567,7 @@ export default function App() {
     const memberKeys = (node: GraphNode) => new Set([node.key, ...node.members.map((member) => `${member.kind}:${member.row.id}`)])
     const lensMatched = new Set(graphNodes.filter(({ node }) => nodeTags(node).some((tag) => view.lens.includes(tag))).map(({ node }) => node.key))
     const directionalEdges = projected.edges.flatMap((edge) => splitEdgeDirections(edge, view.aspect))
-    const visibleKeys = [...graphNodes.map(({ node }) => node.key), ...projected.boundaries.map((boundary) => boundary.key)]
+    const visibleKeys = [...graphNodes.map(({ node }) => node.key), ...graphBoundaries.map(({ boundary }) => boundary.key)]
     const classified = classifyEmphasis(visibleKeys, directionalEdges, selectedEmphasisKeys, lensMatched)
     const neighborKeys = (keys: Set<string>) => new Set(projected.edges.flatMap((edge) => keys.has(edge.a) ? [edge.b] : keys.has(edge.b) ? [edge.a] : []))
     const selectedNodes = new Set(graphNodes.filter(({ node }) => selectedKey && memberKeys(node).has(selectedKey)).map(({ node }) => node.key))
@@ -612,14 +617,17 @@ export default function App() {
         width: size.width,
       }
     })
-    const boundaryByKey = new Map(projected.boundaries.map((boundary) => [boundary.key, boundary]))
-    const boundaryDepth = (boundary: GraphBoundary): number => boundary.parentKey
-      ? 1 + boundaryDepth(boundaryByKey.get(boundary.parentKey)!) : 0
-    const boundaryNodes: BoundaryNode[] = projected.boundaries.filter((boundary) => !boundary.stub)
-      .sort((left, right) => boundaryDepth(left) - boundaryDepth(right) || left.key.localeCompare(right.key)).map((boundary) => ({
+    const boundaryByKey = new Map(graphBoundaries.map(({ boundary }) => [boundary.key, boundary]))
+    const boundaryDepth = (boundary: GraphBoundary): number => {
+      const parent = boundary.parentKey ? boundaryByKey.get(boundary.parentKey) : undefined
+      return parent ? 1 + boundaryDepth(parent) : 0
+    }
+    const boundaryNodes: BoundaryNode[] = graphBoundaries.filter(({ boundary }) => !boundary.stub)
+      .sort((left, right) => boundaryDepth(left.boundary) - boundaryDepth(right.boundary) || left.boundary.key.localeCompare(right.boundary.key)).map(({ boundary, ghost }) => ({
       data: {
         boundary,
         description: boundary.row.description ?? '',
+        ghost,
         label: rowLabel(boundary.row),
         onCollapse: () => changeExpansion(boundary.nodeKey, false),
       },
@@ -631,7 +639,7 @@ export default function App() {
       type: 'boundary',
     }))
     return applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
-  }, [cardSizes, changeExpansion, diff, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedEmphasisKeys, selectedKey, view.aspect, view.lens])
+  }, [cardSizes, changeExpansion, diff, graphBoundaries, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedEmphasisKeys, selectedKey, view.aspect, view.lens])
 
   const graphEdges = useMemo(() => {
     const merged = new Map(projected.edges.map((edge) => [edge.key, { edge, ghost: false }]))
@@ -650,8 +658,8 @@ export default function App() {
       return rect ? [rect] : []
     })
     const classified = classifyEmphasis([
-      ...projected.nodes.map((node) => node.key),
-      ...projected.boundaries.map((boundary) => boundary.key),
+      ...graphNodes.map(({ node }) => node.key),
+      ...graphBoundaries.map(({ boundary }) => boundary.key),
     ], rendered.map(({ spline }) => spline), selectedEmphasisKeys, lensMatched)
     const edgeEmphasis = (spline: DirectionalSpline): SemanticData['emphasis'] => {
       if (selectedSplineId) return spline.id === selectedSplineId ? 'selected' : 'unrelated'
@@ -698,7 +706,7 @@ export default function App() {
         (hovered) => setHoveredEdgeId(hovered ? spline.id : null),
       )
     })
-  }, [depth, diff, graphEdges, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedEmphasisKeys, selectedSplineId, view.aspect, view.lens, zoom])
+  }, [depth, diff, graphBoundaries, graphEdges, graphNodes, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedEmphasisKeys, selectedSplineId, view.aspect, view.lens, zoom])
 
   const visibleCanvas = useCallback((): Rect | null => {
     const element = canvasRef.current

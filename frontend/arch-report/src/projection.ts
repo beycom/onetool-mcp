@@ -385,6 +385,24 @@ export function unionGraph(payload: ReportPayload, timeline: number, expansion: 
   return mapGraph(scopeAt(state, null), expansion)
 }
 
+// Removed entities render as ghosts for the diff story. A removed expanded
+// container must merge as a ghost BOUNDARY, not vanish: its ghost children
+// keep their layout parent, otherwise applyPositions drops the parentId and
+// stacks them at the boundary-relative origin.
+export function mergeRemovedBoundaries(
+  current: readonly GraphBoundary[],
+  compared: readonly GraphBoundary[] | null,
+  removedKeys: ReadonlySet<string>,
+): Array<{ boundary: GraphBoundary; ghost: boolean }> {
+  const merged = new Map(current.map((boundary) => [boundary.key, { boundary, ghost: false }]))
+  for (const boundary of compared ?? []) {
+    if (!merged.has(boundary.key) && !boundary.stub && removedKeys.has(boundary.key)) {
+      merged.set(boundary.key, { boundary, ghost: true })
+    }
+  }
+  return [...merged.values()]
+}
+
 export function projectState(payload: ReportPayload, view: View): ProjectedView {
   const rawState = stateAt(payload, view.timeline, view.position)
   const graph = mapGraph(scopeAt(rawState, view.scope), view.expand)

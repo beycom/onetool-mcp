@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { mapGraph, scopeAt, stateAt } from './projection'
+import { diffStates, mapGraph, mergeRemovedBoundaries, scopeAt, stateAt } from './projection'
 import { KINDS, type ReportPayload, type ReportRow, type RowKind } from './types'
 
 const intervals = [{ live: [[0, null] as [number, null]], clips: [] }]
@@ -65,5 +65,34 @@ describe('P12 map contract', () => {
     expect(graph(model, ['systems:sys1', 'subsystems:ss1']).edges[0]).toMatchObject({
       a: 'containers:c', b: 'containers:d', interfaces: ['inside'],
     })
+  })
+})
+
+describe('ghost boundary merge (exit-gate fix)', () => {
+  const ended = [{ live: [[0, 1]] as Array<[number, number]>, clips: [{ start: 2, end: null, by: 'sys' }] }] as ReportRow['intervals']
+  const model = payload({
+    systems: [row('sys', { name: 'Sys' })],
+    containers: [row('mono', { intervals: ended, parent: 'sys' })],
+    components: [row('comp', { container: 'mono', intervals: ended })],
+  })
+  const expand = ['systems:sys', 'containers:mono']
+  const at = (position: number) => mapGraph(scopeAt(stateAt(model, 0, position), null), expand)
+
+  test('a removed expanded container merges as a ghost boundary; live entities never do', () => {
+    const current = at(2)
+    const compared = at(1)
+    const removed = new Set(diffStates(model, 0, 1, 2).removed.map((item) => `${item.kind}:${item.id}`))
+    expect(current.boundaries.map((boundary) => boundary.key)).toEqual([])
+    const merged = mergeRemovedBoundaries(current.boundaries, compared.boundaries, removed)
+    expect(merged).toEqual([
+      { boundary: expect.objectContaining({ key: 'containers:mono' }), ghost: true },
+    ])
+  })
+
+  test('without a compared projection nothing merges', () => {
+    const current = at(1)
+    const merged = mergeRemovedBoundaries(current.boundaries, null, new Set(['containers:mono']))
+    expect(merged.every(({ ghost }) => !ghost)).toBe(true)
+    expect(merged.map(({ boundary }) => boundary.key)).toEqual(current.boundaries.map((boundary) => boundary.key))
   })
 })

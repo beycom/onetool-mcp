@@ -366,6 +366,47 @@ inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
 
+- **2026-08-30** — Phase 1 exit gate: architect half RE-RUN on the
+  post-P14 tree and PASSED, with one gate fix landed and committed; the
+  user half is now the only outstanding Phase 1 item. Walkthrough at
+  1440×900 and 1024×720 under `file://`, storage cleared for a true cold
+  load: console clean at every step (0 warnings/errors), the only
+  network request is the local HTML file; cold open reads (radial hub,
+  whole-graph fit at 37%, doc exactly 1440×900, zero scroll, no
+  layout-method control — correct, acme authors no `layout:` block);
+  card select opens Info with one-hop accent and keeps the hub visible;
+  spline select shows Connection details with linked endpoints,
+  direction, and member; Stage 5 renders the cutover story with the
+  selection surviving the switch; Data opens with four tabs and no
+  stale-layout toast; at 1024×720 View auto-collapses to the 36 px rail
+  when Info opens and the app fills the viewport exactly. Evidence:
+  plans/arch/wip/test-results/exit-gate/p14-*.png and
+  ghost-boundaries-stage5-component.png.
+  GATE FIX (architect, in-scope): probing the P14 watch item (Component
+  preset at Stage 5) found removed EXPANDED containers vanishing while
+  their removed children rendered — three legacy components stacked at
+  the boundary-relative origin (identical translate(20px,50px)); root
+  cause: App.tsx merged removed entities from the compared projection as
+  ghost NODES only, never ghost BOUNDARIES, so applyPositions dropped
+  the missing parentId and applied the relative position as absolute.
+  Fix: `mergeRemovedBoundaries` in projection.ts (pure, tested) merges
+  removed non-stub boundaries from the compared projection as ghosts;
+  boundary nodes build from the merged list (ghost = dashed, dimmed, no
+  collapse control); report.md layout-stability rule amended. Live
+  re-check: 4 ghost boundaries render the full legacy retirement story
+  at Component/Stage 5, the three components sit inside their ghost
+  parents, 0 leaf overlaps, 56 edges (11 retired ghost edges restored),
+  console clean. ~40 changed source lines (tests + generated template
+  excluded); frontend 73 passed (+2 merge cases), tsc clean, bundle
+  rebuilt, acme regenerated. Pre-existing watch item unchanged: a LIVE
+  preset switch still leaves content outside the frame until Fit
+  (fresh-load framing is correct). Not re-run (verified at earlier
+  gates, unaffected): dock drag-resize, reduced motion; payload-viewer
+  and sequence checks are Phase 2 scope. Next action: user reviews the
+  regenerated plans/arch/wip/acme-report.html + exit-gate screenshots
+  and confirms or fails the gate; on pass, wave 2 opens with the
+  attachments design → P21.
+
 - **2026-08-30** — P14 architect gate PASSED (with one gate fix); tree
   committed; default-method decision recorded. Independently re-verified:
   frontend tests, arch py 83 (+4 prescribed), `just lint`,
