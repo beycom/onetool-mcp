@@ -39,7 +39,7 @@ prompt — executors read them as part of the contract.
 | P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
 | chunk-15 | Edge-label collision + collapse affordance + Detail-dropdown removal (issues p14, p16, p27) | DONE — gate PASSED 2026-08-31 (193/700 lines + the architect's port-label collision fix) | — |
 | chunk-16 | Canvas performance: gesture freeze, CSS zoom scaling, referential stability (issue p33) | DONE — gate PASSED 2026-08-31 (252/500 lines, no architect fix needed) | — |
-| chunk-17 | Gate-feedback polish sweep (issues p24, p26, p28, p29, p32 open bullets, p34, p35) | READY | now — before the exit-gate re-run |
+| chunk-17 | Gate-feedback polish sweep (issues p24, p26, p28, p29, p32 open bullets, p34, p35) | DONE — gate PASSED 2026-09-01 (242/1,500 lines + the architect's blank-value set-filter fix) | — |
 | chunk-21 (was D12a) | Sequence parser + payload + attachments | DONE — gate PASSED 2026-08-31 (699/700 lines, no architect fix needed) | — |
 | chunk-22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | chunk-23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -595,7 +595,7 @@ before/after trace numbers in the log entry. Console clean, zero
 external requests. Definition of done: rules 5-8, then STOP.
 ```
 
-## chunk-17 — gate-feedback polish sweep (READY — runs now)
+## chunk-17 — gate-feedback polish sweep (DONE 2026-09-01, gate PASSED)
 
 ```text
 [standard rules + UI rule 9]

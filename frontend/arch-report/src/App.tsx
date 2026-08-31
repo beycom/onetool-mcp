@@ -33,7 +33,7 @@ import {
 import { GlobalSearch, type SearchResult } from './GlobalSearch'
 import { GridPanel } from './GridPanel'
 import { InfoPanel, selectionKey, type Selection } from './InfoPanel'
-import { FitIcon, MapIcon, SearchIcon } from './Icons'
+import { FitIcon, HomeIcon, MapIcon, SearchIcon } from './Icons'
 import { applyPositions, defaultLayoutMethod, makeLayoutKey, NODE_HEIGHT, NODE_WIDTH, stableExpansionLayout, starHub, unionLayout, type LayoutMethod, type Positions } from './layout'
 import { configuredLayoutMethod, layoutSettings, loadLayoutMethod, queryLayoutMethod, resolveLayoutMethod, saveLayoutMethod } from './layoutConfig'
 import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from './layoutPreferences'
@@ -41,7 +41,7 @@ import { readPayload } from './payload'
 import { diffStates, legendEntries, mergeRemovedBoundaries, projectState, unionGraph } from './projection'
 import { ResizablePanel } from './ResizablePanel'
 import { endpointsNearViewport, splinePath, type SplinePath } from './splinePath'
-import { kindPresentationStyle, themeStyle } from './theme'
+import { kindColorReference, kindPresentationStyle, themeStyle } from './theme'
 import {
   type Aspect,
   type GraphEdge,
@@ -76,6 +76,7 @@ type ArchitectureData = {
   onExpand: (key: string) => void
   row: ReportRow
   statuses: DiffStatus[]
+  tagMatched: boolean
 }
 type ArchitectureNode = Node<ArchitectureData, 'architecture'>
 type BoundaryData = { boundary: GraphBoundary; description: string; ghost: boolean; label: string; onCollapse: (key: string) => void }
@@ -119,6 +120,7 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
       data-kind={data.kind}
       data-selected={selected ? 'true' : 'false'}
       data-status={data.statuses.join(' ')}
+      data-tag-match={data.tagMatched ? 'true' : 'false'}
       style={kindPresentationStyle(data.kind, selected)}
     >
       <div className="node-heading"><span className="kind-pill" data-kind={data.kind}>{KIND_LABEL[data.kind]}</span>{data.boundary ? <span className="external-pill">External</span> : null}</div>
@@ -291,6 +293,14 @@ function nodeTags(node: GraphNode): string[] {
   return [...new Set([...(node.row.tags ?? []), ...node.members.flatMap((member) => member.row.tags ?? [])])].sort()
 }
 
+function displayKeyForSelection(projected: ReturnType<typeof projectState>, key: string | null): string | null {
+  if (!key) return null
+  return projected.nodes.find((node) => node.key === key)?.key
+    ?? projected.boundaries.find((boundary) => boundary.nodeKey === key)?.key
+    ?? projected.nodes.find((node) => node.members.some((member) => `${member.kind}:${member.row.id}` === key))?.key
+    ?? null
+}
+
 function DependencyView({
   aspect,
   focusKey,
@@ -317,7 +327,7 @@ function DependencyView({
     })),
   ]
   const focus = visibleNodes.find((node) => node.key === focusKey)
-  if (!focus) return <div className="empty-state"><p>The focused entity is not in this projection.</p><button onClick={onClose} type="button">Return to map</button></div>
+  if (!focus) return <div className="dependency-empty empty-state"><p>The focused entity is not in this projection.</p><button className="secondary-action" onClick={onClose} type="button">Return to map</button></div>
   const incoming: Array<{ edge: GraphEdge; node: GraphNode }> = []
   const outgoing: Array<{ edge: GraphEdge; node: GraphNode }> = []
   for (const edge of projected.edges.filter((item) => item.a === focusKey || item.b === focusKey)) {
@@ -330,15 +340,18 @@ function DependencyView({
   const column = (label: string, entries: Array<{ edge: GraphEdge; node: GraphNode }>) => (
     <section aria-label={`${label} dependencies`} className="dependency-column">
       <h3>{label} <span>{entries.length}</span></h3>
-      {entries.map(({ edge, node }) => <button key={`${label}:${edge.key}`} onClick={() => { onFocus(node.key); onSelect(node.kind, node.row, node.members) }} type="button"><strong>{rowLabel(node.row)}</strong><span>{edge.interfaces.length + edge.relationships.length} connections</span></button>)}
+      {entries.map(({ edge, node }) => {
+        const names = [...edge.interfaceRows, ...edge.relationshipRows].map(rowLabel)
+        return <button key={`${label}:${edge.key}`} onClick={() => { onFocus(node.key); onSelect(node.kind, node.row, node.members) }} type="button"><strong>{rowLabel(node.row)}</strong><span>{names.join(' · ') || 'Unnamed connection'}</span></button>
+      })}
     </section>
   )
   return (
     <section className="dependency-view">
-      <header><div><span className="panel-kicker">DEPENDENCY FOCUS</span><h2>{rowLabel(focus.row)}</h2><p>{incoming.length} incoming · {outgoing.length} outgoing · {new Set([...incoming, ...outgoing].flatMap(({ edge }) => [...edge.interfaces, ...edge.relationships])).size} connections</p><label>Focus <select aria-label="Dependency focus" onChange={(event) => { const node = visibleNodes.find((item) => item.key === event.target.value); if (node) { onFocus(node.key); onSelect(node.kind, node.row, node.members) } }} value={focusKey}>{visibleNodes.map((node) => <option key={node.key} value={node.key}>{rowLabel(node.row)}</option>)}</select></label></div><button aria-label="Close dependency view" onClick={onClose} type="button">×</button></header>
+      <header><div><span className="panel-kicker">Dependency focus</span><h2>{rowLabel(focus.row)}</h2><p>{incoming.length} incoming · {outgoing.length} outgoing · {incoming.length + outgoing.length} entries</p><label>Focus <select aria-label="Dependency focus" onChange={(event) => { const node = visibleNodes.find((item) => item.key === event.target.value); if (node) { onFocus(node.key); onSelect(node.kind, node.row, node.members) } }} value={focusKey}>{visibleNodes.map((node) => <option key={node.key} value={node.key}>{rowLabel(node.row)}</option>)}</select></label></div><button aria-label="Close dependency view" onClick={onClose} type="button">×</button></header>
       <div className="dependency-columns">
         {column('Incoming', incoming)}
-        <button className="dependency-focus-node" data-kind={focus.kind} onClick={() => onSelect(focus.kind, focus.row, focus.members)} style={kindPresentationStyle(focus.kind, true)} type="button"><span className="kind-pill" data-kind={focus.kind}>{KIND_LABEL[focus.kind]}</span><strong>{rowLabel(focus.row)}</strong></button>
+        <button className="architecture-node dependency-focus-node" data-kind={focus.kind} onClick={() => onSelect(focus.kind, focus.row, focus.members)} style={kindPresentationStyle(focus.kind, true)} type="button"><span className="kind-pill" data-kind={focus.kind}>{KIND_LABEL[focus.kind]}</span><strong className="node-name">{rowLabel(focus.row)}</strong>{focus.row.description ? <span className="node-description">{focus.row.description}</span> : null}</button>
         {column('Outgoing', outgoing)}
       </div>
     </section>
@@ -436,6 +449,8 @@ export default function App() {
     canvas?.style.setProperty('--canvas-edge-width-diff', `${edgeWidth + 0.25}px`)
     canvas?.style.setProperty('--canvas-edge-width-emphasized', `${edgeWidth + 0.8}px`)
     canvas?.style.setProperty('--canvas-edge-width-focus', `${edgeWidth + 5}px`)
+    canvas?.style.setProperty('--canvas-selection-ring', `${4 * zoomCompensation}px`)
+    canvas?.style.setProperty('--canvas-tag-halo', `${5 * zoomCompensation}px`)
     if (!shouldCommitViewport(committedViewport.current, next, reason)) return
     committedViewport.current = next
     setCanvasViewport(next)
@@ -481,13 +496,7 @@ export default function App() {
   const legend = useMemo(() => legendEntries(projected), [projected])
 
   const selectedKey = selected?.type === 'row' ? `${selected.kind}:${selected.row.id}` : null
-  const selectedDisplayKey = useMemo(() => {
-    if (!selectedKey) return null
-    const exact = projected.nodes.find((node) => node.key === selectedKey)?.key
-      ?? projected.boundaries.find((boundary) => boundary.nodeKey === selectedKey)?.key
-    if (exact) return exact
-    return projected.nodes.find((node) => node.members.some((member) => `${member.kind}:${member.row.id}` === selectedKey))?.key ?? null
-  }, [projected.boundaries, projected.nodes, selectedKey])
+  const selectedDisplayKey = useMemo(() => displayKeyForSelection(projected, selectedKey), [projected, selectedKey])
   const selectedEmphasisKeys = useMemo(() => {
     const keys = new Set<string>()
     if (!selectedDisplayKey) return keys
@@ -645,6 +654,7 @@ export default function App() {
           onExpand: expandNode,
           row: node.row,
           statuses: ghost ? ['removed'] : statusesForNode(node, diff),
+          tagMatched: lensMatched.has(node.key),
         },
         height: size.height,
         id: node.key,
@@ -905,6 +915,16 @@ export default function App() {
     framedLayout.current = ''
     setView({ layout: method }, true)
   }
+  const resetView = () => {
+    const baseView = { ...view, deps: null, expand: [] }
+    const baseProjection = projectState(payload, baseView)
+    const visibleTags = new Set(legendEntries(baseProjection).map(({ tag }) => tag))
+    const lens = view.lens.filter((tag) => visibleTags.has(tag))
+    if (selectedKey && !displayKeyForSelection(baseProjection, selectedKey)) closeInfo()
+    layoutIntent.current = null
+    framedLayout.current = ''
+    setView({ deps: null, expand: [], lens }, true)
+  }
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     requestAnimationFrame(() => searchTrigger.current?.focus())
@@ -952,7 +972,7 @@ export default function App() {
       <main className="workspace">
         <div className="dock-row">
           <ResizablePanel className="view-dock" label="View" layout={autoViewCollapsed ? { ...layout.docks.view, collapsed: true } : layout.docks.view} name="view" onChange={(dock) => { setAutoViewCollapsed(false); setDock('view', dock) }}>
-            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} layoutMethod={displayedLayoutMethod} legend={legend} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onLayout={chooseLayout} onView={setView} payload={payload} view={view} />
+            <ViewDock canvasActive={!view.deps} copyStatus={copyStatus} layoutMethod={displayedLayoutMethod} legend={legend} matchedCount={graphNodes.filter(({ node }) => nodeTags(node).some((tag) => view.lens.includes(tag))).length} onCanvas={() => setView({ deps: null }, true)} onCopy={() => void copyLink()} onLayout={chooseLayout} onView={setView} payload={payload} view={view} />
           </ResizablePanel>
 
           <div className={`canvas-root depth-${depth}`} data-reading-depth={depth} ref={canvasRef}>
@@ -993,20 +1013,33 @@ export default function App() {
               onNodeMouseLeave={leaveNode}
               proOptions={{ hideAttribution: true }}
             >
-              {mapOpen ? <MiniMap className="semantic-radar" pannable zoomable /> : null}
+              {mapOpen ? <MiniMap<CanvasNode>
+                ariaLabel="Architecture minimap"
+                bgColor="var(--surface)"
+                className="semantic-radar"
+                maskColor="color-mix(in srgb, var(--canvas) 72%, transparent)"
+                maskStrokeColor="var(--accent)"
+                maskStrokeWidth={3}
+                nodeClassName={(node) => `minimap-node minimap-node-${node.type}`}
+                nodeColor={(node) => kindColorReference(node.type === 'boundary' ? node.data.boundary.kind : node.data.kind)}
+                nodeStrokeColor={(node) => node.type === 'boundary' ? kindColorReference(node.data.boundary.kind) : 'var(--surface)'}
+                nodeStrokeWidth={2}
+                pannable
+                zoomable
+              /> : null}
             </ReactFlow>}
 
-            <div className="map-cluster-wrap">
-              {mapOpen ? <span className="map-label">Map</span> : null}
+            {!view.deps ? <div className="map-cluster-wrap">
               <div aria-label="Map, fit, and zoom" className="map-cluster" role="group">
                 <button aria-label="Toggle map" aria-pressed={mapOpen} onClick={() => setMapOpen((open) => !open)} title="Map" type="button"><MapIcon /><span>Map</span></button>
                 <button aria-label="Fit canvas" onClick={() => { if (flow) void flow.fitView({ duration: 150, padding: 0.2 }) }} title="Fit" type="button"><FitIcon /><span>Fit</span></button>
+                {view.expand.length ? <button aria-label="Reset view" onClick={resetView} title="Reset to the top-level System landscape" type="button"><HomeIcon /></button> : null}
                 <button aria-label="Zoom out" onClick={() => { if (flow) void flow.zoomOut({ duration: 120 }) }} title="Zoom out" type="button">−</button>
-                <output aria-live="polite"><strong>{Math.round(zoom * 100)}%</strong><span>{depth}</span></output>
+                <output aria-live="polite" title={`${depth} detail`}><strong>{Math.round(zoom * 100)}%</strong></output>
                 <button aria-label="Zoom in" onClick={() => { if (flow) void flow.zoomIn({ duration: 120 }) }} title="Zoom in" type="button">+</button>
               </div>
               {!positions.size ? <span className="layout-indicator">Laying out</span> : null}
-            </div>
+            </div> : null}
           </div>
 
           <ResizablePanel className="info-dock" label="Info" layout={layout.docks.info} name="info" onChange={(dock) => setDock('info', dock)}>

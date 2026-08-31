@@ -297,12 +297,14 @@ docs):
   Spec: report.md "Performance contract — canvas at scale (chunk-16)".
   DONE, gate PASSED 2026-08-31 at 252/500 changed source lines, no
   architect fix needed — see the progress log; p33 resolved.)
-- [ ] **chunk-17 — gate-feedback polish sweep** (added 2026-08-31;
+- [x] **chunk-17 — gate-feedback polish sweep** (added 2026-08-31;
   absorbs the parked wave-2 polish set p24/p26/p28/p29/p32 — re-raised
   by the user at the gate — plus new p34 tag-filter clarity and p35
   reset-to-system-view. Spec: report.md "Polish contract — pass 6";
-  the issue files are normative. Prompt READY after the chunk-16 gate,
-  budget 1,500.)
+  the issue files are normative. DONE, gate PASSED 2026-09-01 at
+  242/1,500 changed source lines including the architect's blank-value
+  set-filter fix — see the progress log; p24/p26/p28/p29/p32/p34/p35
+  resolved.)
 - [ ] **Phase 1 exit gate (architect + user)** — HELD 2026-08-31: the
   user's walkthrough half surfaced p33 (performance) and re-raised the
   parked polish set, so the gate now runs after the chunk-16 and
@@ -430,6 +432,84 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-09-01** — chunk-17 architect gate PASSED with one gate fix;
+  tree committed; issues p24/p26/p28/p29/p32/p34/p35 RESOLVED →
+  resolved/ (annotated). Independently re-verified: frontend Vitest 83
+  passed (18 files, exactly the 5 prescribed cases), tsc clean, `just
+  lint` clean, arch pytest 271 passed (`-m "unit and tools" -k arch`),
+  `just build-arch-report` reproduced the executor's template
+  byte-for-byte (shasum match, pre-fix). Diff reviewed line-by-line
+  against all seven issue Expected sections and the pass-6 pinned
+  decisions — all held; the executor's eight recorded assumptions were
+  each judged sound. GATE FIX (architect): `CheckboxSetFilter` dropped
+  blank values from its option list (`filter(Boolean)`) while
+  `doesFilterPass` still tested them, so any active set filter on a
+  column with blanks (parent on every top-level entity, boundary on
+  every internal one) silently hid all blank rows with no checkbox to
+  restore them; fixed by including blanks as a "(Blank)" option
+  (labelFor helper; the existing prescribed set-filter test extended
+  to cover it — still 5 cases). Post-fix: Vitest 83/83, tsc clean,
+  bundle rebuilt, acme report regenerated OK. Final budget 242/1,500
+  changed source lines. Executor's open question (the one-off
+  non-reproducible "Stored table layout references an unknown column"
+  recovery toast) decided: no issue filed — it is the recovery path
+  doing its job and a clean-storage replay did not reproduce it;
+  re-raise only if it recurs. PIPELINE: no executor prompt queued —
+  chunk-22/23/31 stay gated on the Phase 1 exit gate. Next action:
+  Phase 1 exit-gate re-run — the architect walkthrough half
+  (ui-polish-direction.md "Acceptance checks" + test-ui.md walkthrough
+  at 1440×900 and 1024×720), then the user's half.
+
+- **2026-09-01** — chunk-17 gate-feedback polish sweep implemented; left
+  uncommitted for architect gate review. The Data table now uses community-
+  compatible checkbox header filters for enum-like columns, with Title-case
+  singular kind labels and a single popup controller; the toolbar filter
+  duplicates are gone. Data tabs and shared controls use the pinned compact
+  scale. Dependency mode hides canvas controls, reuses the architecture-card
+  visual language, names interface/relationship entries, compacts counts, and
+  styles its fallback action. The minimap has kind colours, boundary cues, an
+  accent viewport, and no floating label. Tag lenses default to the five most
+  common tags, expose Show all/fewer, report matched entities, halo matches,
+  and more strongly dim non-matches. Reset view clears invalid lens/selection
+  state, expansion and layout intent, reframes once, and preserves one-step
+  Back restoration. Low-zoom selection, Far-depth kind identity, the collapsed
+  Data rail, and removed-edge treatment were also tightened. Source budget:
+  **238 / 1,500 changed lines** (tests and generated bundle excluded). Exactly
+  **5 prescribed test cases** added; focused App/Grid tests passed **10/10**;
+  frontend Vitest passed **83/83** across 18 files; `npx tsc --noEmit`, `just
+  lint`, and `just build-arch-report` were clean; arch pytest passed **88 / 88**
+  with 540 deselected; CLI regeneration returned `OK` for
+  `plans/arch/wip/acme-report.html`; `git diff --check` was clean. Rule-9
+  verification walked all seven issue scenarios at **1440×900** and
+  **1024×720**: set filters changed the visible row count and excluded the
+  toolbar duplicates while popup ownership remained exclusive; controls/tabs/
+  Connections matched the compact token; dependency normal and fallback paths
+  passed; the minimap was readable; the tag lens reported 6 matching entities
+  and haloed exactly 6 cards; Reset → Back restored the two-level expansion;
+  Far-depth selection/kind and removed-edge treatments held. Console was 0
+  errors/warnings at both sizes and network traffic was local file requests
+  only, with zero external requests. Evidence:
+  `/tmp/arch-v3-evidence/test-results/chunk-17/` (one screenshot per issue).
+  Assumptions: (1) the optional stale “four P13 defects” wording is a scope
+  guard, while chunk-17's seven named issue files are the active contract and
+  the four resolved P13 files are secondary ambiguity authority; (2) because
+  no dependency may be added and AG Grid Enterprise is absent, “set filter”
+  means a custom community-compatible checkbox `IFilterComp`; (3) “small
+  number” of default tags means the five highest counts, retaining selected
+  tags so active state remains operable; (4) Reset retains only active tags
+  with base-view matches and retains selection only when it resolves into the
+  base roll-up, otherwise clearing them; (5) dependency summary counts mean
+  rendered directional entry buttons and named entries use interface or
+  relationship member names; (6) “one step harder” dimming is 0.28 for cards
+  and 0.20 for edges, following the existing polish scale; (7) the p32-permitted
+  quieter removed-element option is ghost opacity rather than a new toggle;
+  (8) minimap kind colour uses the established kind palette, with boundary
+  strokes carrying hierarchy. Open question (out of scope, no diff): a long
+  mixed walkthrough once surfaced the existing “Stored table layout references
+  an unknown column” recovery toast after Data interaction plus a stage change;
+  a clean-storage replay did not reproduce it, so decide whether it merits a
+  separate issue. No commit or push made. Next action: architect gate review.
 
 - **2026-08-31** — chunk-16 architect gate PASSED, no gate fix needed;
   tree committed; issue p33 RESOLVED → resolved/. Independently

@@ -54,7 +54,7 @@ export function ResizablePanel({
         title="Drag to resize; double-click to reset"
         type="button"
       />
-      {layout.collapsed ? <div className="panel-rail"><button aria-label={`Open ${dockLabel}`} aria-expanded="false" onClick={() => onChange({ ...layout, collapsed: false })} title={`Open ${dockLabel}`} type="button"><PanelIcon /></button></div> : <div className="panel-content">
+      {layout.collapsed ? <div className="panel-rail"><button aria-label={`Open ${dockLabel}`} aria-expanded="false" onClick={() => onChange({ ...layout, collapsed: false })} title={`Open ${dockLabel}`} type="button"><PanelIcon />{name === 'data' ? <span>Data</span> : null}</button></div> : <div className="panel-content">
         <header className="panel-header"><strong>{label}</strong><button aria-label={`Collapse ${dockLabel}`} aria-expanded="true" className="panel-collapse" onClick={() => onChange({ ...layout, collapsed: true })} title={`Collapse ${dockLabel}`} type="button"><ChevronIcon direction={collapseDirection} /></button></header>
         <div className="panel-body">{children}</div>
       </div>}

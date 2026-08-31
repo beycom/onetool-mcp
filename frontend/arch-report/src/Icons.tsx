@@ -26,6 +26,10 @@ export function FitIcon(props: IconProps) {
   return <Icon {...props}><path d="M6 3H3v3M10 3h3v3M6 13H3v-3M10 13h3v-3" /></Icon>
 }
 
+export function HomeIcon(props: IconProps) {
+  return <Icon {...props}><path d="m2.5 7 5.5-4.5L13.5 7M4.5 6v7h7V6M7 13V9h2v4" /></Icon>
+}
+
 export function ViewIcon(props: IconProps) {
   return <Icon {...props}><path d="M3 3.5h10M3 8h10M3 12.5h10" /><circle cx="5" cy="3.5" fill="currentColor" r="1" stroke="none" /></Icon>
 }

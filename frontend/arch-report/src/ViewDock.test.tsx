@@ -30,6 +30,7 @@ test.each([undefined, { user_choice: false }])('Layout is hidden when user_choic
     copyStatus: '',
     layoutMethod: 'layered' as const,
     legend: [],
+    matchedCount: 0,
     onCanvas: () => undefined,
     onCopy: () => undefined,
     onLayout: () => undefined,

@@ -33,7 +33,7 @@ vi.mock('ag-grid-community', () => ({
 }))
 
 import fixture from './fixture-payload.json'
-import { GridPanel } from './GridPanel'
+import { CheckboxSetFilter, GridPanel } from './GridPanel'
 import { projectState } from './projection'
 import type { ReportPayload, View } from './types'
 
@@ -76,4 +76,47 @@ test('Data folds subsystems into raw Entities, hides empty columns, and auto-siz
   expect(columns.find((column) => column.field === 'property.empty_note')).toMatchObject({ headerName: 'Empty note', hide: true })
   expect(columns.find((column) => column.field === 'property.populated_note')).toMatchObject({ headerName: 'Populated note', hide: false })
   expect(grid.api.autoSizeColumns).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ getColId: expect.any(Function) })]), false)
+})
+
+test('Kind and Status use checkbox header filters instead of toolbar menus', async () => {
+  const projected = projectState(fixture as unknown as ReportPayload, {
+    aspect: 'call-direction', compare: 'off', comparePosition: 0, deps: null, expand: [],
+    lens: [], position: 1, scope: null, theme: 'light', timeline: 0, layout: null,
+  })
+  render(<GridPanel
+    density="comfortable"
+    diff={{ added: [], changed: [], removed: [] }}
+    layouts={{}}
+    onDensity={() => undefined}
+    onDiagnostic={() => undefined}
+    onLayout={() => undefined}
+    onSelect={() => undefined}
+    onShowOnCanvas={() => undefined}
+    payload={fixture as unknown as ReportPayload}
+    projected={projected}
+    selectedKey={null}
+    selectedOnCanvas={false}
+    timeline={0}
+  />)
+
+  await waitFor(() => expect(grid.options).not.toBeNull())
+  const columns = grid.options!.columnDefs as Array<{ field: string; filter?: unknown; filterParams?: { values: string[] } }>
+  expect(columns.find(({ field }) => field === 'kind')).toMatchObject({ filter: CheckboxSetFilter })
+  expect(columns.find(({ field }) => field === 'status')).toMatchObject({ filter: CheckboxSetFilter })
+  expect(screen.queryByRole('button', { name: 'Kind' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Status' })).toBeNull()
+
+  const filterChangedCallback = vi.fn()
+  const filter = new CheckboxSetFilter()
+  filter.init({
+    filterChangedCallback,
+    formatValue: (value: string) => value,
+    getValue: (node: { data?: { kind?: string } }) => node.data?.kind,
+    values: ['', 'systems', 'users'],
+  } as never)
+  expect([...filter.getGui().querySelectorAll('label')].map((label) => label.textContent)).toEqual(['(Blank)', 'systems', 'users'])
+  filter.setModel({ values: ['', 'systems'] })
+  expect(filter.doesFilterPass({ node: { data: { kind: 'systems' } } } as never)).toBe(true)
+  expect(filter.doesFilterPass({ node: { data: { kind: 'users' } } } as never)).toBe(false)
+  expect(filter.doesFilterPass({ node: { data: {} } } as never)).toBe(true)
 })

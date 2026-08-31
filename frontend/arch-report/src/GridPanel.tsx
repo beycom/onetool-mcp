@@ -7,6 +7,9 @@ import {
   type ColumnState,
   type GridApi,
   type ICellRendererParams,
+  type IDoesFilterPassParams,
+  type IFilterComp,
+  type IFilterParams,
   type RowSelectedEvent,
 } from 'ag-grid-community'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -19,6 +22,56 @@ ModuleRegistry.registerModules([AllCommunityModule])
 
 export type TableTab = 'entities' | 'interfaces' | 'milestones' | 'diff'
 type GridRow = Record<string, unknown> & { _key: string; id: string; kind?: RowKind; status?: string }
+type SetFilterModel = { values: string[] }
+type SetFilterParams = IFilterParams<GridRow> & { formatValue?: (value: string) => string; values: string[] }
+const SET_FILTER_FIELDS = new Set(['boundary', 'call_direction', 'data_flow_direction', 'kind', 'parent', 'status'])
+
+export class CheckboxSetFilter implements IFilterComp<GridRow> {
+  private readonly gui = document.createElement('div')
+  private params!: SetFilterParams
+  private selected = new Set<string>()
+  private values: string[] = []
+
+  init(params: IFilterParams<GridRow>): void {
+    this.params = params as SetFilterParams
+    this.values = [...this.params.values]
+    this.selected = new Set(this.values)
+    this.renderOptions()
+  }
+
+  getGui(): HTMLElement { return this.gui }
+  isFilterActive(): boolean { return this.selected.size !== this.values.length }
+  getModel(): SetFilterModel | null { return this.isFilterActive() ? { values: [...this.selected] } : null }
+  setModel(model: SetFilterModel | null): void {
+    this.selected = new Set(model?.values ?? this.values)
+    this.renderOptions()
+  }
+  doesFilterPass({ node }: IDoesFilterPassParams<GridRow>): boolean {
+    return this.selected.has(String(this.params.getValue(node) ?? ''))
+  }
+  getModelAsString(): string { return this.isFilterActive() ? [...this.selected].map((value) => this.labelFor(value)).join(', ') : 'All' }
+
+  private labelFor(value: string): string {
+    return value === '' ? '(Blank)' : this.params.formatValue?.(value) ?? humanizeField(value)
+  }
+
+  private renderOptions(): void {
+    this.gui.className = 'enum-set-filter'
+    this.gui.replaceChildren(...this.values.map((value) => {
+      const label = document.createElement('label')
+      const checkbox = document.createElement('input')
+      checkbox.type = 'checkbox'
+      checkbox.checked = this.selected.has(value)
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) this.selected.add(value)
+        else this.selected.delete(value)
+        this.params.filterChangedCallback()
+      })
+      label.append(checkbox, this.labelFor(value))
+      return label
+    }))
+  }
+}
 
 export function dataKindChip(value: unknown): HTMLElement | string {
   const kind = String(value ?? '') as RowKind
@@ -75,18 +128,15 @@ function Grid({
 }) {
   const element = useRef<HTMLDivElement>(null)
   const apiRef = useRef<GridApi<GridRow> | null>(null)
+  const columnsMenu = useRef<HTMLDetailsElement>(null)
   const layoutRef = useRef(layout)
   const callbacks = useRef({ onDiagnostic, onLayout, onSelect })
-  const filters = useRef({ kinds: [] as string[], statuses: [] as string[] })
   const [query, setQuery] = useState('')
   const [columnQuery, setColumnQuery] = useState('')
-  const [kindFilter, setKindFilter] = useState<string[]>([])
-  const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [revision, setRevision] = useState(0)
   const knownColumns = useMemo(() => new Set(columns.map((column) => column.field).filter((field): field is string => Boolean(field))), [columns])
   layoutRef.current = layout
   callbacks.current = { onDiagnostic, onLayout, onSelect }
-  filters.current = { kinds: kindFilter, statuses: statusFilter }
   const persist = useCallback(() => {
     if (apiRef.current) callbacks.current.onLayout(apiRef.current.getColumnState().filter((column) => knownColumns.has(column.colId)))
     setRevision((value) => value + 1)
@@ -100,12 +150,7 @@ function Grid({
     const api = createGrid(element.current, {
       columnDefs: columns,
       defaultColDef: { filter: true, minWidth: 80, resizable: true, sortable: true },
-      doesExternalFilterPass: (node) => (
-        (filters.current.kinds.length === 0 || filters.current.kinds.includes(String(node.data?.kind ?? '')))
-        && (filters.current.statuses.length === 0 || filters.current.statuses.includes(String(node.data?.status ?? '')))
-      ),
       getRowId: ({ data }) => data._key,
-      isExternalFilterPresent: () => filters.current.kinds.length > 0 || filters.current.statuses.length > 0,
       onColumnMoved: (event) => { if (event.finished) persist() },
       onColumnPinned: persist,
       onColumnResized: (event) => { if (event.finished) persist() },
@@ -115,6 +160,7 @@ function Grid({
           event.api.autoSizeColumns(event.api.getAllDisplayedColumns(), false)
         }
       },
+      onFilterOpened: () => { if (columnsMenu.current) columnsMenu.current.open = false },
       onRowSelected: (event: RowSelectedEvent<GridRow>) => { if (event.node.isSelected() && event.data) callbacks.current.onSelect(event.data) },
       rowData: rows,
       rowHeight: density === 'compact' ? 31 : 40,
@@ -133,7 +179,6 @@ function Grid({
   }, [columns, density, knownColumns, persist, rows])
 
   useEffect(() => { apiRef.current?.setGridOption('quickFilterText', query) }, [query])
-  useEffect(() => { apiRef.current?.onFilterChanged() }, [kindFilter, statusFilter])
   useEffect(() => {
     const api = apiRef.current
     if (!api) return
@@ -145,8 +190,6 @@ function Grid({
     }
   }, [rows, selectedKey])
 
-  const availableKinds = [...new Set(rows.map((row) => String(row.kind ?? '')).filter(Boolean))].sort()
-  const availableStatuses = [...new Set(rows.map((row) => String(row.status ?? '')).filter(Boolean))].sort()
   void revision
   const visibleColumns = (apiRef.current?.getColumns() ?? []).filter((column) => (
     column.getColId() !== '_key' && column.getColId().toLowerCase().includes(columnQuery.toLowerCase())
@@ -162,13 +205,8 @@ function Grid({
     <div className="grid-region" data-density={density}>
       <div className="table-toolbar">
         <input aria-label="Quick filter" onChange={(event) => setQuery(event.target.value)} placeholder="Quick filter" type="search" value={query} />
-        {[['Kind', availableKinds, kindFilter, setKindFilter], ['Status', availableStatuses, statusFilter, setStatusFilter]].map(([label, options, selected, setSelected]) => (
-          <details className="table-menu" key={label as string}>
-            <summary>{label as string}</summary>
-            <div>{(options as string[]).map((option) => <label key={option}><input checked={(selected as string[]).includes(option)} onChange={() => (setSelected as (value: string[]) => void)((selected as string[]).includes(option) ? (selected as string[]).filter((item) => item !== option) : [...selected as string[], option])} type="checkbox" />{option}</label>)}</div>
-          </details>
-        ))}
-        <details className="table-menu columns-menu">
+        <span aria-hidden="true" className="toolbar-divider" />
+        <details className="table-menu columns-menu" onToggle={(event) => { if (event.currentTarget.open) apiRef.current?.hidePopupMenu() }} ref={columnsMenu}>
           <summary>Columns</summary>
           <div>
             <input aria-label="Search columns" onChange={(event) => setColumnQuery(event.target.value)} placeholder="Find a column" type="search" value={columnQuery} />
@@ -178,7 +216,8 @@ function Grid({
         <button onClick={() => void copySelected()} type="button">Copy TSV</button>
         <button onClick={() => apiRef.current?.exportDataAsCsv({ exportedRows: 'filteredAndSorted' })} type="button">CSV filtered</button>
         <button onClick={() => apiRef.current?.exportDataAsCsv({ allColumns: true, exportedRows: 'all' })} type="button">CSV all</button>
-        <button onClick={() => { apiRef.current?.resetColumnState(); apiRef.current?.setFilterModel(null); setKindFilter([]); setStatusFilter([]); setQuery(''); persist() }} type="button">Reset table</button>
+        <span aria-hidden="true" className="toolbar-divider" />
+        <button onClick={() => { apiRef.current?.resetColumnState(); apiRef.current?.setFilterModel(null); setQuery(''); persist() }} type="button">Reset table</button>
       </div>
       {rows.length ? <div aria-label="Architecture data grid" className="data-grid" ref={element} /> : <div className="table-empty" role="status"><strong>{emptyLabel}</strong><span>Choose another stage or table.</span></div>}
     </div>
@@ -252,6 +291,13 @@ export function GridPanel({
         hide: empty(field),
         minWidth: Math.max(80, headerName.length * 7 + 36),
         ...(field === 'kind' ? { cellRenderer: KindCell } : {}),
+        ...(SET_FILTER_FIELDS.has(field) ? {
+          filter: CheckboxSetFilter,
+          filterParams: {
+            formatValue: field === 'kind' ? (value: string) => KIND_LABEL[value as RowKind] : humanizeField,
+            values: [...new Set(rows.map((row) => String(row[field] ?? '')))].sort(),
+          },
+        } : {}),
       }
     })] as ColDef<GridRow>[], rows }
   }, [diff, payload, projected, tab, timeline])
