@@ -38,6 +38,8 @@ prompt — executors read them as part of the contract.
 | P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
 | P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
 | chunk-15 | Edge-label collision + collapse affordance + Detail-dropdown removal (issues p14, p16, p27) | DONE — gate PASSED 2026-08-31 (193/700 lines + the architect's port-label collision fix) | — |
+| chunk-16 | Canvas performance: gesture freeze, CSS zoom scaling, referential stability (issue p33) | READY | now — before the exit-gate re-run |
+| chunk-17 | Gate-feedback polish sweep (issues p24, p26, p28, p29, p32 open bullets, p34, p35) | READY after the chunk-16 gate | chunk-16 gate |
 | chunk-21 (was D12a) | Sequence parser + payload + attachments | DONE — gate PASSED 2026-08-31 (699/700 lines, no architect fix needed) | — |
 | chunk-22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | chunk-23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
@@ -536,6 +538,111 @@ legible-base. Capture the five screenshots listed in the pass
 contract. Definition of done: rules 5-8 (report npm test output;
 pytest run unchanged by this chunk), then STOP — D13d is a separate
 prompt.
+```
+
+## chunk-16 — canvas performance (READY; runs before the Phase 1 exit-gate re-run)
+
+```text
+[standard rules + UI rule 9]
+
+Context: pan/zoom on large graphs is slow and labels flicker during
+zoom. The root cause is confirmed and documented — READ IN FULL, in
+this order:
+1. plans/arch/arch-v3/issues/p33-ui-canvas-performance.md — the issue
+   this chunk resolves, with the confirmed root cause (per-frame
+   viewport state commits + the edge-presentation memo keyed on
+   canvasViewport, defeating memo() on every edge).
+2. plans/arch/arch-v3/report.md "Performance contract — canvas at
+   scale (chunk-16)" — the normative spec; implement it exactly.
+
+This chunk changes WHEN presentation is computed, never WHAT is
+rendered at rest: at any settled viewport the scene must be pixel-
+identical to today's. Frontend only (frontend/arch-report/); no Python,
+no payload changes.
+
+Scope:
+1. Track the live viewport in a ref; commit React viewport state only
+   on gesture end (onMoveEnd), programmatic camera moves, and
+   readingDepth bucket transitions (spec rule 2). Extract the commit
+   decision as a pure, tested helper.
+2. Move zoom-scale compensation (stroke width, arrowhead scale) to a
+   CSS custom property written to the canvas container via ref each
+   frame; delete the per-edge React plumbing of zoom for pure scaling
+   (spec rule 4). Depth-dependent LOGIC (label eligibility, port
+   expansion) stays in React and keys off the committed depth bucket.
+3. Make edge/node data referentially stable across recomputes with
+   unchanged inputs; stabilize handler identities (spec rules 5–6).
+   Restructure the big edges useMemo as needed, but do not change its
+   at-rest output.
+4. Do not touch: layout engines, projection.ts, view.ts, collision-
+   pass semantics (only when it runs), any Python.
+
+Budget: 500 changed source lines (additions + deletions; tests and the
+generated bundle excluded). Stop and ask before exceeding it.
+
+Tests: exactly the three cases in the performance contract's
+"Prescribed tests"; every existing frontend test stays green.
+
+Finish: `just lint` (touched paths), frontend suite, tsc,
+`just build-arch-report`, regenerate the acme report via the CLI, then
+verify per rule 9 from file:// at 1440x900: load the report with the
+legacy #level=components link (bulk expansion), record a Performance
+trace of a 2 s continuous pan and a scroll-zoom crossing a depth
+boundary, and confirm (a) no multi-frame stalls from React commits,
+(b) zero label/pill visibility changes mid-gesture, (c) the settled
+scene matches a pre-change capture of the same viewport. Record
+before/after trace numbers in the log entry. Console clean, zero
+external requests. Definition of done: rules 5-8, then STOP.
+```
+
+## chunk-17 — gate-feedback polish sweep (READY after the chunk-16 gate)
+
+```text
+[standard rules + UI rule 9]
+
+Prereq: the chunk-16 gate commit is the baseline.
+Context: the user's 2026-08-31 exit-gate walkthrough re-raised open
+polish defects. This chunk resolves seven issue files — READ EVERY ONE
+IN FULL, each carries Current/Expected and screenshots:
+  plans/arch/arch-v3/issues/p24-ui-data-table-filters.md
+  plans/arch/arch-v3/issues/p26-ui-chrome-polish.md
+  plans/arch/arch-v3/issues/p28-ui-dependency-view.md
+  plans/arch/arch-v3/issues/p29-ui-minimap.md
+  plans/arch/arch-v3/issues/p32-ui-consistency-sweep.md (open bullets
+    only — the dev-console bullet is already satisfied)
+  plans/arch/arch-v3/issues/p34-ui-tag-filter.md
+  plans/arch/arch-v3/issues/p35-ui-reset-view.md
+Then READ plans/arch/arch-v3/report.md "Polish contract — pass 6:
+gate-feedback sweep (chunk-17)" — it pins the cross-issue decisions
+(reset-control placement and semantics, tag-halo treatment, single
+popover controller, control-token scale) and the out-of-scope list.
+Styling authority for anything the issues leave open:
+ui-polish-direction.md.
+
+Scope: implement every issue's Expected section plus the five pinned
+decisions. Frontend only; no Python, no payload changes, no layout-
+engine changes. Do not regress chunk-16's gesture freeze (no new
+per-frame state).
+
+Budget: 1,500 changed source lines (additions + deletions; TS/TSX/CSS;
+tests and the generated bundle excluded). Stop and ask before
+exceeding it.
+
+Tests: exactly the five cases in the pass-6 contract's "Prescribed
+tests"; every existing frontend test stays green (AG Grid filter-config
+tests updated to set filters count as updates).
+
+Finish: `just lint` (touched paths), frontend suite, tsc,
+`just build-arch-report`, regenerate the acme report via the CLI, then
+verify per rule 9 from file:// at 1440x900 and 1024x720: walk each
+issue's Current scenario and confirm its Expected holds — table header
+set-filters with one popup at a time; Data tabs / View dependencies /
+map cluster / Connections rows at control scale; dependency view with
+hidden canvas controls, styled fallback, named interfaces; readable
+minimap; tag lens with halo + matched-count; reset control round-trip
+via Back. Capture one screenshot per issue into the chunk evidence dir
+(/tmp/arch-v3-evidence/test-results/chunk-17/). Console clean, zero
+external requests. Definition of done: rules 5-8, then STOP.
 ```
 
 ## chunk-21 (was D12a) — sequence parser + payload + attachments (DONE 2026-08-31, gate PASSED)

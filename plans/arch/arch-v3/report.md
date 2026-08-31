@@ -1571,6 +1571,108 @@ report.
    id is dropped with a diagnostic; a legacy `drill=` link resolves to
    the equivalent expansion + selection.
 
+## Performance contract — canvas at scale (chunk-16)
+
+Added 2026-08-31 from the user's exit-gate walkthrough (issue
+p33-ui-canvas-performance carries the confirmed root cause). The
+contract changes **when** presentation is computed, never **what** is
+rendered at rest — every visual rule from D13, P11–P14, and chunk-15
+stands unchanged.
+
+### Gesture freeze
+
+1. During a pan/zoom gesture the scene is frozen: React Flow's own CSS
+   transform provides the motion; no node or edge receives new props,
+   and no presentation pass (routing, anchors, emphasis, collision,
+   orphan suppression) runs per frame.
+2. The live viewport is tracked outside React state (ref). React state
+   commits happen only on: gesture end (`onMoveEnd`), programmatic
+   viewport changes (Fit, camera moves — these already settle), and a
+   `readingDepth` **bucket transition** (far/read/full). Within a
+   bucket, zoom ticks commit nothing.
+3. Consequence the user must see: labels, pills, and port labels do
+   NOT pop in/out mid-gesture. They update once, when the gesture
+   settles (or at the moment the depth bucket flips). The at-rest
+   result is identical to today's.
+
+### Zoom-dependent styling via CSS
+
+4. Stroke width, arrowhead scale, and any other pure-scale compensation
+   move from per-edge React data to a CSS custom property (e.g.
+   `--canvas-zoom`) set on the canvas container via ref on each frame
+   (a style write, not a render). Rendered appearance at any given
+   zoom is unchanged.
+
+### Referential stability
+
+5. Edge and node data objects preserve identity across recomputes when
+   their inputs are unchanged, so the existing `memo()` wrappers prune
+   re-renders. Handlers passed into data are stable
+   (`useCallback`/refs), not fresh closures per pass.
+6. The collision/orphan pass keys off the settled viewport, and its
+   output for an unchanged (viewport, selection, hover, depth,
+   positions) tuple is not recomputed.
+
+### Verification
+
+Measured on the acme report with a bulk expansion (legacy
+`#level=components` link): a continuous 2-second pan and a
+pinch/scroll zoom across a depth boundary must hold interactive frame
+rates (no multi-frame stalls in the Performance trace attributable to
+React commits), with zero mid-gesture label/pill visibility changes.
+Before/after numbers go in the log entry.
+
+### Prescribed tests (exactly these three, plus keeping every existing test green)
+
+1. The viewport-commit helper: within-bucket zoom changes produce no
+   state commit; a bucket-crossing change produces exactly one; gesture
+   end always commits.
+2. Edge-data stability: recomputing presentation with an unchanged
+   input tuple yields referentially identical edge data objects
+   (extracted pure function).
+3. At-rest equivalence: for a fixed settled viewport, the presentation
+   output (labels shown, ports expanded, emphasis classes) is
+   byte-equal to the pre-chunk-16 pass on the same scene fixture.
+
+## Polish contract — pass 6: gate-feedback sweep (chunk-17)
+
+Added 2026-08-31. The normative content lives in the issue files this
+chunk resolves — p24, p26, p28, p29, p32 (open bullets), p34, p35 —
+each carries Current/Expected; this section only pins the cross-issue
+decisions:
+
+1. **Reset view (p35):** a home-glyph button in the map cluster,
+   between Fit and the zoom group. Clears the expansion set and runs
+   the standard fresh-load framing; one history entry; hidden when the
+   expansion set is empty. Selection/lens survive when their targets
+   remain visible, else clear.
+2. **Tag lens cue (p34):** matched cards get a halo distinct from
+   selection accent (reuse the accent hue at reduced alpha, no ring
+   thickness change); unmatched content dims one step harder than
+   today's lens dim. The dim-not-hide decision (Q4) stands.
+3. **One popup at a time (p24):** a single shared popover controller
+   for toolbar menus and header filters; opening any closes others.
+4. **Control scale:** every button introduced or restyled by this pass
+   uses the D13a control tokens (`--control-height`, 11px label). No
+   new one-off font sizes.
+5. **Out of scope:** anything the perf contract (chunk-16) owns;
+   guided views (chunk-22); the Payload viewer (chunk-31); dark theme.
+
+### Prescribed tests (exactly these five, plus keeping every existing test green)
+
+1. Reset view: bulk-expanded state → reset control clears `expand`,
+   refits, pushes exactly one history entry; Back restores the prior
+   expansion; control absent at base state.
+2. Kind/Status column header set-filters filter rows and the toolbar
+   no longer renders Kind/Status dropdown buttons (p24).
+3. Tag lens: activating a tag renders the matched-count line and
+   applies the matched-halo class to exactly the matching cards (p34).
+4. Dependency view open → map cluster and zoom readout are not
+   rendered; not-in-projection fallback renders the styled Return to
+   map button (p28).
+5. Minimap: viewport rectangle visible, kind-coloured dots, no
+   floating "Map" label chip (p29 — assert on rendered classes/props).
+
 ## Attachments and the Payload viewer (design landed 2026-08-30; viewer ships with chunk-31)
 
 Un-defers D13d's Payload viewer with real data (schema.md "Attachments",

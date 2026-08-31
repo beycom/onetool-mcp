@@ -29,7 +29,7 @@ lands; a fresh session should be able to resume from this file alone.
 | Implementation | `src/otdev/tools/arch.py` facade + `src/otdev/tools/_arch/v3/`; report app source `frontend/arch-report/` (v1 deleted at cutover 2026-08-23) |
 | Canonical v3 fixture | `tests/unit/tools/fixtures/arch/acme.yaml` |
 | Fixture source of record | `plans/arch/wip/acme-arch-v2.xlsx` (dumped to `plans/arch/arch-v3/fixture-src/`) |
-| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16/p27 assigned to chunk-15 (p27 decided: remove the Detail dropdown); p24/p26/p28/p29/p32 open, unassigned (wave-2 polish chunk, authored at wave-2 start); p3-* files feed chunk-22/chunk-43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
+| Open issues | `plans/arch/arch-v3/issues/` + index (cleaned up 2026-08-30): p14/p16/p27 assigned to chunk-15 (p27 decided: remove the Detail dropdown); p24/p26/p28/p29/p32 + new p34/p35 assigned to chunk-17, p33 (performance) to chunk-16 (2026-08-31 user walkthrough); p3-* files feed chunk-22/chunk-43; resolved files (incl. provider-consumer.md, absorbed into schema.md) in `issues/resolved/`; Archify/IcePanel reference screenshots stay in `issues/` (cited by the polish pass specs) |
 | UI research (IcePanel/Archify) | `plans/arch/arch-v3/research/ui/ui-research-findings.md` + evidence captures |
 | Confirmed UI direction (decision source for all UI work) | `plans/arch/arch-v3/ui-polish-direction.md` — confirmed 2026-08-27; authoritative for all UI/interaction decisions, supersedes conflicting guidance in ui-polish.md and the report.md wave-2 contract. The `designs/` artboard directory was removed the same day (decisions captured in the direction; files in git history) |
 | UI polish issue list (CLOSED 2026-08-29) | `plans/arch/arch-v3/ui-polish.md` — 27 itemized issues (2026-08-25 Playwright walkthrough + 2026-08-28 user screenshots), tagged D13a–D13d; every issue now carries a CLOSED/WAIVED/superseded annotation — the Phase 1 exit gate re-checks the walkthrough, not the list |
@@ -191,6 +191,8 @@ with another):**
 | P13 | — | Report UI correctness fixes: issues p15, p17, p18, p19 (added 2026-08-30) |
 | P14 | — | Layout engines + config + A/B harness — layout-design.md; absorbs issue p13 (added 2026-08-30) |
 | chunk-15 | — | Edge-label collision + collapse affordance + Detail-dropdown removal — issues p14, p16, p27 (added 2026-08-30) |
+| chunk-16 | — | Canvas performance: gesture freeze + CSS zoom scaling — issue p33 (added 2026-08-31) |
+| chunk-17 | — | Gate-feedback polish sweep — issues p24, p26, p28, p29, p32, p34, p35 (added 2026-08-31; supersedes the parked "wave-2 polish chunk") |
 | chunk-21 | D12a | Sequence parser + payload + attachments (re-scoped 2026-08-30) |
 | chunk-22 | D11 | Report definitions + guided views |
 | chunk-23 | D8 | Client-side SVG / draw.io export + SQLite adapter |
@@ -288,8 +290,23 @@ docs):
   PASSED 2026-08-31 at 193/700 changed source lines including the
   architect's port-label fix — see the progress log; p14/p16/p27
   resolved).
-- [ ] **Phase 1 exit gate (architect + user)** — runs after the chunk-15
-  gate (label collision changes the rendered frame). The held 3P exit gate:
+- [ ] **chunk-16 — canvas performance** (added 2026-08-31: the user's
+  walkthrough found pan/zoom slow with label flicker on large graphs;
+  issue p33 carries the architect-confirmed root cause — per-frame
+  viewport state commits driving the full edge-presentation recompute.
+  Spec: report.md "Performance contract — canvas at scale (chunk-16)".
+  Prompt READY, budget 500. Runs before the exit-gate re-run: it
+  changes when frames render, so the gate must judge the fixed build.)
+- [ ] **chunk-17 — gate-feedback polish sweep** (added 2026-08-31;
+  absorbs the parked wave-2 polish set p24/p26/p28/p29/p32 — re-raised
+  by the user at the gate — plus new p34 tag-filter clarity and p35
+  reset-to-system-view. Spec: report.md "Polish contract — pass 6";
+  the issue files are normative. Prompt READY after the chunk-16 gate,
+  budget 1,500.)
+- [ ] **Phase 1 exit gate (architect + user)** — HELD 2026-08-31: the
+  user's walkthrough half surfaced p33 (performance) and re-raised the
+  parked polish set, so the gate now runs after the chunk-16 and
+  chunk-17 gates. The held 3P exit gate:
   open acme's report cold and the story reads without explanation and
   *looks* deliberate. Run ui-polish-direction.md "Acceptance checks" at
   1440 × 900 and 1024 × 720 under `file://` (light theme) —
@@ -413,6 +430,40 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-31** — User exit-gate walkthrough surfaced defects; gate
+  HELD; issues triaged, chunks 16 and 17 authored; tree committed.
+  The user's findings and their disposition: (1) pan/zoom slow +
+  label flicker on large graphs → NEW issue p33; architect confirmed
+  the root cause in App.tsx — `onViewportChange` commits state every
+  frame and the edge-presentation memo depends on `canvasViewport`,
+  so each frame re-runs routing, anchors, emphasis, and the chunk-15
+  collision pass and rebuilds all edge data, defeating memo(); the
+  user's Far/Read/Full suspicion is the depth half of the same
+  coupling. (2) Info Connections fonts too big/bold → amended into
+  p26. (3) Too many tags + unclear tag highlight → NEW issue p34.
+  (4) map cluster still wrong (already p26/p29, open) + no way back
+  to System view → NEW issue p35 (reset control; the old Detail
+  preset route was removed with chunk-15). (5) "View dependencies" /
+  unstyled "Return to map" → p26 (already filed) + p28 amended.
+  (6) table tabs/controls → confirmed already filed as p24 + p26,
+  which had been parked for "a wave-2 polish chunk authored at wave-2
+  start" — that parking is superseded: the user re-raising them at
+  the gate makes them Phase 1 work. NEW CHUNKS: chunk-16 (canvas
+  performance, issue p33; spec report.md "Performance contract —
+  canvas at scale"; gesture freeze, depth-bucket-only commits, CSS
+  zoom scaling, referential stability; budget 500; READY — runs
+  first, before the exit-gate re-run) and chunk-17 (polish sweep
+  absorbing p24/p26/p28/p29/p32-open/p34/p35; spec report.md "Polish
+  contract — pass 6" pinning reset-control, tag-halo, single-popover
+  and control-scale decisions; budget 1,500; READY after the chunk-16
+  gate — both touch App.tsx/CSS, so sequential). Evidence: user
+  screenshots copied to issues/ as v3-connections-typography.png and
+  v3-deps-return-to-map.png. Exit-gate order is now: chunk-16 gate →
+  chunk-17 gate → architect walkthrough re-run → user half. The
+  chunk-31 control artifacts (unblocked by the chunk-21 gate) remain
+  queued architect work, order-independent of this. Next action: user
+  runs the chunk-16 prompt in delegation.md.
 
 - **2026-08-31** — chunk-21 architect gate PASSED, no gate fix needed;
   tree committed; open question 2 ANSWERED (stale fixtures refreshed).
