@@ -54,7 +54,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 .workspace { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; overflow: hidden; }
 .dock-row { display: flex; min-height: 0; min-width: 0; }
-.canvas-root { background: var(--canvas); flex: 1 1 auto; min-width: 0; overflow: hidden; position: relative; }
+.canvas-root { --canvas-arrow-size: 6.4px; --canvas-edge-width: 1.5px; --canvas-edge-width-diff: 1.75px; --canvas-edge-width-emphasized: 2.3px; --canvas-edge-width-focus: 6.5px; background: var(--canvas); flex: 1 1 auto; min-width: 0; overflow: hidden; position: relative; }
 .react-flow { background: var(--canvas); }
 
 .resizable-panel, .map-cluster, .semantic-radar, .search-dialog, .table-menu > div {
@@ -184,9 +184,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .boundary-title strong { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .containment-boundary > header .boundary-collapse { align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 5px; display: flex; flex: 0 0 28px; font-size: 17px; height: 28px; justify-content: center; width: 28px; }
 .boundary-description { bottom: 10px; color: var(--muted); font: 10px/1.3 var(--font-ui); left: 20px; margin: 0; overflow: hidden; position: absolute; right: 20px; text-overflow: ellipsis; white-space: nowrap; }
-.semantic-edge-focus { opacity: 0; pointer-events: none; stroke: var(--accent); }
+.react-flow__edge-path.semantic-edge-focus { opacity: 0; pointer-events: none; stroke: var(--accent); stroke-width: var(--canvas-edge-width-focus); }
 .semantic-edge-focus.is-outgoing, .semantic-edge-focus.is-incoming, .semantic-edge-focus.is-selected { opacity: .18; }
-.semantic-edge { stroke: var(--edge); transition: opacity 150ms ease, stroke 150ms ease; }
+.react-flow__edge-path.semantic-arrow-carrier { pointer-events: none; stroke: transparent; stroke-width: var(--canvas-arrow-size); }
+.react-flow__edge-path.semantic-edge { stroke: var(--edge); stroke-width: var(--canvas-edge-width); transition: opacity 150ms ease, stroke 150ms ease; }
+.semantic-edge.is-added, .semantic-edge.is-changed { stroke-width: var(--canvas-edge-width-diff); }
+.semantic-edge.is-outgoing, .semantic-edge.is-incoming, .semantic-edge.is-neighbor, .semantic-edge.is-selected { stroke-width: var(--canvas-edge-width-emphasized); }
 .semantic-edge.is-outgoing { animation: edge-flow 1.9s linear infinite; stroke-dasharray: 10 7; }
 .semantic-edge.is-unrelated { opacity: .32; }
 .app[data-selection='off'][data-lens='active'] .semantic-edge.is-unrelated, .app[data-selection='off'][data-lens='active'] .edge-label[data-emphasis='unrelated'] { opacity: .32; }

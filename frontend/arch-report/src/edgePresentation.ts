@@ -1,6 +1,7 @@
 import type { ReadingDepth } from './zoom'
 import type { Aspect, GraphEdge, ReportRow, RowKind } from './types'
 import type { EdgeAnchorPair, EdgePoint, EdgeRect } from './edgeAnchors'
+import { intersects } from './splinePath'
 
 export type SplineDirection = 'forward' | 'reverse'
 export type DirectionalMember = {
@@ -24,6 +25,11 @@ export type EmphasisResult = {
 }
 type EmphasisSpline = Pick<DirectionalSpline, 'id' | 'source' | 'target'> & Partial<Pick<DirectionalSpline, 'members'>>
 export type InterfacePort = { count: number; label: string; point: EdgePoint }
+export type AtRestEdgePresentation = {
+  emphasis: EdgeEmphasis | 'selected'
+  portLabel: Pick<EdgePoint, 'x' | 'y'> | null
+  showLabel: boolean
+}
 
 function rowLabel(row: ReportRow): string {
   return row.name ?? row.action ?? row.id
@@ -95,6 +101,47 @@ export function edgeStrokeToken(emphasis: EdgeEmphasis | 'selected', statuses: s
   if (statuses.includes('changed')) return 'var(--diff-changed)'
   if (statuses.includes('added')) return 'var(--diff-edge-added)'
   return 'var(--edge)'
+}
+
+export function atRestEdgePresentation({
+  depth,
+  directReveal,
+  emphasis,
+  endpointVisible,
+  hasCompetingFocus,
+  hovered,
+  labelPlaced,
+  labelRect,
+  labelObstacles,
+  occupiedLabels,
+  port,
+  selectedOrConnected,
+}: {
+  depth: ReadingDepth
+  directReveal: boolean
+  emphasis: EdgeEmphasis | 'selected'
+  endpointVisible: boolean
+  hasCompetingFocus: boolean
+  hovered: boolean
+  labelPlaced: boolean
+  labelRect: EdgeRect
+  labelObstacles: EdgeRect[]
+  occupiedLabels: EdgeRect[]
+  port: InterfacePort | null
+  selectedOrConnected: boolean
+}): AtRestEdgePresentation {
+  const showLabel = endpointVisible && edgeLabelVisible(depth, selectedOrConnected, hovered)
+    && (directReveal || labelPlaced) && (!hasCompetingFocus || directReveal)
+  const portObstacles = showLabel && !directReveal ? [...occupiedLabels, labelRect] : occupiedLabels
+  let portLabel: AtRestEdgePresentation['portLabel'] = null
+  if (port && (depth === 'full' || directReveal) && endpointVisible && (!hasCompetingFocus || directReveal)) {
+    const placement = portLabelPlacement(port)
+    if (directReveal || (labelObstacles.every((rect) => !intersects(placement.rect, rect))
+      && portObstacles.every((rect) => !intersects(placement.rect, rect)))) {
+      portLabel = placement.point
+    }
+  }
+  return { emphasis, portLabel, showLabel }
 }
 
 export function classifyEmphasis(

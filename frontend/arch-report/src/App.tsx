@@ -11,15 +11,16 @@ import {
   type NodeProps,
   type ReactFlowInstance,
 } from '@xyflow/react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 
 import { fitViewport, initialViewport, shiftViewport, type Rect } from './camera'
+import { shouldCommitViewport, stabilizeItemData, type ViewportCommitReason } from './canvasPerformance'
 import { cardSize, measureCardText } from './cardSize'
 import { KIND_LABEL, levelForKind, rowLabel } from './display'
 import { edgeAnchors, type EdgeAnchorPair, type EdgeRect } from './edgeAnchors'
 import {
   classifyEmphasis,
-  edgeLabelVisible,
+  atRestEdgePresentation,
   edgeStrokeToken,
   interfacePort,
   portLabelPlacement,
@@ -39,7 +40,7 @@ import { loadLayout, saveLayout, type DockName, type LayoutPreferences } from '.
 import { readPayload } from './payload'
 import { diffStates, legendEntries, mergeRemovedBoundaries, projectState, unionGraph } from './projection'
 import { ResizablePanel } from './ResizablePanel'
-import { endpointsNearViewport, intersects, splinePath, type SplinePath } from './splinePath'
+import { endpointsNearViewport, splinePath, type SplinePath } from './splinePath'
 import { kindPresentationStyle, themeStyle } from './theme'
 import {
   type Aspect,
@@ -71,12 +72,13 @@ type ArchitectureData = {
   kind: EntityKind
   label: string
   members: RowRef[]
-  onExpand: () => void
+  nodeKey: string
+  onExpand: (key: string) => void
   row: ReportRow
   statuses: DiffStatus[]
 }
 type ArchitectureNode = Node<ArchitectureData, 'architecture'>
-type BoundaryData = { boundary: GraphBoundary; description: string; ghost: boolean; label: string; onCollapse: () => void }
+type BoundaryData = { boundary: GraphBoundary; description: string; ghost: boolean; label: string; onCollapse: (key: string) => void }
 type BoundaryNode = Node<BoundaryData, 'boundary'>
 type CanvasNode = ArchitectureNode | BoundaryNode
 type SemanticData = {
@@ -89,14 +91,13 @@ type SemanticData = {
   labelPoint: SplinePath['point']
   portLabel: SplinePath['point'] | null
   memberCount: number
-  onSelect: () => void
-  onHover: (hovered: boolean) => void
+  onSelect: (edge: GraphEdge, direction: SplineDirection) => void
+  onHover: (id: string, hovered: boolean) => void
   port: InterfacePort | null
   path: string
   selected: boolean
   showLabel: boolean
   statuses: DiffStatus[]
-  zoom: number
 }
 type SemanticFlowEdge = Edge<SemanticData, 'semantic'>
 const payload = readPayload()
@@ -129,7 +130,7 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
         {data.childCount ? <span title={`${data.childCount} children`}>{data.childCount} children</span> : null}
         {data.connectionCount ? <span title={`${data.connectionCount} connections`}>{data.connectionCount} connections</span> : null}
       </div>
-      {data.expandable ? <button aria-label={`Expand ${data.label}, ${data.childCount} children`} className="expand-button" onClick={(event) => { event.stopPropagation(); data.onExpand() }} title="Expand direct children" type="button"><ExpandIcon /><span>{data.childCount}</span></button> : null}
+      {data.expandable ? <button aria-label={`Expand ${data.label}, ${data.childCount} children`} className="expand-button" onClick={(event) => { event.stopPropagation(); data.onExpand(data.nodeKey) }} title="Expand direct children" type="button"><ExpandIcon /><span>{data.childCount}</span></button> : null}
       {data.statuses.length ? (
         <span aria-label={`Changes: ${data.statuses.join(', ')}`} className="diff-badges">
           {data.statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
@@ -144,7 +145,7 @@ export function ArchitectureNodeView({ data, selected }: NodeProps<ArchitectureN
 export function BoundaryNodeView({ data, selected }: NodeProps<BoundaryNode>) {
   return (
     <section className="containment-boundary" data-ghost={data.ghost ? 'true' : 'false'} data-kind={data.boundary.kind} data-selected={selected ? 'true' : 'false'} data-stub={data.boundary.stub ? 'true' : 'false'} style={kindPresentationStyle(data.boundary.kind, selected)}>
-      <header><span className="boundary-title"><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong></span>{data.ghost ? null : <button aria-label={`Collapse ${data.label}`} className="boundary-collapse" onClick={(event) => { event.stopPropagation(); data.onCollapse() }} title="Collapse" type="button">−</button>}</header>
+      <header><span className="boundary-title"><span className="kind-pill" data-kind={data.boundary.kind}>{KIND_LABEL[data.boundary.kind]}</span><strong>{data.label}</strong></span>{data.ghost ? null : <button aria-label={`Collapse ${data.label}`} className="boundary-collapse" onClick={(event) => { event.stopPropagation(); data.onCollapse(data.boundary.nodeKey) }} title="Collapse" type="button">−</button>}</header>
       {data.description ? <p className="boundary-description">{data.description}</p> : null}
       <Handle position={Position.Left} type="target" />
       <Handle position={Position.Right} type="source" />
@@ -161,39 +162,34 @@ export function SemanticEdge({
   const statuses = data?.statuses ?? []
   const emphasis = data?.emphasis ?? 'normal'
   const markerId = `arrow-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
-  const arrowSize = Math.max(6.4, 6.4 / Math.max(data.zoom, 0.2))
-  const strokeWidth = Math.max(1.5, 1.5 / Math.max(data.zoom, 0.2))
-  const emphasized = ['outgoing', 'incoming', 'neighbor', 'selected'].includes(emphasis)
   const accented = ['outgoing', 'incoming', 'selected'].includes(emphasis)
-  const diffIncrement = statuses.includes('added') || statuses.includes('changed') ? 0.25 : 0
   const stroke = edgeStrokeToken(emphasis, statuses)
-  const edgeStyle = { stroke, strokeWidth: strokeWidth + (emphasized ? 0.8 : diffIncrement) } as CSSProperties
-  const focusStyle = { strokeWidth: strokeWidth + 5 } as CSSProperties
+  const edgeStyle = { stroke } as CSSProperties
   const expandedPort = data.portLabel !== null
   return (
     <>
       <defs>
-        <marker id={markerId} markerHeight={arrowSize} markerUnits="userSpaceOnUse" markerWidth={arrowSize} orient="auto" refX="10" refY="5" viewBox="0 0 10 10">
+        <marker id={markerId} markerHeight="1" markerUnits="strokeWidth" markerWidth="1" orient="auto" refX="10" refY="5" viewBox="0 0 10 10">
           <path className={`semantic-arrow is-${emphasis} ${statuses.map((status) => `is-${status}`).join(' ')}`} d="M 0 0 L 10 5 L 0 10 z" style={{ fill: stroke }} />
         </marker>
       </defs>
-      <BaseEdge className={`semantic-edge-focus is-${emphasis}`} id={`${id}:focus`} interactionWidth={0} path={path} style={focusStyle} />
+      <BaseEdge className={`semantic-edge-focus is-${emphasis}`} id={`${id}:focus`} interactionWidth={0} path={path} />
+      <BaseEdge className="semantic-arrow-carrier" id={`${id}:arrow`} interactionWidth={0} markerEnd={`url(#${markerId})`} path={path} />
       <BaseEdge
         className={`semantic-edge is-${emphasis} ${statuses.map((status) => `is-${status}`).join(' ')}`}
         id={id}
         interactionWidth={24}
-        markerEnd={`url(#${markerId})`}
         path={path}
         style={edgeStyle}
       />
       <EdgeLabelRenderer>
-        {data.showLabel ? <button className="edge-label" data-direct-reveal={data.selected || data.hovered ? 'true' : 'false'} data-emphasis={emphasis} data-status={statuses.join(' ')} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${data.labelPoint.x}px,${data.labelPoint.y}px)` }} title={data.label} type="button">
+        {data.showLabel ? <button className="edge-label" data-direct-reveal={data.selected || data.hovered ? 'true' : 'false'} data-emphasis={emphasis} data-status={statuses.join(' ')} onClick={() => data.onSelect(data.edge, data.direction)} onMouseEnter={() => data.onHover(id, true)} onMouseLeave={() => data.onHover(id, false)} style={{ transform: `translate(-50%, -50%) translate(${data.labelPoint.x}px,${data.labelPoint.y}px)` }} title={data.label} type="button">
           {data.label}
           {data.memberCount > 1 ? <i>{data.memberCount}</i> : null}
           {statuses.map((status) => <b data-status={status} key={status}>{STATUS_ICON[status]}</b>)}
         </button> : null}
         {[data.anchors.sourcePoint, data.anchors.targetPoint].map((point, index) => <span aria-hidden="true" className="edge-port" data-accent={accented ? 'true' : 'false'} key={index} style={{ transform: `translate(-50%, -50%) translate(${point.x}px,${point.y}px)` }} />)}
-        {data.port ? <button aria-label={`Interface port ${data.port.label}`} className="interface-port" data-accent={accented ? 'true' : 'false'} data-direct-reveal={expandedPort && (data.selected || data.hovered) ? 'true' : 'false'} data-expanded={expandedPort ? 'true' : 'false'} onClick={data.onSelect} onMouseEnter={() => data.onHover(true)} onMouseLeave={() => data.onHover(false)} style={{ transform: `translate(-50%, -50%) translate(${(data.portLabel ?? data.port.point).x}px,${(data.portLabel ?? data.port.point).y}px)` }} title={data.port.label} type="button">
+        {data.port ? <button aria-label={`Interface port ${data.port.label}`} className="interface-port" data-accent={accented ? 'true' : 'false'} data-direct-reveal={expandedPort && (data.selected || data.hovered) ? 'true' : 'false'} data-expanded={expandedPort ? 'true' : 'false'} onClick={() => data.onSelect(data.edge, data.direction)} onMouseEnter={() => data.onHover(id, true)} onMouseLeave={() => data.onHover(id, false)} style={{ transform: `translate(-50%, -50%) translate(${(data.portLabel ?? data.port.point).x}px,${(data.portLabel ?? data.port.point).y}px)` }} title={data.port.label} type="button">
           {expandedPort ? <>{data.port.label}{data.port.count > 1 ? <i>{data.port.count}</i> : null}</> : null}
         </button> : null}
       </EdgeLabelRenderer>
@@ -244,9 +240,8 @@ function flowEdge(
   showLabel: boolean,
   port: InterfacePort | null,
   portLabel: SplinePath['point'] | null,
-  zoom: number,
-  onSelect: () => void = () => {},
-  onHover: (hovered: boolean) => void = () => {},
+  onSelect: SemanticData['onSelect'],
+  onHover: SemanticData['onHover'],
 ): SemanticFlowEdge {
   return {
     data: {
@@ -266,7 +261,6 @@ function flowEdge(
       selected,
       showLabel,
       statuses,
-      zoom,
     },
     id: spline.id,
     source: spline.source,
@@ -378,6 +372,11 @@ export default function App() {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null)
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const committedViewport = useRef(canvasViewport)
+  const gestureActive = useRef(false)
+  const liveViewport = useRef(canvasViewport)
+  const stableNodes = useRef<CanvasNode[]>([])
+  const stableEdges = useRef<SemanticFlowEdge[]>([])
   const framedLayout = useRef('')
   const positionCache = useRef(new Map<string, Positions>())
   const layoutIntent = useRef<{ anchor: string; previous: Positions; target: string } | null>(null)
@@ -406,6 +405,41 @@ export default function App() {
         },
       }))
   }, [layout.docks.view.collapsed])
+  const revealInfoRef = useRef(revealInfo)
+  revealInfoRef.current = revealInfo
+  const selectEdge = useCallback((edge: GraphEdge, direction: SplineDirection) => {
+    revealInfoRef.current({ type: 'edge', direction, edge })
+  }, [])
+  const hoverEdge = useCallback((id: string, hovered: boolean) => {
+    if (gestureActive.current) return
+    setHoveredEdgeId(hovered ? id : null)
+  }, [])
+  const enterEdge = useCallback((_event: ReactMouseEvent, edge: SemanticFlowEdge) => {
+    if (!gestureActive.current) setHoveredEdgeId(edge.id)
+  }, [])
+  const leaveEdge = useCallback(() => {
+    if (!gestureActive.current) setHoveredEdgeId(null)
+  }, [])
+  const enterNode = useCallback((_event: ReactMouseEvent, node: CanvasNode) => {
+    if (!gestureActive.current && node.type !== 'boundary') setHoveredKey(node.id)
+  }, [])
+  const leaveNode = useCallback(() => {
+    if (!gestureActive.current) setHoveredKey(null)
+  }, [])
+  const commitViewport = useCallback((next: typeof canvasViewport, reason: ViewportCommitReason) => {
+    liveViewport.current = next
+    const canvas = canvasRef.current
+    const zoomCompensation = Math.max(1, 1 / Math.max(next.zoom, 0.2))
+    const edgeWidth = 1.5 * zoomCompensation
+    canvas?.style.setProperty('--canvas-arrow-size', `${6.4 * zoomCompensation}px`)
+    canvas?.style.setProperty('--canvas-edge-width', `${edgeWidth}px`)
+    canvas?.style.setProperty('--canvas-edge-width-diff', `${edgeWidth + 0.25}px`)
+    canvas?.style.setProperty('--canvas-edge-width-emphasized', `${edgeWidth + 0.8}px`)
+    canvas?.style.setProperty('--canvas-edge-width-focus', `${edgeWidth + 5}px`)
+    if (!shouldCommitViewport(committedViewport.current, next, reason)) return
+    committedViewport.current = next
+    setCanvasViewport(next)
+  }, [])
   const closeInfo = useCallback(() => {
     selectedRef.current = null
     setSelected(null)
@@ -543,6 +577,10 @@ export default function App() {
     framedLayout.current = target
     setView({ deps: null, expand: expansion }, true)
   }, [layoutConfigKey, positions, setView, view.expand, view.timeline])
+  const changeExpansionRef = useRef(changeExpansion)
+  changeExpansionRef.current = changeExpansion
+  const expandNode = useCallback((key: string) => changeExpansionRef.current(key, true), [])
+  const collapseBoundary = useCallback((key: string) => changeExpansionRef.current(key, false), [])
 
   const graphNodes = useMemo(() => {
     const merged = new Map(projected.nodes.map((node) => [node.key, { node, ghost: false }]))
@@ -603,7 +641,8 @@ export default function App() {
           kind: node.kind,
           label: rowLabel(node.row),
           members: node.members,
-          onExpand: () => changeExpansion(node.key, true),
+          nodeKey: node.key,
+          onExpand: expandNode,
           row: node.row,
           statuses: ghost ? ['removed'] : statusesForNode(node, diff),
         },
@@ -627,7 +666,7 @@ export default function App() {
         description: boundary.row.description ?? '',
         ghost,
         label: rowLabel(boundary.row),
-        onCollapse: () => changeExpansion(boundary.nodeKey, false),
+        onCollapse: collapseBoundary,
       },
       id: boundary.key,
       position: { x: 0, y: 0 },
@@ -636,8 +675,11 @@ export default function App() {
       style: { zIndex: -1 },
       type: 'boundary',
     }))
-    return applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
-  }, [cardSizes, changeExpansion, diff, graphBoundaries, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedEmphasisKeys, selectedKey, view.aspect, view.lens])
+    const next = applyPositions([...boundaryNodes, ...architectureNodes], positions) as CanvasNode[]
+    const stabilized = stabilizeItemData(stableNodes.current, next)
+    stableNodes.current = stabilized
+    return stabilized
+  }, [cardSizes, collapseBoundary, diff, expandNode, graphBoundaries, graphNodes, hoveredKey, positions, projected, selected, selectedDisplayKey, selectedEmphasisKeys, selectedKey, view.aspect, view.lens])
 
   const graphEdges = useMemo(() => {
     const merged = new Map(projected.edges.map((edge) => [edge.key, { edge, ghost: false }]))
@@ -692,32 +734,36 @@ export default function App() {
       targetRect,
     })))
     const occupiedLabels: EdgeRect[] = []
-    return routable.map(({ edge, ghost, sourceRect, spline, targetRect }, index) => {
+    const next = routable.map(({ edge, ghost, sourceRect, spline, targetRect }, index) => {
       const anchors = anchorsById.get(spline.id)!
       const isSelected = spline.id === selectedSplineId
       const isHovered = spline.id === hoveredEdgeId
       const emphasis = edgeEmphasis(spline)
       const selectionReveal = selectedEmphasisKeys.size > 0 && (emphasis === 'outgoing' || emphasis === 'incoming')
       const directReveal = isSelected || isHovered
-      const labelEligible = edgeLabelVisible(depth, isSelected || selectionReveal, isHovered)
       const labelWidth = Math.min(180, Math.max(48, spline.label.length * 6 + 20 + (spline.members.length > 1 ? 24 : 0)))
       const route = splinePath(anchors, obstacleRects, occupiedLabels, labelWidth, index % 2 === 0, labelObstacles)
       const endpointVisible = !viewportRect || endpointsNearViewport(sourceRect, targetRect, viewportRect, 120 / canvasViewport.zoom)
-      const showLabel = endpointVisible && labelEligible && (directReveal || route.labelPlaced)
-        && ((!hoveredEdgeId && !selectedSplineId) || directReveal)
-      if (showLabel && !directReveal) occupiedLabels.push(route.rect)
       const port = interfacePort(spline, anchors)
-      let portLabel: SplinePath['point'] | null = null
-      if (port && (depth === 'full' || directReveal) && endpointVisible
-        && ((!hoveredEdgeId && !selectedSplineId) || directReveal)) {
+      const presentation = atRestEdgePresentation({
+        depth,
+        directReveal,
+        emphasis,
+        endpointVisible,
+        hasCompetingFocus: Boolean(hoveredEdgeId || selectedSplineId),
+        hovered: isHovered,
+        labelObstacles,
+        labelPlaced: route.labelPlaced,
+        labelRect: route.rect,
+        occupiedLabels,
+        port,
+        selectedOrConnected: isSelected || selectionReveal,
+      })
+      const { portLabel, showLabel } = presentation
+      if (showLabel && !directReveal) occupiedLabels.push(route.rect)
+      if (port && portLabel && !directReveal) {
         const placement = portLabelPlacement(port)
-        if (directReveal) {
-          portLabel = placement.point
-        } else if (labelObstacles.every((rect) => !intersects(placement.rect, rect))
-          && occupiedLabels.every((rect) => !intersects(placement.rect, rect))) {
-          portLabel = placement.point
-          occupiedLabels.push(placement.rect)
-        }
+        occupiedLabels.push(placement.rect)
       }
       return flowEdge(
         edge,
@@ -731,12 +777,14 @@ export default function App() {
         showLabel,
         port,
         portLabel,
-        zoom,
-        () => revealInfo({ type: 'edge', direction: spline.direction, edge }),
-        (hovered) => setHoveredEdgeId(hovered ? spline.id : null),
+        selectEdge,
+        hoverEdge,
       )
     })
-  }, [canvasViewport, depth, diff, graphBoundaries, graphEdges, graphNodes, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, revealInfo, selectedEmphasisKeys, selectedSplineId, view.aspect, view.lens, zoom])
+    const stabilized = stabilizeItemData(stableEdges.current, next)
+    stableEdges.current = stabilized
+    return stabilized
+  }, [canvasViewport, depth, diff, graphBoundaries, graphEdges, graphNodes, hoverEdge, hoveredEdgeId, hoveredKey, nodes, positions, projected.nodes, selectEdge, selectedEmphasisKeys, selectedSplineId, view.aspect, view.lens])
 
   const visibleCanvas = useCallback((): Rect | null => {
     const element = canvasRef.current
@@ -750,7 +798,7 @@ export default function App() {
       ? [edge.b] : edge.b === selectedDisplayKey ? [edge.a] : [])
     const neighborhood = [...new Set([selectedDisplayKey, ...neighbors])]
     const neighborhoodBounds = flow.getNodesBounds(neighborhood)
-    const viewport = flow.getViewport()
+    const viewport = liveViewport.current
     const neighborhoodFits = neighborhoodBounds.width * viewport.zoom <= visible.width
       && neighborhoodBounds.height * viewport.zoom <= visible.height
     let next = viewport
@@ -921,9 +969,12 @@ export default function App() {
                 const data = edge.data as SemanticData | undefined
                 if (data) revealInfo({ type: 'edge', direction: data.direction, edge: data.edge })
               }}
-              onEdgeMouseEnter={(_event, edge) => setHoveredEdgeId(edge.id)}
-              onEdgeMouseLeave={() => setHoveredEdgeId(null)}
-              onInit={(instance) => { setFlow(instance); setCanvasViewport(instance.getViewport()) }}
+              onEdgeMouseEnter={enterEdge}
+              onEdgeMouseLeave={leaveEdge}
+              onInit={(instance) => { setFlow(instance); commitViewport(instance.getViewport(), 'programmatic') }}
+              onMoveStart={() => { gestureActive.current = true }}
+              onMove={(_event, viewport) => commitViewport(viewport, 'gesture')}
+              onMoveEnd={(_event, viewport) => { commitViewport(viewport, 'gesture-end'); gestureActive.current = false }}
               onNodeClick={(_event, node) => {
                 if (node.type === 'boundary') {
                   const boundary = (node.data as BoundaryData).boundary
@@ -936,11 +987,10 @@ export default function App() {
               onNodeDoubleClick={(_event, node) => {
                 if (node.type !== 'architecture') return
                 const data = node.data as ArchitectureData
-                if (data.expandable) data.onExpand()
+                if (data.expandable) data.onExpand(data.nodeKey)
               }}
-              onNodeMouseEnter={(_event, node) => { if (node.type !== 'boundary') setHoveredKey(node.id) }}
-              onNodeMouseLeave={() => setHoveredKey(null)}
-              onViewportChange={(viewport) => setCanvasViewport(viewport)}
+              onNodeMouseEnter={enterNode}
+              onNodeMouseLeave={leaveNode}
               proOptions={{ hideAttribution: true }}
             >
               {mapOpen ? <MiniMap className="semantic-radar" pannable zoomable /> : null}

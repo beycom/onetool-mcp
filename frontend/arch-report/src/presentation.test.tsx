@@ -88,7 +88,6 @@ function edgeElement(edge: GraphEdge, memberCount: number, emphasis: EdgeEmphasi
       selected: emphasis === 'selected',
       showLabel,
       statuses: [],
-      zoom: 1,
     },
     id,
   } as never)
@@ -114,7 +113,7 @@ test('a collision-cleared port renders its label at the offset point and a colli
     anchors: { sourcePoint: { x: 0, y: 0, side: 'right' }, targetPoint: { x: 100, y: 0, side: 'left' } },
     direction: 'forward', edge, emphasis: 'normal', hovered: false, label: spline.label,
     labelPoint: { x: 50, y: 20 }, memberCount: 1, onHover: () => undefined, onSelect: () => undefined,
-    path: 'M 0 0 L 100 0', selected: false, showLabel: false, statuses: [], zoom: 1, port,
+    path: 'M 0 0 L 100 0', selected: false, showLabel: false, statuses: [], port,
   }
   const { rerender } = render(SemanticEdge({ data: { ...base, portLabel: { x: 60, y: 20 } }, id: 'port-a' } as never))
   const expanded = screen.getByRole('button', { name: 'Interface port Fetch rates' })

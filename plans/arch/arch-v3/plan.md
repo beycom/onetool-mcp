@@ -290,13 +290,13 @@ docs):
   PASSED 2026-08-31 at 193/700 changed source lines including the
   architect's port-label fix — see the progress log; p14/p16/p27
   resolved).
-- [ ] **chunk-16 — canvas performance** (added 2026-08-31: the user's
+- [x] **chunk-16 — canvas performance** (added 2026-08-31: the user's
   walkthrough found pan/zoom slow with label flicker on large graphs;
-  issue p33 carries the architect-confirmed root cause — per-frame
+  issue p33 carried the architect-confirmed root cause — per-frame
   viewport state commits driving the full edge-presentation recompute.
   Spec: report.md "Performance contract — canvas at scale (chunk-16)".
-  Prompt READY, budget 500. Runs before the exit-gate re-run: it
-  changes when frames render, so the gate must judge the fixed build.)
+  DONE, gate PASSED 2026-08-31 at 252/500 changed source lines, no
+  architect fix needed — see the progress log; p33 resolved.)
 - [ ] **chunk-17 — gate-feedback polish sweep** (added 2026-08-31;
   absorbs the parked wave-2 polish set p24/p26/p28/p29/p32 — re-raised
   by the user at the gate — plus new p34 tag-filter clarity and p35
@@ -430,6 +430,90 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-31** — chunk-16 architect gate PASSED, no gate fix needed;
+  tree committed; issue p33 RESOLVED → resolved/. Independently
+  re-verified: frontend Vitest 78 passed (18 files, includes exactly
+  the 3 prescribed performance tests), tsc clean, `just lint` clean,
+  arch pytest 88 passed / 540 deselected, `just build-arch-report`
+  reproduced the executor's template byte-for-byte (shasum match),
+  acme regenerated OK, budget confirmed at 252/500 changed source
+  lines (App 162 + edgePresentation 47 + styles 9 + new
+  canvasPerformance.ts 34; tests excluded). Code review conforms to
+  the performance contract: single commit path (`commitViewport`)
+  guarded by the pure `shouldCommitViewport` helper (gesture commits
+  only on depth-bucket transition; gesture-end/programmatic always);
+  CSS-var zoom scaling reproduces the old per-edge math exactly,
+  including emphasized-over-diff stroke precedence and the
+  `markerUnits="strokeWidth"` transparent-carrier trick for arrowhead
+  scale; `atRestEdgePresentation` extraction preserves the inline
+  label/port logic including occupied-rect ordering (the label rect
+  joins the port obstacles via `portObstacles` exactly where the old
+  push sat); `stabilizeItemData` deep-compares and reuses prior data
+  objects so stable `useCallback` handlers pass `Object.is`. Live
+  re-check on the regenerated report (file://, 1440×900, legacy
+  `#level=components` link — rewrote to the full `expand=` preset in
+  one push): a genuinely-driven 40-frame mouse pan (transform moved
+  exactly with the drag) and a 0.2→2.0 wheel zoom crossing every
+  depth bucket showed ZERO mid-gesture label/pill count changes
+  (an earlier probe using PointerEvents was vacuous — d3-zoom ignores
+  them; redone with mouse/wheel events); settled zoom-2 scene over
+  content renders 3 labels + 3 expanded port pills (depth commit
+  fires after wheel settle); programmatic Fit settles and commits
+  (returns to the exact framed transform, confirming assumption 3);
+  CSS vars verified at both extremes (zoom 0.2 → 7.5/32/12.5 px,
+  zoom 2 → 1.5 px floor); console 0 errors/warnings, one local
+  request. All five executor assumptions ACCEPTED (scope-guard
+  reading; p33's copied P12-style tests not required; onMoveEnd
+  settlement; one mid-gesture bucket commit is spec rule 2; the
+  arrow carrier is presentation-only — the executor's 4-antialias-
+  pixel settled-capture delta corroborates). Evidence moved to
+  /tmp/arch-v3-evidence/test-results/chunk-16/ per the 2026-08-31
+  rule (executor had written to plans/arch/wip/test-results/).
+  PIPELINE: chunk-17 prompt re-reviewed against this tree — no
+  changes needed (its "no new per-frame state" guard fits the landed
+  commitViewport structure; all seven issue files and the pass-6
+  spec section exist; evidence dir already points at /tmp). Next
+  action: user runs the chunk-17 prompt in delegation.md; after its
+  gate, the Phase 1 exit-gate re-run (architect walkthrough + user
+  half).
+
+- **2026-08-31** — chunk-16 canvas performance implemented; left
+  uncommitted for architect gate review. The live viewport now stays in a
+  ref, React viewport state commits only at reading-depth transitions and
+  move settlement, and hover presentation freezes during gestures. Edge
+  widths and arrowhead size now follow canvas CSS variables written on each
+  viewport frame; per-edge React zoom data was removed. Stable handlers plus
+  structural data reuse preserve unchanged node and edge data identities, and
+  collision/orphan presentation uses only the committed viewport. Source
+  budget: **252 / 500 changed lines** (tests and generated bundle excluded).
+  Tests: exactly the 3 performance-contract cases added; frontend Vitest
+  **78 passed** across 18 files; TypeScript and Vite build clean; arch pytest
+  **88 passed / 540 deselected**; `just lint` clean; `just
+  build-arch-report` clean; CLI regeneration returned `OK` for
+  `plans/arch/wip/acme-report.html`. Rule-9 verification used the legacy
+  `#level=components` link at 1440x900 over `file://`. Before → after trace:
+  maximum frame gap **38.2 ms → 18.6 ms**; label/pill count changes during
+  the pan **48 → 0**; the after trace had **0** events over 50 ms and a
+  **27.7 ms** longest event. The bucket-crossing zoom moved far → read in 11
+  wheel ticks with zero label/pill count changes. Console: 0 errors/warnings;
+  network: one local HTML request, zero external requests. Settled captures
+  are `plans/arch/wip/test-results/chunk-16/{before,after}-settled.png`; their
+  1,296,000-pixel comparison differed only at 4 arrow-edge antialias pixels,
+  each by one channel level, with no geometry or visible-content delta.
+  Assumptions: (1) the optional P13 "four numbered defects" wording is a
+  scope guard for chunk-16's four numbered clauses because P13 is already
+  gated and its four issue files now live under `issues/resolved/`; (2) the
+  six P12-style tests copied into p33 below "Acme showcase delta" are not
+  chunk-16 tests because delegation.md and report.md both explicitly require
+  exactly the three performance-contract tests; (3) programmatic camera
+  animations settle through React Flow `onMoveEnd`, while `onInit` commits
+  explicitly; (4) a reading-depth boundary may commit once mid-gesture, as
+  report.md rule 2 requires, while all within-bucket presentation remains
+  frozen; (5) the CSS-scaled invisible arrow carrier is presentation-only and
+  does not change spline, layout, projection, or collision semantics.
+  Open questions: none. Next action: architect gate review; no commit or push
+  made.
 
 - **2026-08-31** — User exit-gate walkthrough surfaced defects; gate
   HELD; issues triaged, chunks 16 and 17 authored; tree committed.
