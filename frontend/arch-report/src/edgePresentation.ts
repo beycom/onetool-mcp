@@ -1,6 +1,6 @@
 import type { ReadingDepth } from './zoom'
 import type { Aspect, GraphEdge, ReportRow, RowKind } from './types'
-import type { EdgeAnchorPair, EdgePoint } from './edgeAnchors'
+import type { EdgeAnchorPair, EdgePoint, EdgeRect } from './edgeAnchors'
 
 export type SplineDirection = 'forward' | 'reverse'
 export type DirectionalMember = {
@@ -150,4 +150,18 @@ export function interfacePort(spline: DirectionalSpline, anchors: EdgeAnchorPair
     label: rowLabel(first.row),
     point: first.providerKey === spline.source ? anchors.sourcePoint : anchors.targetPoint,
   }
+}
+
+export type PortLabelPlacement = { point: { x: number; y: number }; rect: EdgeRect }
+
+export function portLabelPlacement(port: InterfacePort): PortLabelPlacement {
+  const width = Math.min(200, Math.round(port.label.length * 5.6) + 14 + (port.count > 1 ? 22 : 0))
+  const height = 24
+  const gap = 8
+  const { side } = port.point
+  const point = {
+    x: port.point.x + (side === 'left' ? -(width / 2 + gap) : side === 'right' ? width / 2 + gap : 0),
+    y: port.point.y + (side === 'top' ? -(height / 2 + gap) : side === 'bottom' ? height / 2 + gap : 0),
+  }
+  return { point, rect: { x: point.x - width / 2, y: point.y - height / 2, width, height } }
 }

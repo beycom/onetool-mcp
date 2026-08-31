@@ -1,7 +1,8 @@
 import type { EdgeAnchorPair, EdgePoint, EdgeRect, EdgeSide } from './edgeAnchors'
 
 export type SplinePoint = { x: number; y: number }
-export type SplinePath = { labelPoint: SplinePoint; labelRect: EdgeRect; path: string; points: SplinePoint[] }
+export type LabelPlacement = { point: SplinePoint; rect: EdgeRect }
+export type SplinePath = LabelPlacement & { labelPlaced: boolean; path: string; points: SplinePoint[] }
 
 type Point = SplinePoint
 
@@ -145,18 +146,18 @@ function pointAt(points: Point[], ratio: number): Point {
   return points.at(-1)!
 }
 
-function intersects(left: EdgeRect, right: EdgeRect): boolean {
+export function intersects(left: EdgeRect, right: EdgeRect): boolean {
   return left.x < right.x + right.width && left.x + left.width > right.x
     && left.y < right.y + right.height && left.y + left.height > right.y
 }
 
-function labelPlacement(
+export function placeEdgeLabel(
   points: Point[],
   cardRects: EdgeRect[],
   occupied: EdgeRect[],
   width: number,
   preferNegative: boolean,
-): { point: Point; rect: EdgeRect } {
+): LabelPlacement | null {
   const direction = preferNegative ? -1 : 1
   const ratios = [0, 0.05, -0.05, 0.1, -0.1, 0.15, -0.15, 0.2, -0.2]
     .map((offset) => 0.5 + offset * direction)
@@ -167,7 +168,22 @@ function labelPlacement(
   return candidates.find(({ rect }) => (
     cardRects.every((card) => !intersects(rect, card))
     && occupied.every((label) => !intersects(rect, label))
-  )) ?? candidates[0]
+  )) ?? null
+}
+
+export function endpointsNearViewport(
+  source: EdgeRect,
+  target: EdgeRect,
+  viewport: EdgeRect,
+  margin: number,
+): boolean {
+  const near = {
+    x: viewport.x - margin,
+    y: viewport.y - margin,
+    width: viewport.width + margin * 2,
+    height: viewport.height + margin * 2,
+  }
+  return intersects(source, near) || intersects(target, near)
 }
 
 type CubicSegment = { start: Point; first: Point; second: Point; end: Point }
@@ -225,6 +241,7 @@ export function splinePath(
   occupiedLabels: EdgeRect[] = [],
   labelWidth = 180,
   preferNegativeNudge = false,
+  labelObstacles: EdgeRect[] = rects,
 ): SplinePath {
   const obstacles = rects.filter((rect) => (
     !contains(rect, anchors.sourcePoint) && !contains(rect, anchors.targetPoint)
@@ -242,6 +259,8 @@ export function splinePath(
     `L ${anchors.targetPoint.x} ${anchors.targetPoint.y}`,
   ].join(' ')
   const curve = [anchors.sourcePoint, ...sampleSegments(segments), anchors.targetPoint]
-  const label = labelPlacement(curve, rects, occupiedLabels, labelWidth, preferNegativeNudge)
-  return { labelPoint: label.point, labelRect: label.rect, path, points }
+  const midpoint = pointAt(curve, 0.5)
+  const fallback = { point: midpoint, rect: { x: midpoint.x - labelWidth / 2, y: midpoint.y - 12, width: labelWidth, height: 24 } }
+  const label = placeEdgeLabel(curve, labelObstacles, occupiedLabels, labelWidth, preferNegativeNudge)
+  return { ...(label ?? fallback), labelPlaced: label !== null, path, points }
 }

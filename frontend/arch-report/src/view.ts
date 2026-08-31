@@ -53,14 +53,6 @@ export function presetExpansion(payload: ReportPayload, preset: Level): string[]
   return [...childrenByKey.keys()].filter((key) => kinds.has(byKey.get(key)!.kind)).sort()
 }
 
-export function expansionPreset(payload: ReportPayload, expand: readonly string[]): Level | 'custom' {
-  const current = [...new Set(expand)].sort().join(',')
-  for (const preset of LEVELS) {
-    if (presetExpansion(payload, preset).join(',') === current) return preset
-  }
-  return 'custom'
-}
-
 export function expansionPath(payload: ReportPayload, key: string, includeSelf = true): string[] {
   const { childrenByKey, parentByKey } = containmentIndex(payload)
   const path: string[] = []
@@ -81,7 +73,7 @@ function oneOf<T extends string>(value: string | null, values: Set<T>, fallback:
   return value !== null && values.has(value as T) ? value as T : fallback
 }
 
-export type ViewDecodeResult = { diagnostics: string[]; select: string | null; view: View }
+export type ViewDecodeResult = { diagnostics: string[]; legacyLevel: boolean; select: string | null; view: View }
 
 export function decodeView(payload: ReportPayload, fragment = ''): ViewDecodeResult {
   const params = new URLSearchParams(fragment.replace(/^#/, ''))
@@ -131,7 +123,7 @@ export function decodeView(payload: ReportPayload, fragment = ''): ViewDecodeRes
     ? layoutValue as LayoutMethod
     : null
   if (layoutValue !== null && layout === null) diagnostics.push(`view.fragment.layout.${layoutValue}: unknown layout method ignored`)
-  return { diagnostics, select: legacyDrill ?? select, view: {
+  return { diagnostics, legacyLevel: !requestedExpand.length && legacyLevel !== null, select: legacyDrill ?? select, view: {
     timeline,
     position: integer(params.get('time'), 0, maximum),
     expand: [...expand].sort(),

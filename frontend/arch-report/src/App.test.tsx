@@ -68,8 +68,8 @@ test('the Stage dropdown has every position and changes the projected state', as
 })
 
 test('stage changes move changed fields into Info and remove the card popover', async () => {
+  history.replaceState(null, '', '#level=containers')
   const { container } = render(<App />)
-  fireEvent.change(screen.getByLabelText('Detail'), { target: { value: 'containers' } })
   fireEvent.change(screen.getByLabelText('Stage'), { target: { value: '1' } })
 
   const select = await screen.findByLabelText('Select Commerce Monolith')
@@ -95,15 +95,13 @@ test('Escape closes search before clearing the selection and Info', async () => 
   await waitFor(() => expect(screen.queryByLabelText('Close details')).toBeNull())
 })
 
-test('Detail presets write one history entry and hand expansion displays Custom', async () => {
+test('View has no Detail control and a legacy level link restores its expansion in one history entry', async () => {
+  history.replaceState(null, '', '#level=containers')
   const push = vi.spyOn(history, 'pushState')
   render(<App />)
 
-  fireEvent.change(screen.getByLabelText('Detail'), { target: { value: 'containers' } })
-  await waitFor(() => expect((screen.getByLabelText('Detail') as HTMLSelectElement).value).toBe('containers'))
+  expect(screen.queryByLabelText('Detail')).toBeNull()
+  await waitFor(() => expect(new URLSearchParams(location.hash.slice(1)).get('expand')).not.toBeNull())
   expect(new URLSearchParams(location.hash.slice(1)).get('expand')?.split(',')).toEqual(presetExpansion(payload as unknown as ReportPayload, 'containers'))
   expect(push).toHaveBeenCalledTimes(1)
-
-  fireEvent.click(screen.getAllByRole('button', { name: /^Expand / })[0])
-  await waitFor(() => expect((screen.getByLabelText('Detail') as HTMLSelectElement).value).toBe('custom'))
 })

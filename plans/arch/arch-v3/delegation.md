@@ -37,8 +37,8 @@ prompt — executors read them as part of the contract.
 | P12 | Map model: in-place C4 expansion | DONE, gate PASSED 2026-08-29 (710/2,600 lines + the architect's anchor perimeter-overflow fix) | — |
 | P13 | Report UI correctness fixes (issues p15, p17, p18, p19) | DONE — gate PASSED 2026-08-30 | — |
 | P14 | Layout engines + config + A/B harness (layout-design.md) | DONE — gate PASSED 2026-08-30 (with an architect fix) | — |
-| chunk-15 | Edge-label collision + collapse affordance + Detail-dropdown removal (issues p14, p16, p27) | READY (authored 2026-08-30) | now — pre-exit-gate |
-| chunk-21 (was D12a) | Sequence parser + payload + attachments | READY (re-scoped 2026-08-30 for the attachments design) | Phase 1 exit gate |
+| chunk-15 | Edge-label collision + collapse affordance + Detail-dropdown removal (issues p14, p16, p27) | DONE — gate PASSED 2026-08-31 (193/700 lines + the architect's port-label collision fix) | — |
+| chunk-21 (was D12a) | Sequence parser + payload + attachments | READY (re-scoped 2026-08-30 for the attachments design; gate-reviewed against the post-chunk-15 tree 2026-08-31 — no changes needed, Python-only scope) | now — parallel OK in a separate worktree; merges after review |
 | chunk-22 (was D11) | Report definitions + guided views | GATED on designs | Phase 1 exit gate |
 | chunk-23 (was D8) | SQLite adapter, SVG/draw.io export | GATED | Phase 1 exit gate |
 | chunk-31 (was D12b) | Sequence renderer + SEQ-* | GATED on layout vectors + acme flow docs | chunk-21 gate |
@@ -538,7 +538,7 @@ pytest run unchanged by this chunk), then STOP — D13d is a separate
 prompt.
 ```
 
-## chunk-21 (was D12a) — sequence parser + payload + attachments (re-scoped 2026-08-30; READY, runs once the Phase 1 exit gate passes)
+## chunk-21 (was D12a) — sequence parser + payload + attachments (re-scoped 2026-08-30; READY — may run NOW in a separate worktree, in parallel with the Phase 1 exit gate: Python-only scope, zero file overlap with the UI work; re-reviewed at the chunk-15 gate 2026-08-31, no changes)
 
 ```text
 [standard rules]
@@ -1055,7 +1055,7 @@ confirm the outer System boundary's collapse control sits beside its
 own title and nothing collapse-like renders adjacent to the focused
 child card; confirm View shows no Detail control and the dock layout
 has no gap; console clean throughout. Capture replacement evidence to
-plans/arch/wip/test-results/chunk-15/. Rebuild the bundle and regenerate
+/tmp/arch-v3-evidence/test-results/chunk-15/. Rebuild the bundle and regenerate
 plans/arch/wip/acme-report.html via the CLI.
 
 Definition of done: rules 5–8 (lint, arch pytest, budget, log entry) +

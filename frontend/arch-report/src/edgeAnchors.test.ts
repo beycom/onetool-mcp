@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 
 import { edgeAnchors, type EdgeRect } from './edgeAnchors'
-import { splinePath } from './splinePath'
+import { endpointsNearViewport, intersects, placeEdgeLabel, splinePath } from './splinePath'
 
 test('anchors use facing borders, distribute each side, and terminate with perpendicular stubs', () => {
   const center: EdgeRect = { x: 100, y: 100, width: 80, height: 60 }
@@ -87,4 +87,35 @@ test('an over-capacity side spills its outermost anchors to adjacent sides; only
     targetId: 'far',
     targetRect: { x: 700, y: 0, width: 80, height: 60 },
   }])).toThrow(RangeError)
+})
+
+test('selected-hub labels nudge away from cards and pills, then hide overflow instead of stacking', () => {
+  const hub = { x: 420, y: 80, width: 160, height: 40 }
+  const curve = [{ x: 0, y: 100 }, { x: 1000, y: 100 }]
+  const occupied: EdgeRect[] = []
+  let hidden = 0
+
+  for (let index = 0; index < 6; index += 1) {
+    const placement = placeEdgeLabel(curve, [hub], occupied, 140, index % 2 === 0)
+    if (!placement) {
+      hidden += 1
+      continue
+    }
+    expect(intersects(placement.rect, hub)).toBe(false)
+    expect(occupied.every((pill) => !intersects(placement.rect, pill))).toBe(true)
+    occupied.push(placement.rect)
+  }
+
+  expect(occupied.length).toBeGreaterThan(0)
+  expect(hidden).toBeGreaterThan(0)
+})
+
+test('orphan labels require at least one endpoint in or near the viewport', () => {
+  const viewport = { x: 0, y: 0, width: 500, height: 300 }
+  const farSource = { x: 900, y: 80, width: 100, height: 60 }
+  const farTarget = { x: 1200, y: 120, width: 100, height: 60 }
+  const nearSource = { ...farSource, x: 560 }
+
+  expect(endpointsNearViewport(farSource, farTarget, viewport, 80)).toBe(false)
+  expect(endpointsNearViewport(nearSource, farTarget, viewport, 80)).toBe(true)
 })

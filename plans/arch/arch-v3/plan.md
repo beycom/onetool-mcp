@@ -161,8 +161,12 @@ may run in parallel once their architect inputs exist). Completed
 chunks keep their historical ids — `D1`–`D14`, `D13a`–`D13d`, and
 `P11`–`P14` — in the progress log, the design docs, and delegation.md,
 because renaming finished work would break those references. Chunk
-evidence dirs under `plans/arch/wip/test-results/` follow the chunk id
-(`chunk-15/`; the older `p13/`, `p14/` dirs are frozen history).
+evidence dirs live under `/tmp/arch-v3-evidence/test-results/` and
+follow the chunk id (`chunk-15/`) — moved out of `plans/arch/wip/`
+2026-08-31 (user request: screenshots that are never committed belong
+in tmp; the older `p13/`, `p14/`, `exit-gate/` dirs moved with it).
+Evidence is transient — gates cite it, but it does not survive
+reboots.
 
 **Identifier registries (one line each, so no scheme is ever confused
 with another):**
@@ -274,15 +278,16 @@ docs):
   hash + localStorage, shared invariant suite, dev-only ?layout= A/B
   harness. Default-method decision (architect, from the captures): the
   topology-aware default is retained (layout-design.md Decisions 0).
-- [ ] **chunk-15 — edge-label collision + collapse affordance +
+- [x] **chunk-15 — edge-label collision + collapse affordance +
   Detail-dropdown removal** (added 2026-08-30 when the user flagged
   that issues p14 and p16 were owned by no chunk; p27 added same day
   by user decision: remove. Specs: report.md "Collision invariant
   (chunk-15)" under At-rest edge labels — absorbs p18's deferred
   orphan-label clause — "Collapse-control placement (chunk-15)" and
-  "Detail dropdown: REMOVED" under the Map contract; prompt READY in
-  delegation.md, proposed budget 700). Runs before the exit-gate user
-  half: p14 reproduces in the gate's own select-card walkthrough step.
+  "Detail dropdown: REMOVED" under the Map contract. DONE, gate
+  PASSED 2026-08-31 at 193/700 changed source lines including the
+  architect's port-label fix — see the progress log; p14/p16/p27
+  resolved).
 - [ ] **Phase 1 exit gate (architect + user)** — runs after the chunk-15
   gate (label collision changes the rendered frame). The held 3P exit gate:
   open acme's report cold and the story reads without explanation and
@@ -406,6 +411,52 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-31** — chunk-15 architect gate PASSED (with one architect
+  gate fix); tree committed; issues p14/p16/p27 RESOLVED → resolved/.
+  The executor had left the work uncommitted with no log entry and no
+  evidence captures — the architect ran the full verification instead:
+  frontend 73→75 passed, tsc clean, `just build-arch-report`
+  reproduced the executor's template byte-for-byte, acme regenerated,
+  file:// walkthrough at 1440×900 console-clean (0 warnings/errors,
+  one local request). Verified live: legacy `#level=containers` link
+  rewrites to the preset `expand=` set in one history push with no
+  Detail control and no View-dock gap; all 10 boundary collapse
+  controls render `−` inline after their own title (correct
+  aria-labels), and at close zoom an off-screen boundary header keeps
+  its control off-screen (p16's exact failure mode); hub selection at
+  fit reveals 12 one-hop pills with 0 pill-card / 0 pill-pill
+  overlaps; orphan suppression drops all pills when no endpoint is
+  near the viewport. GATE FIX (architect, in-scope): the p14 issue's
+  offending "chips" were partly `.interface-port` labels (P11 ports,
+  auto-expanded at Full depth, centered ON the card perimeter — half
+  the label overlapped the card by construction), which the chunk-15
+  contract never named; the executor's pill pass was faithful to the
+  spec. Fix: `portLabelPlacement` in edgePresentation.ts offsets the
+  expanded label outside the card along the anchor side's normal;
+  App.tsx runs port labels through the same occupied-rect pass
+  (hide → dot when they don't fit; direct reveal exempt, z-index 20);
+  CSS caps rendered port labels at 200 px with ellipsis so the
+  rendered rect never exceeds the estimate. report.md "Collision
+  invariant (chunk-15)" amended ("Port labels included"). Re-check
+  after fix: p14 repro scene (hub selected, zoom 2) renders 9 label
+  chips, 0 over cards, 0 over each other. Budget 193/700 changed
+  source lines (executor ~145 + fix ~48; tests and generated template
+  excluded). Prescribed tests delivered as 5 (some unit-level rather
+  than scene-level — accepted) + 2 architect port tests. EVIDENCE
+  MOVED TO TMP (user request this session): all gate screenshots now
+  live under `/tmp/arch-v3-evidence/test-results/` (chunk-15/ has the
+  before/after captures; p13/p14/exit-gate/layout-ab moved as-is) —
+  plans/arch/wip/ no longer accumulates PNGs; registry line updated.
+  PIPELINE: chunk-21 prompt re-reviewed against this tree — no
+  changes (Python-only scope); its status is upgraded to "may run NOW
+  in a separate worktree" since it shares no files with the UI work
+  and does not depend on the exit-gate outcome
+  (`git worktree add ../arch-v3-c21 -b feature/arch-v3-c21
+  feature/arch-v3`, merge after its gate, after chunk-15's commit).
+  Next action: the Phase 1 exit gate — architect walkthrough re-run
+  on this tree (label + port rendering changed the frame), then the
+  user half; chunk-21 may start in parallel any time.
 
 - **2026-08-30** — p27 DECIDED (user): the Detail dropdown is
   **removed**, riding chunk-15; tree committed. Design landed as:

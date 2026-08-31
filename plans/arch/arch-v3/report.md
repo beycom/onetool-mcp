@@ -1366,6 +1366,18 @@ semantics (P12), `projection.ts`, Info/Data content, drill behavior.
   reveals exactly that pill above everything else (a single direct
   reveal is exempt from the pass — one pill can always show). The pass
   re-runs on zoom-band, selection, and expansion changes.
+  **Port labels included (gate amendment 2026-08-31):** expanded
+  `interface-port` labels (P11's distributed ports, expanded at Full
+  depth) are label chips too — p14's offending chips were partly port
+  labels. An expanded port label anchors *outside* its card, offset
+  from the port point along the anchor side's outward normal, and
+  joins the same one-pass collision set (cards, boundary headers,
+  pills, other port labels — the muted boundary *description* is not
+  an obstacle); a port label that cannot be placed stays a 5 px dot.
+  Direct reveal (its spline selected or hovered) is exempt and renders
+  above everything; while any spline is hovered or selected, only the
+  direct reveal's label chips show. Rendered port labels cap at 200 px
+  with ellipsis so the rendered rect never exceeds the estimated one.
 - **Orphan suppression (rides from issue p18):** a pill renders only
   when at least one endpoint of its spline is in or near the viewport —
   no chips floating in empty space.
