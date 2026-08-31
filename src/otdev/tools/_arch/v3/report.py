@@ -7,9 +7,8 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 
+from .api import _load_document
 from .payload import build_payload
-from .validate import validate
-from .yamlio import load_architecture
 
 PAYLOAD_TOKEN = "__ARCH_PAYLOAD_JSON__"
 TEMPLATE_PATH = Path(__file__).parent / "_bundle" / "report-template.html"
@@ -21,12 +20,12 @@ class ReportError(ValueError):
 
 def payload_file(yaml_path: Path) -> dict[str, Any]:
     """Load, validate, and compile one architecture payload."""
-    architecture = load_architecture(yaml_path)
-    errors = [item for item in validate(architecture) if item.severity == "error"]
+    architecture, sequences, findings = _load_document(yaml_path)
+    errors = [item for item in findings if item.severity == "error"]
     if errors:
         codes = ", ".join(dict.fromkeys(item.code for item in errors))
         raise ReportError(f"architecture has validation errors: {codes}")
-    return build_payload(architecture, yaml_path.name)
+    return build_payload(architecture, yaml_path.name, sequences=sequences)
 
 
 def generate_report(yaml_path: Path, html_path: Path) -> dict[str, Any]:

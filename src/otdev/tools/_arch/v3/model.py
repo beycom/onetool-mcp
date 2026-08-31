@@ -123,6 +123,7 @@ class Interface(TemporalNamedItem):
     consumer: Identifier
     call_direction: CallDirection = "consumer_to_provider"
     data_flow_direction: DataFlowDirection = "provider_to_consumer"
+    attachments: list[str] = Field(default_factory=list)
 
 
 class Relationship(StrictModel):

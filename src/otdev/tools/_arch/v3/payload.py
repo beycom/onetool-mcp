@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from .attachments import attachment_language, inspect_attachment
 from .resolver import (
     KINDS,
     StateSelector,
@@ -13,6 +14,8 @@ from .resolver import (
     resolve,
     timeline_view,
 )
+from .sequence import compile_sequences
+from .yamlio import source_location
 
 if TYPE_CHECKING:
     from .model import Architecture, StrictModel
@@ -20,7 +23,7 @@ if TYPE_CHECKING:
 
 def _serialize(item: StrictModel) -> dict[str, Any]:
     value = item.model_dump(by_alias=True, exclude_none=True, mode="json")
-    for field in ("tags", "properties"):
+    for field in ("tags", "properties", "attachments"):
         if not value.get(field):
             value.pop(field, None)
     defaults = {
@@ -66,10 +69,15 @@ def _clip_segments(
     return segments
 
 
-def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any]:
+def build_payload(
+    architecture: Architecture,
+    source_name: str,
+    *,
+    sequences: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Compile an architecture into the ``arch-report/v1`` payload."""
     timelines = architecture.timelines or []
-    materialized = (
+    materialized: list[dict[str, Any]] = (
         [{"id": item.id, "milestones": list(item.milestones)} for item in timelines]
         if timelines
         else [
@@ -135,7 +143,7 @@ def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any
             ]
             serialized_rows[kind].append(value)
 
-    return {
+    payload = {
         "payload": "arch-report/v1",
         "schema_version": 3,
         "source": Path(source_name).name,
@@ -153,3 +161,35 @@ def build_payload(architecture: Architecture, source_name: str) -> dict[str, Any
         ),
         "rows": serialized_rows,
     }
+    compiled = compile_sequences(architecture)[0] if sequences is None else sequences
+    if compiled:
+        payload["sequences"] = compiled
+    references = {
+        relative
+        for interface in architecture.interfaces
+        for relative in interface.attachments
+    }
+
+    def collect(items: list[dict[str, Any]]) -> None:
+        for item in items:
+            references.update(item.get("attachments", []))
+            collect(item.get("items", []))
+            for branch in item.get("else", []):
+                collect(branch.get("items", []))
+
+    for sequence in compiled:
+        for scenario in sequence["scenarios"]:
+            collect(scenario["items"])
+    source, _mark = source_location(architecture, ())
+    if references and source is not None:
+        files: dict[str, dict[str, str]] = {}
+        for relative in sorted(references):
+            _code, text, _size = inspect_attachment(source.parent, relative)
+            if text is not None:
+                files[relative] = {
+                    "lang": attachment_language(relative),
+                    "text": text,
+                }
+        if files:
+            payload["files"] = files
+    return payload

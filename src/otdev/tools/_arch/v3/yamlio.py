@@ -95,6 +95,7 @@ _ROW_KEYS = {
         "consumer",
         "call_direction",
         "data_flow_direction",
+        "attachments",
         "start_in",
         "end_in",
         "description",
@@ -271,6 +272,8 @@ def load_architecture(path: Path) -> Architecture:
 
 def _ordered_row(row: dict[str, Any], *, collection: str) -> dict[str, Any]:
     if collection == "interfaces":
+        if not row.get("attachments"):
+            row.pop("attachments", None)
         if row.get("call_direction") == "consumer_to_provider":
             row.pop("call_direction")
         if row.get("data_flow_direction") == "provider_to_consumer":

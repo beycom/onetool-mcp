@@ -109,6 +109,7 @@ HEADERS = {
         "consumer",
         "call_direction",
         "data_flow_direction",
+        "attachments",
         "start_in",
         "end_in",
         "description",
@@ -141,7 +142,7 @@ ID_FIELDS = {
     "end_in",
 }
 ENUM_FIELDS = {"call_direction", "data_flow_direction"}
-LIST_FIELDS = {"tags"}
+LIST_FIELDS = {"tags", "attachments"}
 PROPERTY_SHEETS = set(COLLECTIONS)
 MILESTONE_VALIDATION_NAME = "arch_milestones"
 END_MILESTONE_VALIDATION_NAME = "arch_end_milestones"

@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Any
 from .ids import assign_missing_ids
 from .model import Architecture
 from .resolver import StateSelector, advance, diff, resolve
-from .validate import validate
+from .sequence import compile_sequences
+from .validate import Finding, validate
 from .yamlio import dump_architecture, load_architecture
 
 if TYPE_CHECKING:
@@ -17,6 +18,14 @@ if TYPE_CHECKING:
 
 class ArchitectureValidationError(ValueError):
     """Raised when an operation requires structurally valid input."""
+
+
+def _load_document(
+    path: Path,
+) -> tuple[Architecture, list[dict[str, Any]], list[Finding]]:
+    architecture = load_architecture(path)
+    sequences, sequence_findings = compile_sequences(architecture)
+    return architecture, sequences, [*validate(architecture), *sequence_findings]
 
 
 def _starter() -> Architecture:
@@ -62,7 +71,7 @@ def init_file(path: Path) -> dict[str, Any]:
 
 def validate_file(path: Path) -> dict[str, Any]:
     """Load a file and return its structured validation payload."""
-    findings = validate(load_architecture(path))
+    _architecture, _sequences, findings = _load_document(path)
     errors = [asdict(item) for item in findings if item.severity == "error"]
     warnings = [asdict(item) for item in findings if item.severity == "warning"]
     return {

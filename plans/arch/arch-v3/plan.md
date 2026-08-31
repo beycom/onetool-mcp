@@ -324,14 +324,14 @@ inputs exist:
       `attachments` column, and two new architect-authored parser
       vectors (`flows/attachments*.md` + `files/` samples) in the chunk-21
       control fixture. The held chunk-21 prompt was re-scoped the same day.
-- [ ] **chunk-21 (was D12a)** — sequence parser, validation findings,
+- [x] **chunk-21 (was D12a)** — sequence parser, validation findings,
       `sequences` payload, interface + message attachments (fields,
       resolution, `files` embedding, Excel column), CLI + facade
       wiring. Control mechanism: the parser-vector fixture
       (`tests/unit/tools/fixtures/arch/sequence/`, committed
-      2026-08-25; attachments vectors added 2026-08-30). Prompt
-      re-scoped 2026-08-30, READY (proposed budget 700) — runs at the
-      Phase 1 exit gate.
+      2026-08-25; attachments vectors added 2026-08-30). DONE, gate
+      PASSED 2026-08-31 at 699/700 changed source lines, no architect
+      fix needed — see the progress log.
 - [ ] **chunk-22 (was D11)** — saved report definitions + guided views:
       `p3-report-definitions` (named reports, view-mode flow — starting
       point: export the config as a ready-to-paste `views:` YAML entry;
@@ -396,9 +396,11 @@ None yet. Format: `branch-name — question being explored — outcome`.
 1. Per-state layout fallback if union-graph layout is chronically poor for
    sparse early states (risk table; re-evaluate at the Phase 1 exit
    gate — D13b's layout work may moot it).
-
 Answered questions (answers live in the design docs; details in
-log-archive.md): P12 anchor-capacity overflow (Q2 of the P12 gate,
+log-archive.md): stale payload fixtures (Q2, answered at the chunk-21
+gate 2026-08-31 — both refreshed via CLI regeneration so byte-identity
+checks stay clean; `layout: {}` is the P14 contract enforced by
+`test_arch_v3_payload.py`); P12 anchor-capacity overflow (Q2 of the P12 gate,
 2026-08-29 — perimeter spill to adjacent sides, architect-implemented;
 report.md "Perimeter overflow" under pass-5 edge termination is the
 authority); bundle location/build wiring (report.md "Shape");
@@ -411,6 +413,71 @@ and mined (Q6, 2026-08-24); D9b projection-vector conversion to
 inclusive `end_in` (Q7, 2026-08-24).
 
 ## Progress log (append-only, newest first)
+
+- **2026-08-31** — chunk-21 architect gate PASSED, no gate fix needed;
+  tree committed; open question 2 ANSWERED (stale fixtures refreshed).
+  Independently re-verified: targeted sequence suite 5 passed, full
+  arch selection 88 passed, `just lint` clean, CLI standalone validate
+  on the control model 0 errors / 3 expected warnings, budget exactly
+  699/700 changed source lines (102 modified + 597 new; tests
+  excluded), generated acme HTML byte-identical to the checked-in
+  artifact. Code review conforms to the re-scoped prompt and the
+  fixture README's pinned decisions: shared `attachments.py`
+  (grammar + escape + UTF-8 + 256 KB checks, one inspect function for
+  both interface rows and `attach` lines), `sequence.py` compiler
+  (fence/scenario parsing, arrow matrix, frames, defer pairing,
+  auto-activation LIFO reply matching, drop-defaults, interval
+  segments with clips always []), payload key order rows → sequences →
+  files with both omitted when empty (that is what kept every existing
+  payload byte-identical — D10's surface untouched), Excel
+  `attachments` list cell in the adapters.md column position, findings
+  routed through the new `_load_document` shared load path so
+  validate/generate/payload all pick flows up and generate stays
+  atomic. All five executor assumptions ACCEPTED (scope-guard reading
+  of the "four defects" wording; payload order; raw attachment strings
+  until located validation; the `layout` contract not bent to stale
+  JSON; UI rule 9 not applicable to a Python-only chunk). OPEN
+  QUESTION 2 DECIDED: refresh, not baseline revision —
+  `tests/unit/tools/fixtures/arch/projection/payload.json` and
+  `frontend/arch-report/src/fixture-payload.json` regenerated via the
+  CLI (delta: the `layout: {}` key only, verified before refresh);
+  arch py 88 and frontend 75 pass on the refreshed fixtures. Next
+  action: two architect items remain, in either order — the Phase 1
+  exit gate walkthrough re-run (owed since the chunk-15 gate; blocks
+  wave-2 chunk-22/23) and the chunk-31 control artifacts (layout
+  vectors + 2–3 acme flow docs; chunk-31 is now unblocked by this
+  gate).
+
+- **2026-08-31** — chunk-21 sequence parser, payload, and attachments
+  implemented; left uncommitted for architect review. Markdown flow docs now
+  compile from sorted `sequences/*.md` discovery with located findings,
+  interval segments, participants, scenarios, frames, notes, messages,
+  activation/deferred rules, and attachment statements. Interface attachments
+  now round-trip through canonical YAML and Excel, validate relative UTF-8
+  files with the shared finding codes, and embed once in sorted payload
+  `files`; sequence payload is omitted when absent. Validate, payload, and
+  generate share sequence discovery, and generate remains atomic on flow
+  errors. Source budget: **699 / 700 changed lines** (additions + deletions;
+  tests excluded). Tests: exactly 5 prescribed cases added; the targeted file
+  passed **5**, the full arch selection passed **88 / 540 deselected**, and
+  `just lint` passed. CLI validate on the control model reported **0 errors / 3
+  expected model warnings**; the generated acme HTML remained byte-identical.
+  Projection and acme pretty payload byte checks differ only by P14's
+  pre-existing `layout: {}` key omission in the checked-in JSON; Open question
+  2 records the stale-fixture decision. UI rule 9 required no browser pass
+  because the issued chunk is Python-only and touched no frontend file.
+  Assumptions: (1) the optional "four numbered defects" wording is a scope
+  guard against unrelated fixes, while all five numbered chunk-21 tasks remain
+  required; (2) the payload order is `rows`, optional `sequences`, optional
+  `files`, following sequence.md plus report.md; (3) attachment YAML strings
+  stay raw until located path validation so whitespace cannot become a valid
+  path through coercion; (4) P13's four resolved issue files and
+  layout-design.md introduce no sequence behavior, but confirm that P14's
+  `layout` payload contract must not be changed to make stale JSON compare;
+  (5) UI rule 9 applies only when `frontend/arch-report/` is touched, matching
+  its own scope and chunk-21's explicit no-frontend rule. Open questions: the
+  stale payload fixtures above only. Next action: architect gate review, then
+  author the chunk-31 control artifacts if the gate passes.
 
 - **2026-08-31** — chunk-15 architect gate PASSED (with one architect
   gate fix); tree committed; issues p14/p16/p27 RESOLVED → resolved/.

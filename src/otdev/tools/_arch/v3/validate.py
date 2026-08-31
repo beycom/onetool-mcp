@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from itertools import pairwise
 from typing import Literal
 
+from .attachments import MAX_ATTACHMENT_BYTES, inspect_attachment
 from .model import Architecture, Interface, Relationship
 from .resolver import (
     ENDPOINT_KINDS,
@@ -108,6 +109,29 @@ def _theme_findings(architecture: Architecture) -> list[Finding]:
                     path,
                 )
             )
+    return findings
+
+
+def _attachment_findings(architecture: Architecture) -> list[Finding]:
+    source, _mark = source_location(architecture, ())
+    if source is None:
+        return []
+    findings: list[Finding] = []
+    for row_index, interface in enumerate(architecture.interfaces):
+        for attachment_index, relative in enumerate(interface.attachments):
+            code, _text, size = inspect_attachment(source.parent, relative)
+            path = ("interfaces", row_index, "attachments", attachment_index)
+            if code is not None or size > MAX_ATTACHMENT_BYTES:
+                finding_code = code or "large_attachment"
+                findings.append(
+                    _finding(
+                        architecture,
+                        "error" if code is not None else "warning",
+                        finding_code,
+                        f"attachment {relative!r}",
+                        path,
+                    )
+                )
     return findings
 
 
@@ -462,6 +486,7 @@ def _resolution_warnings(architecture: Architecture) -> list[Finding]:
 def validate(architecture: Architecture) -> list[Finding]:
     """Return all structural errors and advisory warnings."""
     findings = _required_findings(architecture)
+    findings.extend(_attachment_findings(architecture))
     findings.extend(_theme_findings(architecture))
     findings.extend(_layout_findings(architecture))
     findings.extend(_duplicate_findings(architecture))
