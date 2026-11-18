@@ -14,6 +14,6 @@ All code is in `src/onetool`. Follow the nearest owning module rather than addin
 
 Tests live under `tests/`; one [fixture server](../../tests/fixtures/fixture_server.py) supports stdio and loopback HTTP. Installed checks are under `tests/installed/`. [Documentation tests](../../tests/test_docs.py) run examples and check local links.
 
-When private planning is linked, start with the [V4 summary](../../planning/features/backlog/[gateway]-v4/summary.md). The bundle holds [tasks](../../planning/features/backlog/[gateway]-v4/tasks.md), [evidence](../../planning/features/backlog/[gateway]-v4/evidence.md), [POC entry point](../../planning/features/backlog/[gateway]-v4/pocs/README.md) and [upstream gap drafts](../../planning/features/backlog/[gateway]-v4/pocs/upstream-gaps.md). These links are optional outside the source workspace.
+When private planning is linked, start with the [V4 summary](../../planning/features/ready/[gateway]-v4/summary.md). The bundle holds [tasks](../../planning/features/ready/[gateway]-v4/tasks.md), [evidence](../../planning/features/ready/[gateway]-v4/evidence.md), [POC entry point](../../planning/features/ready/[gateway]-v4/pocs/README.md) and [upstream gap drafts](../../planning/features/ready/[gateway]-v4/pocs/upstream-gaps.md). These links are optional outside the source workspace.
 
 [Architecture](../project/architecture.md) explains composition; user-facing behavior belongs in [docs](../../docs/python.md). Build/test commands come from `justfile` and `pyproject.toml`.

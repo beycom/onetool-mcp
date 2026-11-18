@@ -20,9 +20,9 @@ OneTool V4 is a small MCP gateway: one YAML file, upstream MCP servers proxied t
 
 The plan is the source of truth. Read it before changing anything:
 
-- `planning/features/backlog/[gateway]-v4/summary.md` first, then `design.md`, `operations.md`, `tasks.md` and `validation.md`.
-- `planning/features/backlog/[gateway]-v4/reviews/stress-test-review.md` explains why the plan is small. Do not reintroduce what it removed.
-- Log task evidence in `planning/features/backlog/[gateway]-v4/evidence.md`. Keep POC scripts in `planning/features/backlog/[gateway]-v4/pocs/`.
+- `planning/features/ready/[gateway]-v4/summary.md` first, then `design.md`, `operations.md`, `tasks.md` and `validation.md`.
+- `planning/features/ready/[gateway]-v4/reviews/stress-test-review.md` explains why the plan is small. Approved scope revisions in `planning/plans/v4-follow-ups.md` supersede its removal decisions for the promoted iter-1 records.
+- Log task evidence in `planning/features/ready/[gateway]-v4/evidence.md`. Keep POC scripts in `planning/features/ready/[gateway]-v4/pocs/`.
 
 T03 removed the V3 source, tests, docs and OpenSpec. The preserved V3 source is readable at `archive/pre-v4-main`; do not restore it into V4.
 
@@ -33,7 +33,7 @@ Developer guidance: [dev-guides/index.md](dev-guides/index.md).
 - Upstream first. Before writing a module, check what FastMCP already does. A gap becomes an upstream issue or pull request where possible. A local stand-in is small, links the upstream issue, and is deleted when upstream ships.
 - Never reach into private FastMCP or MCP SDK attributes.
 - Prove unproven upstream behavior with a POC script before building on it.
-- Production budget is 2,000 to 3,500 lines. Docs budget is 800 user lines and 500 developer lines.
+- Production guidance is 2,000 to 3,500 lines; iter-1 budgets are guidance, not caps. Report production, test and docs lines per record. Docs targets are 800 user lines and 500 developer lines.
 - One package, `src/onetool`. Standard-library argparse and logging. No service locator, plugin loader, module-level runtime state or duplicate sync and async APIs.
 - Never replay a tool call automatically. Report an interrupted call's outcome as unknown.
 - Never log code, arguments, results, header values or env values.
