@@ -87,7 +87,8 @@ worktree-new branch base="main":
 planning-link:
     #!/usr/bin/env bash
     set -euo pipefail
-    repo="../onetool-mcp-planning"
+    common_dir="$(git rev-parse --path-format=absolute --git-common-dir)"
+    repo="$(dirname "$common_dir")/../onetool-mcp-planning"
     if [[ ! -d "$repo/.git" ]]; then
         echo "planning repository missing at $repo; clone or create it beside this checkout" >&2
         exit 1
@@ -103,8 +104,9 @@ planning-link:
     if [[ ! -d .codex ]]; then
         echo "warning: .codex is missing; restore the agent configuration before creating worktrees" >&2
     fi
-    [[ -e .claude ]] || ln -s .codex .claude
-    ls -ld planning .codex .claude
+    [[ -e .claude || -L .claude ]] || ln -s .codex .claude
+    ls -ld planning .claude
+    if [[ -e .codex || -L .codex ]]; then ls -ld .codex; fi
 
 # Uncommitted planning changes and the count of commits not yet on origin/main
 planning-status:
