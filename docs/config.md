@@ -13,7 +13,7 @@ Use UTF-8 YAML, one mapping document, at most 1 MiB. Unknown keys, duplicate key
 | `execution` | Optional execution limits |
 | `logging` | Optional operational logging |
 
-Server names match `[a-z][a-z0-9_]*`. `onetool` is reserved. Native namespaces normally produce `server_tool` names. If two server/tool combinations produce the same name, discovery/execution fails with both source names.
+Server names match `[a-z][a-z0-9_]*`. `onetool` and sandbox helper names `call_tool`, `call_tools`, `set_format`, `results` are reserved. Native namespaces normally produce `server_tool` names. If two server/tool combinations produce the same name, discovery/execution fails with both source names.
 
 ## Stdio servers
 
@@ -70,6 +70,7 @@ Use environment references for credentials. Values supplied by substitution are 
 | Key | Default | Range |
 | --- | --- | --- |
 | `execution.timeout_seconds` | `60` | Finite, greater than 0, at most 3,600 |
+| `execution.max_tool_calls` | `50` | Integer, 1 through 1,000 |
 | `execution.max_output_bytes` | `65536` | Integer, 1,024 through 1,048,576 |
 | `logging.level` | `INFO` | DEBUG, INFO, WARNING, ERROR or CRITICAL |
 | `logging.file` | `null` | Optional path relative to the config directory |
@@ -78,4 +79,4 @@ Every execution has one deadline, including discovery needed by that execution. 
 
 Logs go to stderr. A requested file also receives JSON event records and rotates at 10 MiB with three backups. Failure to open it is a startup error. Records omit code, arguments, results and credential values; wire logs and raw upstream stderr are suppressed.
 
-`onetool_reload()` validates the file, then replaces all upstreams. It rejects changed execution/logging settings; restart the gateway process for those. Set `enabled: false` in YAML to disable a server. See [operations](troubleshooting.md#reload-and-restart).
+`onetool_reload()` validates the file, then replaces all upstreams. It rejects changed execution/logging settings; restart the gateway process for those. Set `enabled: false` in YAML for a persistent setting, or use `onetool_servers(action="disable", name=...)` for a session override. See [operations](troubleshooting.md#server-controls-and-reload).

@@ -42,9 +42,9 @@ That example belongs in the checkout's `examples/` directory. Paths in arguments
 Use `search` to find `alpha_add` and `beta_add`, then `get_schema` to inspect their parameters. Pass this Python as `execute`'s `code` argument:
 
 ```python
-left = await call_tool("alpha_add", {"a": 2, "b": 3})
-right = await call_tool("beta_add", {"a": 4, "b": 5})
-return await call_tool("alpha_add", {"a": left["value"], "b": right["value"]})
+left = await alpha.add(a=2, b=3)
+right = await beta.add(a=4, b=5)
+return await alpha.add(a=left["value"], b=right["value"])
 ```
 
 The result is `{"value": 14}`. Python variables last for one execution; upstream state can last for the gateway process.

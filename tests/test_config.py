@@ -270,3 +270,29 @@ def test_short_literal_values_are_not_masks_but_substitutions_are(
         )
     )
     assert set(config.secret_values) == {"2", "long-literal-secret"}
+
+
+@pytest.mark.parametrize("value", [0, 1001, True, "50"])
+def test_tool_budget_is_strict(tmp_path: Path, value: object) -> None:
+    import yaml
+
+    path = tmp_path / "budget.yaml"
+    path.write_text(
+        yaml.safe_dump({"version": 4, "servers": {}, "execution": {"max_tool_calls": value}})
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)
+
+
+@pytest.mark.parametrize("name", ["call_tool", "call_tools", "set_format", "results"])
+def test_sandbox_helper_server_names_are_reserved(tmp_path: Path, name: str) -> None:
+    import yaml
+
+    path = tmp_path / "reserved.yaml"
+    path.write_text(
+        yaml.safe_dump(
+            {"version": 4, "servers": {name: {"transport": "stdio", "command": "python"}}}
+        )
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)

@@ -3,9 +3,11 @@
 import asyncio
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
+import pytest
 import yaml
 from test_gateway import connected, execute, stdio
 
@@ -18,7 +20,7 @@ async def test_reload_restart_and_catalog_change(tmp_path: Path) -> None:
     ):
         a = (await execute(client, 'return await call_tool("alpha_counter", {})')).data
         b = (await execute(client, 'return await call_tool("beta_counter", {})')).data
-        await client.call_tool("onetool_restart_server", {"name": "alpha"})
+        await client.call_tool("onetool_servers", {"action": "restart", "name": "alpha"})
         a2 = (await execute(client, 'return await call_tool("alpha_counter", {})')).data
         b2 = (await execute(client, 'return await call_tool("beta_counter", {})')).data
         assert a2["count"] == 1 and a2["pid"] != a["pid"]
@@ -329,7 +331,7 @@ async def test_cancelled_admin_drain_reopens_execution(tmp_path: Path) -> None:
             raise AssertionError("fixture did not start")
         for tool, arguments in [
             ("onetool_reload", {}),
-            ("onetool_restart_server", {"name": "alpha"}),
+            ("onetool_servers", {"action": "restart", "name": "alpha"}),
         ]:
             admin = asyncio.create_task(client.call_tool(tool, arguments))
             await asyncio.sleep(0.1)
@@ -343,3 +345,104 @@ async def test_cancelled_admin_drain_reopens_execution(tmp_path: Path) -> None:
             assert (await execute(client, "return 42")).content[0].text == "42"
         work.cancel()
         await asyncio.gather(work, return_exceptions=True)
+
+
+async def test_session_controls_and_disk_restart(tmp_path: Path) -> None:
+    events = tmp_path / "alpha-events.jsonl"
+    async with connected(tmp_path, {"servers": {"alpha": stdio(events), "beta": stdio()}}) as (
+        client,
+        config,
+        _,
+    ):
+        first = (await execute(client, "return await alpha.counter()")).data
+        beta = (await execute(client, "return await beta.counter()")).data
+        original = config.read_text()
+        disabled = await client.call_tool("onetool_servers", {"action": "disable", "name": "alpha"})
+        assert disabled.data["state"] == "disabled" and not disabled.data["session_enabled"]
+        assert config.read_text() == original
+        with pytest.raises(ProcessLookupError):
+            os.kill(first["pid"], 0)
+        assert "alpha_add" not in str((await client.call_tool("search", {"query": "add"})).content)
+        assert (await execute(client, "return await beta.counter()")).data["pid"] == beta["pid"]
+        await client.call_tool("onetool_servers", {"action": "disable", "name": "alpha"})
+        enabled = await client.call_tool("onetool_servers", {"action": "enable", "name": "alpha"})
+        assert enabled.data["state"] == "ready" and enabled.data["tool_count"] > 0
+        assert (await execute(client, "return await alpha.counter()")).data["count"] == 1
+        data = yaml.safe_load(original)
+        data["servers"]["alpha"]["env"] = {"NEW_CONFIG": "non-sensitive"}
+        data["servers"]["beta"]["timeout_seconds"] = 12
+        data["execution"] = {"max_tool_calls": 100}
+        config.write_text(yaml.safe_dump(data))
+        changed = await client.call_tool("onetool_servers", {"action": "restart", "name": "alpha"})
+        assert changed.data["pending_servers"] == ["beta"] and changed.data["restart_required"] == [
+            "execution"
+        ]
+        assert (await execute(client, "return await beta.counter()")).data["pid"] == beta["pid"]
+        assert (await execute(client, "return await alpha.counter()")).data["pid"] != first["pid"]
+        config.write_text("version: 3\nservers: {}\n")
+        failure = await client.call_tool(
+            "onetool_servers", {"action": "restart", "name": "alpha"}, raise_on_error=False
+        )
+        assert failure.is_error
+        await client.call_tool("onetool_servers", {"action": "disable", "name": "alpha"})
+        config.write_text(original)
+        await client.call_tool("onetool_reload", {})
+        assert (
+            await client.call_tool("onetool_servers", {"action": "status", "name": "alpha"})
+        ).data["session_enabled"]
+        unknown = await client.call_tool(
+            "onetool_servers", {"action": "enable", "name": "missing"}, raise_on_error=False
+        )
+        assert unknown.is_error and "alpha" in str(unknown.content)
+
+
+async def test_disable_drains_only_target_and_preserves_unknown_outcome(tmp_path: Path) -> None:
+    events = tmp_path / "events.jsonl"
+    async with connected(tmp_path, {"servers": {"alpha": stdio(events), "beta": stdio()}}) as (
+        client,
+        _,
+        _,
+    ):
+        call = asyncio.create_task(
+            execute(client, "return await alpha.append_wait(seconds=30)", raise_on_error=False)
+        )
+        for _ in range(100):
+            if events.exists() and "append-wait" in events.read_text():
+                break
+            await asyncio.sleep(0.02)
+        disable = asyncio.create_task(
+            client.call_tool("onetool_servers", {"action": "disable", "name": "alpha"})
+        )
+        await asyncio.sleep(0.05)
+        assert (await execute(client, "return await beta.add(a=1,b=2)")).data == {"value": 3}
+        await asyncio.wait_for(disable, 7)
+        result = await asyncio.wait_for(call, 2)
+        assert result.is_error and "unknown" in str(result.content).lower()
+    assert (
+        sum(json.loads(line)["event"] == "append-wait" for line in events.read_text().splitlines())
+        == 1
+    )
+
+
+async def test_concurrent_controls_leave_consistent_state_and_no_processes(tmp_path: Path) -> None:
+    events = tmp_path / "controls-events.jsonl"
+    async with connected(tmp_path, {"servers": {"alpha": stdio(events, enabled=False)}}) as (
+        client,
+        _,
+        _,
+    ):
+        await asyncio.gather(
+            *(
+                client.call_tool("onetool_servers", {"action": action, "name": "alpha"})
+                for action in ["enable", "disable", "enable"]
+            )
+        )
+        await client.call_tool("onetool_servers", {"action": "disable", "name": "alpha"})
+        status = (
+            await client.call_tool("onetool_servers", {"action": "status", "name": "alpha"})
+        ).data
+        assert status["state"] == "disabled" and not status["session_enabled"]
+        assert "alpha_" not in str((await client.call_tool("search", {"query": "add"})).content)
+    for pid in {json.loads(line)["pid"] for line in events.read_text().splitlines()}:
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)

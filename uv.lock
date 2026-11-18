@@ -933,6 +933,7 @@ dependencies = [
     { name = "mcp" },
     { name = "py-key-value-aio", extra = ["keyring"] },
     { name = "pydantic" },
+    { name = "pydantic-monty" },
     { name = "pyyaml" },
 ]
 
@@ -952,6 +953,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.3.0,<3" },
     { name = "py-key-value-aio", extras = ["keyring"], specifier = ">=0.5.0,<0.6" },
     { name = "pydantic", specifier = ">=2.14.3,<3" },
+    { name = "pydantic-monty", specifier = ">=1.6.0,<1.7" },
     { name = "pyyaml", specifier = ">=6.0.3,<7" },
 ]
 

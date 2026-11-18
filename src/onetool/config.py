@@ -66,6 +66,7 @@ class HttpServer(Server):
 class Execution(StrictModel):
     timeout_seconds: Annotated[float, Field(gt=0, le=3600, allow_inf_nan=False)] = 60
     max_output_bytes: Annotated[int, Field(ge=1024, le=1048576)] = 65536
+    max_tool_calls: Annotated[int, Field(ge=1, le=1000)] = 50
 
 
 class LoggingConfig(StrictModel):
@@ -92,7 +93,13 @@ class GatewayConfig(StrictModel):
         cls, values: dict[str, StdioServer | HttpServer]
     ) -> dict[str, StdioServer | HttpServer]:
         for name in values:
-            if name == "onetool" or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
+            if name in {
+                "onetool",
+                "call_tool",
+                "call_tools",
+                "set_format",
+                "results",
+            } or not re.fullmatch(r"[a-z][a-z0-9_]*", name):
                 raise ValueError("invalid or reserved server name")
         return values
 

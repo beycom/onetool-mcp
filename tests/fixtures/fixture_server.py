@@ -6,6 +6,7 @@ import json
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
@@ -35,9 +36,19 @@ def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMC
     server.add_middleware(CatalogProbe())
     record("start")
 
+    class FreeFormTool(Tool):
+        async def run(self, arguments: dict[str, Any]) -> ToolResult:
+            record("freeform")
+            return ToolResult(content=json.dumps(arguments), structured_content=arguments)
+
+    server.add_tool(
+        FreeFormTool(name="freeform", parameters={"type": "object", "additionalProperties": True})
+    )
+
     @server.tool
     def add(a: int, b: int) -> dict:
         """Add two integers."""
+        record("add")
         return {"value": a + b}
 
     @server.tool
@@ -50,10 +61,16 @@ def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMC
         """Return literal text without a schema."""
         return ToolResult(content=[TextContent(type="text", text=value)])
 
+    @server.tool(name="odd-tool")
+    def odd_tool(value: str) -> dict:
+        """An exact non-identifier tool name, with no synthesized alias."""
+        return {"value": value}
+
     @server.tool
     def counter() -> dict:
         """Increment process-local state and report the PID."""
         nonlocal count
+        record("counter")
         count += 1
         return {"count": count, "pid": os.getpid()}
 
@@ -107,6 +124,17 @@ def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMC
         """Append once, then return a large success or error."""
         record("append")
         return ToolResult(content=[TextContent(type="text", text="x" * size)], is_error=error)
+
+    @server.tool
+    async def append_wait(seconds: float = 30) -> dict:
+        """Perform one side effect, then wait so a control can interrupt the outcome."""
+        record("append-wait")
+        try:
+            await asyncio.sleep(seconds)
+        except asyncio.CancelledError:
+            record("append-wait-cancelled")
+            raise
+        return {"appended": True}
 
     @server.tool
     def interrupt() -> None:

@@ -1,6 +1,6 @@
 """One process, native proxy providers and CodeMode. No execution engine.
 
-Public-API wiring is proved in planning/features/backlog/[gateway]-v4/pocs/.
+Public-API wiring is proved in planning/features/ready/[gateway]-v4/pocs/.
 The small catalog/lifecycle stand-ins correspond to upstream-gaps.md there.
 """
 
@@ -24,7 +24,7 @@ from fastmcp import FastMCP
 from fastmcp.client.auth import OAuth
 from fastmcp.client.transports import StdioTransport
 from fastmcp.exceptions import ToolError
-from fastmcp.experimental.transforms.code_mode import CodeMode, MontySandboxProvider
+from fastmcp.experimental.transforms.code_mode import CodeMode
 from fastmcp.mcp_config import MCPConfig
 from fastmcp.prompts import Prompt
 from fastmcp.resources import Resource, ResourceTemplate
@@ -41,8 +41,9 @@ from mcp.shared.exceptions import MCPError
 from onetool import __version__
 from onetool.config import HttpServer, LoadedConfig, StdioServer
 from onetool.diagnostics import Redactor, event, logging_context
-from onetool.operations import Operations
-from onetool.results import ResultFiles
+from onetool.operations import Operations, UnknownOutcome
+from onetool.results import ResultFiles, encoded
+from onetool.sandbox import OneToolSandbox, Presentation
 
 
 def interruption(exc: BaseException) -> str | None:
@@ -109,6 +110,10 @@ class Backend:
         self.name = name
         self.config = config
         self.state = "lazy" if config.enabled else "disabled"
+        self.session_enabled: bool | None = None
+        self.accepting = True
+        self.active: set[asyncio.Task[Any]] = set()
+        self.draining: set[asyncio.Task[Any]] = set()
         self.tool_count: int | None = None
         self.last_error: str | None = None
         self.client: StatefulProxyClient[Any] | None = None
@@ -119,6 +124,10 @@ class Backend:
         )
         proxy.provider_error_strategy = "raise"
         self.provider = FastMCPProvider(proxy).wrap_transform(Namespace(name))
+
+    @property
+    def enabled(self) -> bool:
+        return self.config.enabled if self.session_enabled is None else self.session_enabled
 
     def get_client(self) -> Any:
         if self.client is None:
@@ -215,6 +224,11 @@ class BackendCalls(Middleware):
             "server": backend.name,
             "tool": context.message.name,
         }
+        if not backend.enabled or not backend.accepting:
+            raise ToolError(f"{backend.name}: server is disabled or changing; not dispatched")
+        task = asyncio.current_task()
+        assert task is not None
+        backend.active.add(task)
         try:
             async with asyncio.timeout(self.timeout()):
                 result = await call_next(context)
@@ -241,7 +255,7 @@ class BackendCalls(Middleware):
                 outcome="unknown",
                 error_category="timeout",
             )
-            raise ToolError(
+            raise UnknownOutcome(
                 f"{backend.name}/{context.message.name}: timeout; "
                 "dispatched outcome unknown. Do not replay."
             ) from None
@@ -255,6 +269,11 @@ class BackendCalls(Middleware):
                 outcome="unknown",
                 error_category="cancelled",
             )
+            if task in backend.draining:
+                task.uncancel()
+                raise UnknownOutcome(
+                    f"{backend.name}: dispatched outcome unknown. Do not replay."
+                ) from None
             raise
         except ToolError as exc:
             category = interruption(exc)
@@ -269,7 +288,7 @@ class BackendCalls(Middleware):
                     outcome="unknown",
                     error_category=category,
                 )
-                raise ToolError(
+                raise UnknownOutcome(
                     f"{backend.name}/{context.message.name}: {category}; "
                     "dispatched outcome unknown. Do not replay."
                 ) from None
@@ -294,10 +313,13 @@ class BackendCalls(Middleware):
                 outcome="unknown",
                 error_category=type(exc).__name__,
             )
-            raise ToolError(
+            raise UnknownOutcome(
                 f"{backend.name}/{context.message.name}: interrupted ({type(exc).__name__}); "
                 "dispatched outcome unknown. Do not replay."
             ) from None
+        finally:
+            backend.active.discard(task)
+            backend.draining.discard(task)
 
 
 class Catalog(Provider):
@@ -314,9 +336,9 @@ class Catalog(Provider):
         prefix, separator, _ = name.rpartition("_")
         while separator:
             backend = self.gateway.backends.get(prefix)
-            if backend is not None and backend.config.enabled:
+            if backend is not None and backend.enabled:
                 if any(
-                    prefix.startswith(other.name + "_") and other.config.enabled
+                    prefix.startswith(other.name + "_") and other.enabled
                     for other in self.gateway.backends.values()
                 ):
                     return await super()._get_tool(name, version)
@@ -331,7 +353,7 @@ class Catalog(Provider):
         memo = self.gateway.catalog_memo.get()
         if memo is not None and "tools" in memo:
             return memo["tools"]
-        backends = [backend for backend in self.gateway.backends.values() if backend.config.enabled]
+        backends = [backend for backend in self.gateway.backends.values() if backend.enabled]
         results = await asyncio.gather(
             *(backend.provider.list_tools() for backend in backends), return_exceptions=True
         )
@@ -372,7 +394,7 @@ class Catalog(Provider):
             *(
                 call(backend.provider)
                 for backend in self.gateway.backends.values()
-                if backend.config.enabled
+                if backend.enabled
             ),
             return_exceptions=True,
         )
@@ -435,6 +457,8 @@ class GatewayCalls(Middleware):
             deadline = time.monotonic() + gateway.config.model.execution.timeout_seconds
             deadline_token = gateway.deadline.set(deadline)
             memo_token = gateway.catalog_memo.set({})
+            presentation = Presentation(gateway.config.model.execution.max_output_bytes)
+            presentation_token = gateway.sandbox.presentation.set(presentation)
             try:
                 async with gateway.operations.execution(), asyncio.timeout_at(deadline):
                     result = await call_next(context)
@@ -478,6 +502,7 @@ class GatewayCalls(Middleware):
             finally:
                 gateway.deadline.reset(deadline_token)
                 gateway.catalog_memo.reset(memo_token)
+                gateway.sandbox.presentation.reset(presentation_token)
             event(
                 gateway.logger,
                 "execution_completed",
@@ -487,7 +512,12 @@ class GatewayCalls(Middleware):
                 duration=time.monotonic() - start,
                 outcome="error" if result.is_error else "success",
             )
-            return gateway.results.bound(gateway.sanitize_error(result))
+            result = gateway.sandbox.compose(gateway.sanitize_error(result), presentation)
+            bounded = gateway.results.bound(result)
+            rendered = gateway.sandbox.render(bounded, presentation)
+            if presentation.format != "json" and len(encoded(rendered)) > gateway.results.cap:
+                return gateway.results.bound(result, force=True)
+            return rendered
         finally:
             gateway.request_id.reset(token)
 
@@ -508,18 +538,15 @@ class Gateway:
         self.results = ResultFiles(logger, config.model.execution.max_output_bytes)
         self.operations = Operations(self)
         self.backends = self.build_backends(config)
+        self.sandbox = OneToolSandbox(self)
         execution = config.model.execution
         code = FastMCP(
             "tools",
             providers=[Catalog(self)],
             transforms=[
                 CodeMode(
-                    sandbox_provider=MontySandboxProvider(
-                        limits={
-                            "max_feed_duration_secs": execution.timeout_seconds,
-                            "max_memory": 100_000_000,
-                        }
-                    ),
+                    sandbox_provider=self.sandbox,
+                    max_tool_calls=execution.max_tool_calls,
                     wall_clock_timeout_secs=execution.timeout_seconds,
                 )
             ],
@@ -532,7 +559,7 @@ class Gateway:
         self.server.mount(code)
         self.server.tool(self.status, name="onetool_status")
         self.server.tool(self.reload, name="onetool_reload")
-        self.server.tool(self.restart_server, name="onetool_restart_server")
+        self.server.tool(self.servers, name="onetool_servers")
 
     def build_backends(self, config: LoadedConfig) -> dict[str, Backend]:
         return {name: Backend(self, name, server) for name, server in config.model.servers.items()}
@@ -602,7 +629,8 @@ class Gateway:
             "servers": {
                 name: {
                     "transport": backend.config.transport,
-                    "enabled": backend.config.enabled,
+                    "configured_enabled": backend.config.enabled,
+                    "session_enabled": backend.enabled,
                     "state": backend.state,
                     "tool_count": backend.tool_count,
                     "last_error": backend.last_error,
@@ -623,9 +651,9 @@ class Gateway:
         """Validate config and reset all upstream state. Execution/logging require restart."""
         return await self.operations.reload()
 
-    async def restart_server(self, name: str) -> dict[str, str]:
-        """Reset one server from loaded config. Never replay an interrupted call."""
-        return await self.operations.restart(name)
+    async def servers(self, action: str, name: str | None = None) -> dict[str, Any]:
+        """List/status configured servers or enable/disable/restart one for this session."""
+        return await self.operations.servers(action, name)
 
 
 def serve(config: LoadedConfig) -> None:

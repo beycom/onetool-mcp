@@ -42,9 +42,9 @@ class ResultFiles:
         self.directory = None
         self.temporary = None
 
-    def bound(self, result: ToolResult) -> ToolResult:
+    def bound(self, result: ToolResult, *, force: bool = False) -> ToolResult:
         raw = encoded(result)
-        if len(raw) <= self.cap:
+        if len(raw) <= self.cap and not force:
             return result
         if len(raw) > self.hard_limit:
             return ToolResult(
