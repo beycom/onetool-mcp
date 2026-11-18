@@ -1,0 +1,8 @@
+version: 4
+servers: {}
+execution:
+  timeout_seconds: 60
+  max_output_bytes: 65536
+logging:
+  level: INFO
+  file: null
