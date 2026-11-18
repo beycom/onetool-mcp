@@ -34,6 +34,18 @@ def encoded(result: ToolResult) -> bytes:
     ).encode()
 
 
+def limited_json(value: Any, limit: int) -> bytearray:
+    """Encode at most limit+1 bytes, without copying/traversing an amplified answer."""
+    raw = bytearray()
+    for chunk in json.JSONEncoder(ensure_ascii=False, default=str).iterencode(value):
+        remaining = limit + 1 - len(raw)
+        # A single escaped string chunk can be large; encode only its bounded prefix.
+        raw.extend(chunk[:remaining].encode("utf-8", errors="replace")[:remaining])
+        if len(raw) > limit:
+            break
+    return raw
+
+
 @dataclass(frozen=True)
 class ResultEntry:
     path: Path
@@ -49,6 +61,7 @@ class ResultFiles:
         self, logger: logging.Logger, cap: int, *, protect: Callable[[Any], Any] | None = None
     ):
         self.protect = protect or (lambda value: value)
+        self.worker_lock = asyncio.Lock()
         self.logger = logger
         self.cap = cap
         self.hard_limit = 16 * 1024 * 1024
@@ -209,31 +222,31 @@ class ResultFiles:
         return entry, envelope, text
 
     def fit(self, data: dict[str, Any]) -> dict[str, Any]:
-        from onetool.sandbox import safe_value
-
-        data = safe_value(data)
-        raw = json.dumps(data, ensure_ascii=False, default=str).encode("utf-8", errors="replace")
-
-        def size(value: dict[str, Any]) -> int:
-            return len(encoded(ToolResult(content=value, structured_content=value)))
-
-        if size(data) <= self.cap:
-            return data
-        if "handle" in data and "path" in data:
-            data = dict(data)
-            while data.get("preview") and size(data) > self.cap:
-                data["preview"] = data["preview"][: len(data["preview"]) // 2]
-            if size(data) <= self.cap:
-                return data
-        preview = raw[: self.cap // 2].decode("utf-8", errors="ignore")
+        # JMESPath can repeat references: never normalize/serialize an unbounded answer.
+        try:
+            raw = limited_json(data, self.cap)
+            if len(raw) <= self.cap:
+                data = json.loads(raw, parse_constant=str)
+                if len(encoded(ToolResult(content=data, structured_content=data))) <= self.cap:
+                    return data
+                if "handle" in data and "path" in data:
+                    while data.get("preview"):
+                        data["preview"] = data["preview"][: len(data["preview"]) // 2]
+                        if (
+                            len(encoded(ToolResult(content=data, structured_content=data)))
+                            <= self.cap
+                        ):
+                            return data
+        except (TypeError, ValueError, RecursionError):
+            return {"truncated": True, "message": "Result cannot be encoded; narrow the selection."}
+        preview = bytes(raw[: self.cap // 4]).decode("utf-8", errors="ignore")
         clipped = {
             "truncated": True,
             "preview": preview,
-            "message": (
-                "Narrow the selection or lower the page limit; do not repeat the upstream call."
-            ),
+            "message": "Narrow the selection or page limit; do not repeat the upstream call.",
+            **{key: data[key] for key in ("is_error", "valid") if type(data.get(key)) is bool},
         }
-        while size(clipped) > self.cap:
+        while len(encoded(ToolResult(content=clipped, structured_content=clipped))) > self.cap:
             preview = preview[: len(preview) // 2]
             clipped["preview"] = preview
         return clipped
@@ -268,7 +281,7 @@ class ResultFiles:
                 if isinstance(parsed, dict | list):
                     parsed = safe_value(parsed)
                     return parsed, json.dumps(parsed, ensure_ascii=False, indent=2), "json"
-            except ValueError:
+            except (ValueError, RecursionError):
                 pass
             if re.search(r"(?m)^#{1,6} ", value):
                 return value, value, "markdown"
@@ -281,17 +294,21 @@ class ResultFiles:
                     parsed = yaml.safe_load(value)
                     if isinstance(parsed, dict | list):
                         return safe_value(parsed), value, "yaml"
-            except yaml.YAMLError:
+            except (yaml.YAMLError, RecursionError):
                 pass
             return value, value, "text"
         return value, json.dumps(value, ensure_ascii=False), "text"
 
     def _write(self, value: Any, source: str | None, *, is_error: bool = False) -> dict[str, Any]:
-        if isinstance(value, str) and (
-            len(value) > self.hard_limit
-            or len(value.encode("utf-8", errors="replace")) > self.hard_limit
-        ):
-            raise ToolError("Result exceeds 16 MiB")
+        try:
+            raw = limited_json(value, self.hard_limit)
+            if len(raw) > self.hard_limit:
+                raise ToolError(
+                    "Result exceeds 16 MiB; not retained. Do not replay an upstream call."
+                )
+            value = json.loads(raw, parse_constant=str)
+        except (TypeError, ValueError, RecursionError):
+            raise ToolError("Result cannot be retained; do not replay an upstream call") from None
         value = self.protect(value)
         source = self.protect(source)
         native, text, format = self._prepare_value(value)
@@ -400,6 +417,57 @@ class ResultFiles:
             previous = number
         return {"matches": matches, "text": "\n".join(output), "truncated": truncated}
 
+    async def worker(self, work: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        await self.worker_lock.acquire()
+        try:
+            future = asyncio.create_task(asyncio.to_thread(work))
+        except BaseException:
+            self.worker_lock.release()
+            raise
+
+        def finished(task: asyncio.Task[dict[str, Any]]) -> None:
+            self.worker_lock.release()
+            if not task.cancelled():
+                task.exception()  # Consume failures even when the caller has already cancelled.
+
+        future.add_done_callback(finished)
+        return await asyncio.shield(future)  # Cancel caller promptly; worker retains the lock.
+
+    def query(self, handle: str | None, expression: str | None) -> dict[str, Any]:
+        if not isinstance(expression, str) or len(expression.encode()) > 4096:
+            raise ToolError("query needs an expression of at most 4 KiB")
+        entry, envelope, _ = self._snapshot(handle)
+        native = self._typed(entry, envelope)
+        try:
+            answer = jmespath.search(expression, native)
+        except (jmespath.exceptions.JMESPathError, RecursionError):
+            raise ToolError("Invalid query expression") from None
+        return self.fit({"handle": handle, "value": answer, "is_error": entry.is_error})
+
+    def search(
+        self,
+        handle: str | None,
+        pattern: str | None,
+        context: int,
+        limit: int,
+        case_sensitive: bool,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        if not isinstance(pattern, str) or len(pattern.encode()) > 1024:
+            raise ToolError("grep needs a pattern of at most 1 KiB")
+        if type(context) is not int or not 0 <= context <= 50:
+            raise ToolError("context must be 0 through 50")
+        if isinstance(timeout_seconds, bool) or not 0 < timeout_seconds <= 1:
+            raise ToolError("grep timeout must be greater than zero and at most 1 second")
+        _, _, text = self._snapshot(handle)
+        try:
+            data = self._grep(text, pattern, context, limit, case_sensitive, timeout_seconds)
+        except TimeoutError:
+            raise ToolError("Result search timed out; narrow the search") from None
+        except regex.error:
+            raise ToolError("Invalid search pattern") from None
+        return self.fit({"handle": handle, **data})
+
     async def action(
         self,
         action: str,
@@ -440,6 +508,19 @@ class ResultFiles:
             for h in list(self.entries):
                 self._delete(h)
             return {"deleted": count}
+        if action == "query":
+            return await self.worker(lambda: self.query(handle, expression))
+        if action == "grep":
+            return await self.worker(
+                lambda: self.search(
+                    handle,
+                    pattern,
+                    context,
+                    limit,
+                    case_sensitive,
+                    timeout_seconds,
+                )
+            )
         entry, envelope, text = self._snapshot(handle)
         assert handle is not None
         if action == "inspect":
@@ -470,31 +551,6 @@ class ResultFiles:
             self.entries[handle] = new_entry
             self.path_handles[new_entry.path] = handle
             return self.fit({**receipt, "handle": handle})
-        if action == "query":
-            if not isinstance(expression, str) or len(expression.encode()) > 4096:
-                raise ToolError("query needs an expression of at most 4 KiB")
-            native = self._typed(entry, envelope)
-            try:
-                answer = await asyncio.to_thread(jmespath.search, expression, native)
-            except (jmespath.exceptions.JMESPathError, RecursionError):
-                raise ToolError("Invalid query expression") from None
-            return self.fit({"handle": handle, "value": answer, "is_error": entry.is_error})
-        if action == "grep":
-            if not isinstance(pattern, str) or len(pattern.encode()) > 1024:
-                raise ToolError("grep needs a pattern of at most 1 KiB")
-            if type(context) is not int or not 0 <= context <= 50:
-                raise ToolError("context must be 0 through 50")
-            if isinstance(timeout_seconds, bool) or not 0 < timeout_seconds <= 1:
-                raise ToolError("grep timeout must be greater than zero and at most 1 second")
-            try:
-                data = await asyncio.to_thread(
-                    self._grep, text, pattern, context, limit, case_sensitive, timeout_seconds
-                )
-            except TimeoutError:
-                raise ToolError("Result search timed out; narrow the search") from None
-            except regex.error:
-                raise ToolError("Invalid search pattern") from None
-            return self.fit({"handle": handle, **data})
         if action == "toc":
             return self.fit({"handle": handle, "sections": self._toc(entry, envelope, text)})
         start, end = offset + 1, offset + limit
@@ -513,7 +569,8 @@ class ResultFiles:
                         for i, h in enumerate(headings)
                         if (
                             select == "#" + str(i + 1)
-                            or select.casefold() in h.get("title", "").casefold()
+                            if re.fullmatch(r"#\d+", select)
+                            else select.casefold() in h.get("title", "").casefold()
                         )
                     ),
                     None,

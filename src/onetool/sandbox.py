@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import builtins
 import difflib
 import json
 import keyword
@@ -32,6 +33,18 @@ if TYPE_CHECKING:
     from onetool.gateway import Gateway
 
 FORMATS = frozenset({"json", "json-indent", "yaml", "yaml-block", "text"})
+
+
+def dot_callable(server: str, member: str) -> bool:
+    """Public call spelling shared by namespace exposure and discovery advertisement."""
+    return (
+        server.isidentifier()
+        and not keyword.iskeyword(server)
+        and not hasattr(builtins, server)
+        and member.isidentifier()
+        and not keyword.iskeyword(member)
+        and not member.startswith("_")
+    )
 
 
 def prepare(code: str) -> str:
@@ -140,10 +153,15 @@ class OneToolSandbox:
                     tools.update({tool.name: tool for tool in await Catalog(gateway).list_tools()})
                     catalog_loaded = True
 
-        if tree and any(
-            isinstance(node, ast.Name) and node.id in gateway.backends for node in ast.walk(tree)
-        ):
-            await ensure_catalog()
+        if tree:
+            from onetool.preflight import references
+
+            if references(tree, set(gateway.backends)) or any(
+                isinstance(node, ast.Name) and node.id in gateway.backends
+                for node in ast.walk(tree)
+            ):
+                await ensure_catalog()
+                gateway.preflight.validate(tree, tools)
         original = (external_functions or {})["call_tool"]
         pending: set[asyncio.Task[Any]] = set()
         finished = False
@@ -216,11 +234,7 @@ class OneToolSandbox:
         for name in tools:
             server = max((s for s in gateway.backends if name.startswith(s + "_")), key=len)
             member = name[len(server) + 1 :]
-            if (
-                member.isidentifier()
-                and not keyword.iskeyword(member)
-                and not member.startswith("_")
-            ):
+            if dot_callable(server, member):
                 namespaces.setdefault(server, {})[member] = method(name)
 
         def set_format(value: str) -> None:

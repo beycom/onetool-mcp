@@ -61,6 +61,11 @@ def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMC
         """Return literal text without a schema."""
         return ToolResult(content=[TextContent(type="text", text=value)])
 
+    @server.tool(name="_hidden")
+    def underscore(value: str) -> dict:
+        record("underscore")
+        return {"value": value}
+
     @server.tool(name="odd-tool")
     def odd_tool(value: str) -> dict:
         """An exact non-identifier tool name, with no synthesized alias."""

@@ -119,3 +119,19 @@ Owner commands are `onetool secrets init|encrypt|status|rotate|audit --secrets P
 Secrets-file values, including short values and decrypted values, are masked in diagnostics and returned/stored results. Avoid names or values so broad that masking makes useful output unreadable. Real platform keychain prompts remain an owner check.
 
 V4 uses its own keyring item: service `onetool-mcp`, account `secrets-identity`. It never reads V3's `onetool/age_identity`. Existing V3 `age1enc:` ciphertext cannot decrypt with the V4 identity. Keep the V3 file unchanged: prepare a separate V4 file from the original plaintext, run V4 `secrets init`, then `secrets encrypt`; or use the non-echoing `secrets set NAME` prompt after init. Copying V3 ciphertext into the new file is insufficient. V4 rotation therefore does not change the V3 bridge's identity.
+
+## Includes
+
+Keep shared definitions in local YAML files. For example, [examples/composed.yaml](../examples/composed.yaml) sits beside the checkout's fixtures file:
+
+```yaml
+version: 4
+include: [fixtures.yaml]
+servers: {}
+execution:
+  max_tool_calls: 10
+```
+
+Includes resolve from the declaring file, depth first in listed order; the declaring file wins last. Each server entry replaces its whole definition. Other sections merge one immediate property, and lists replace. Empty `servers: {}` adds no overrides. Root version is required4; an included file may omit version, but any declared version must be4. No globs, URLs, variable expansion, optional files or packaged fallback.
+
+Limits are8levels including root,32file reads and1MiB combined. Cycles, missing files, unsafe/duplicate YAML and invalid final values fail with file/line/field context, without rejected values. Command/cwd resolve from the winning server definition's file; logging.file resolves from its winning property's file. Arguments stay literal. Check-config lists the files read and each server's source; status reports those sources too. Reload and named restart validate every include before changing runtime state. Defaults still need review against the owner's real shared configs.

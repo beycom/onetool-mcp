@@ -1,0 +1,5 @@
+version: 4
+include: [fixtures.yaml]
+servers: {}
+execution:
+  max_tool_calls: 10

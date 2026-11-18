@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
@@ -12,7 +13,7 @@ from urllib.parse import urlsplit
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
-from yaml.nodes import MappingNode
+from yaml.nodes import MappingNode, Node, SequenceNode
 from yaml.tokens import AliasToken, AnchorToken
 
 
@@ -150,19 +151,22 @@ class UniqueLoader(yaml.SafeLoader):
             key = self.construct_object(key_node, deep=deep)
             try:
                 if key in keys:
-                    raise ConfigError("duplicate YAML key")
+                    raise ConfigError(f"duplicate YAML key at line {key_node.start_mark.line + 1}")
                 keys.add(key)
             except TypeError:
                 raise ConfigError("YAML mapping keys must be scalar") from None
         return super().construct_mapping(node, deep=deep)
 
 
-def _schema_error(exc: ValidationError) -> ConfigError:
+def _schema_error(
+    exc: ValidationError, source: Callable[[tuple[str, ...]], str] | None = None
+) -> ConfigError:
     # Pydantic's usual string form includes rejected values. Never emit it.
     failures = []
     for item in exc.errors(include_input=False, include_context=False, include_url=False):
         location = ".".join(str(part) for part in item["loc"])
-        failures.append(f"{location or 'config'}: {item['type']}")
+        origin = source(tuple(str(part) for part in item["loc"])) + " " if source else ""
+        failures.append(f"{origin}{location or 'config'}: {item['type']}")
     return ConfigError("invalid config: " + "; ".join(failures))
 
 
@@ -207,6 +211,8 @@ class LoadedConfig:
     templates: dict[str, StdioServer | HttpServer] = field(default_factory=dict)
     server_errors: dict[str, str] = field(default_factory=dict)
     secrets_path: Path | None = None
+    sources: tuple[Path, ...] = ()
+    server_sources: dict[str, Path] = field(default_factory=dict)
 
     def redacted_env(self) -> dict[str, bool]:
         return {
@@ -223,26 +229,47 @@ class LoadedConfig:
         return resolve_values(template, self.variables, runtime=True)
 
 
-def read_document(path: Path) -> dict[str, Any]:
+def read_document(path: Path, *, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
     """Safe single-document mapping loader shared by config and secrets."""
     try:
         with path.open("rb") as stream:
             raw = stream.read(1048577)
     except OSError as exc:
-        raise ConfigError(f"cannot read config: {type(exc).__name__}") from None
+        raise ConfigError(f"{path}:1 cannot read config: {type(exc).__name__}") from None
     if len(raw) > 1048576:
-        raise ConfigError("config exceeds 1 MiB")
+        raise ConfigError(f"{path}:1 config exceeds 1 MiB")
     try:
         text = raw.decode("utf-8")
         if any(isinstance(token, AliasToken | AnchorToken) for token in yaml.scan(text)):
             raise ConfigError("YAML anchors and aliases are not supported")
         document = yaml.load(text, Loader=UniqueLoader)
-    except (yaml.YAMLError, UnicodeError) as exc:
+    except ConfigError as exc:
+        raise ConfigError(f"{path}: {exc}") from None
+    except (yaml.YAMLError, UnicodeError, RecursionError) as exc:
         mark = getattr(exc, "problem_mark", None)
         location = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
-        raise ConfigError("invalid safe YAML" + location) from None
+        raise ConfigError(f"{path}: invalid safe YAML" + location) from None
     if not isinstance(document, dict):
-        raise ConfigError("config root must be a mapping")
+        raise ConfigError(f"{path}:1 config root must be a mapping")
+    if metadata is not None:
+        locations: dict[tuple[str, ...], int] = {(): 1}
+
+        def locate(node: Node, prefix: tuple[str, ...] = ()) -> None:
+            if isinstance(node, MappingNode):
+                for key, value in node.value:
+                    child = (*prefix, str(key.value))
+                    locations[child] = value.start_mark.line + 1
+                    locate(value, child)
+            elif isinstance(node, SequenceNode):
+                for index, value in enumerate(node.value):
+                    child = (*prefix, str(index))
+                    locations[child] = value.start_mark.line + 1
+                    locate(value, child)
+
+        node = yaml.compose(text, Loader=UniqueLoader)
+        if node is not None:
+            locate(node)
+        metadata.update(size=len(raw), lines=locations)
     return document
 
 
@@ -274,41 +301,47 @@ def resolve_values(
 def load_config(
     path: Path, *, secrets_path: Path | None = None, defer_errors: bool = False
 ) -> LoadedConfig:
+    from onetool.composition import compose
     from onetool.secrets import Variables
 
     path = path.absolute()
-    document = read_document(path)
+    composed = compose(path)
+    document = composed.document
     try:
         model = GatewayConfig.model_validate(document)
     except ValidationError as exc:
-        raise _schema_error(exc) from None
+        raise _schema_error(exc, composed.location) from None
 
     variables = Variables(secrets_path.absolute() if secrets_path else None, model.env)
     resolved: dict[str, StdioServer | HttpServer] = {}
     templates: dict[str, StdioServer | HttpServer] = {}
     errors: dict[str, str] = {}
     for name, server in model.servers.items():
+        directory = composed.origin(("servers", name)).parent
         if isinstance(server, StdioServer):
             command = server.command
             if "/" in command or "\\" in command:
-                command = _path(command, path.parent)
+                command = _path(command, directory)
             server = server.model_copy(
                 update={
                     "command": command,
-                    "cwd": _path(server.cwd, path.parent) if server.cwd is not None else None,
+                    "cwd": _path(server.cwd, directory) if server.cwd is not None else None,
                 }
             )
         templates[name] = server
         try:
             resolved[name] = resolve_values(server, variables, runtime=False)
         except ConfigError as exc:
+            detail = f"{composed.location(('servers', name))} servers.{name}: {exc}"
             if not defer_errors:
-                raise
-            errors[name] = str(exc)
+                raise ConfigError(detail) from None
+            errors[name] = detail
             resolved[name] = server
     logging = model.logging
     if logging.file is not None:
-        logging = logging.model_copy(update={"file": _path(logging.file, path.parent)})
+        logging = logging.model_copy(
+            update={"file": _path(logging.file, composed.origin(("logging", "file")).parent)}
+        )
     model = model.model_copy(update={"servers": resolved, "logging": logging})
     return LoadedConfig(
         path,
@@ -319,4 +352,6 @@ def load_config(
         templates,
         errors,
         secrets_path.absolute() if secrets_path else None,
+        composed.sources,
+        {name: composed.origin(("servers", name)) for name in model.servers},
     )

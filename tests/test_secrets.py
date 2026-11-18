@@ -96,7 +96,8 @@ async def test_secrets_precedence_lazy_decryption_and_no_exposure(tmp_path: Path
     import pyrage
 
     identity = pyrage.x25519.Identity.generate()
-    plain = "owned-plain-file-secret"
+    plain = "owned-plain-file-secret-${MUST_REMAIN_LITERAL}"
+    # Referenced values remain literal across validation and runtime connection resolution.
     hidden = "owned-encrypted-file-secret"
     path = tmp_path / "secrets.yaml"
     path.write_text(
@@ -273,3 +274,30 @@ def test_platform_keyring_resolution_is_forbidden() -> None:
     for resolve in [keyring.get_keyring, keyring.core.get_keyring]:
         with pytest.raises(AssertionError, match="must not resolve"):
             resolve()
+
+
+def test_missing_identity_cli_preserves_safe_init_hint(tmp_path: Path) -> None:
+    path = tmp_path / "plain secrets.yaml"
+    path.write_text("TOKEN: never-print-this-cli-secret\n")
+    env = {
+        **os.environ,
+        "PYTHONPATH": str(Path(__file__).parent / "fixtures"),
+        "PYTHON_KEYRING_BACKEND": "keyring_backend.MemoryKeyring",
+        "ONETOOL_TEST_IDENTITY": "",
+    }
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "onetool",
+            "secrets",
+            "encrypt",
+            "--secrets",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 2 and "run onetool secrets init" in result.stderr
+    assert "never-print-this-cli-secret" not in result.stdout + result.stderr

@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -50,6 +51,8 @@ async def test_python_and_native_request_examples(tmp_path: Path) -> None:
 
 def test_yaml_examples_and_links(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FIXTURE_TOKEN", "owned-doc-secret")
+    for example in (ROOT / "examples").glob("*.yaml"):
+        shutil.copyfile(example, tmp_path / example.name)
     for path in documents():
         text = path.read_text()
         for number, yaml in enumerate(re.findall(r"```yaml\n(.*?)```", text, re.S)):
@@ -74,8 +77,9 @@ def test_yaml_examples_and_links(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
                 assert anchor in anchors, (path, target)
 
 
-async def test_documented_fixture_config_runs() -> None:
-    config = ROOT / "examples/fixtures.yaml"
+@pytest.mark.parametrize("name", ["fixtures.yaml", "composed.yaml"])
+async def test_documented_fixture_config_runs(name: str) -> None:
+    config = ROOT / "examples" / name
     env = {"PATH": str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]}
     transport = StdioTransport(
         sys.executable, ["-m", "onetool", "serve", "--config", str(config)], env=env

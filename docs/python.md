@@ -64,7 +64,7 @@ This bounds final output, not the memory used to receive an upstream result. See
 
 ## Exact namespaces
 
-Namespaces are built afresh from the execution's catalog and assigned by the longest configured server prefix. No fuzzy names, aliases or argument abbreviations route calls. Tools whose upstream names are not Python identifiers, or are keywords, are callable only with exact `call_tool` names, such as `alpha_odd-tool`. Builtins and local variables shadow namespaces: a server named `len` uses `call_tool`; assigning `alpha = ...` hides that namespace for the submission. Server names cannot equal `call_tool`, `call_tools`, `set_format` or `results`.
+Namespaces are built afresh from the execution's catalog and assigned by the longest configured server prefix. No fuzzy names, aliases or argument abbreviations route calls. Tools whose upstream names are not Python identifiers, are keywords, or start with an underscore, are callable only with exact `call_tool` names, such as `alpha_odd-tool`. Builtins and local variables shadow namespaces: a server named `len` uses `call_tool`; assigning `alpha = ...` hides that namespace for the submission. Server names cannot equal `call_tool`, `call_tools`, `set_format` or `results`.
 
 ## Printed output and formatting
 
@@ -100,10 +100,22 @@ saved = await results.write({"items": [{"name": "first", "count": 2}]}, source="
 return await results.query(saved["handle"], expression="items[0].count")
 ```
 
-Actions are `write`, `read`, `grep`, `slice`, `toc`, `query`, `append`, `list`, `inspect`, `delete` and `purge`, with the same names inside `results`. Read uses zero-based `offset`, `limit=100` up to 500, and optional `tail=true`. Lines longer than 500 characters carry `[+N chars]`. Grep is case-insensitive by default, supports `context` up to 50 and at most 500 matched lines; output also fits the inline cap. Patterns are at most 1 KiB, run off the event loop and time out after one second by default. Timeout errors reveal no pattern or content.
+Actions are `write`, `read`, `grep`, `slice`, `toc`, `query`, `append`, `list`, `inspect`, `delete` and `purge`, with the same names inside `results`. Read uses zero-based `offset`, `limit=100` up to 500, and optional `tail=true`. Lines longer than 500 characters carry `[+N chars]`. Grep is case-insensitive by default, supports `context` up to 50 and at most 500 matched lines; output also fits the inline cap. Patterns are at most 1 KiB, run off the event loop and time out after one second by default. Timeout errors reveal no pattern or content. Query/grep use one store worker at a time. Cancelling the caller returns promptly; the next search waits for that worker to finish. Amplified answers are bounded before serialization/copying, and stored answers over16MiB are not retained.
 
 Slice accepts `select="1:10"` (one-based inclusive lines), `"#2"` (Markdown section number) or a heading substring. TOC reports Markdown sections or structured key/type/size information. Query accepts JMESPath expressions up to 4 KiB on typed JSON/YAML values; arbitrary tool text is never guessed to be JSON. Explicit writes detect JSON, YAML mappings/lists, Markdown or text once when stored. Append preserves the handle; inspect retains the original error flag. These operations never rerun an upstream call. Responses that cannot fit return a bounded preview and truncation notice.
 
 ## Measured imports
 
 `onetool_status(check="json")` probes one module; ordinary status lazily probes the standard set and caches results for this process. Working in Monty 1.6.0: json, re, datetime, csv, collections, itertools, math, base64, hashlib, functools, typing, dataclasses, decimal, random, time, copy, bisect and asyncio. Missing: statistics, difflib, textwrap, html, urllib.parse, uuid, operator, string, zoneinfo, heapq, enum and fractions. Ask status on your installed version rather than assuming CPython's modules are available.
+
+## Preflight validation
+
+Execute checks statically known dot calls and literal `call_tool` names/argument keys against its fresh collision-checked catalog before the first business call. A typo in the third static call stops the whole submission before the first call. Diagnostics name the line/column and exact suggestions. Computed names/argument dictionaries and locally shadowed namespaces remain unresolved; normal dispatch validates them when reached. Open argument schemas remain upstream-owned. Native Monty parses execution syntax; no source wrapper or name rewriting is used.
+
+Use the separate `check` discovery tool for an advisory inspection:
+
+```json
+{"tool":"check","arguments":{"code":"return await alpha.add(a=2,b=3)"}}
+```
+
+Check uses only already-observed catalogs, reports their ages and unknown servers, and never refreshes a connection or runs statements, imports or loops. Its syntax checks are provisional CPython AST checks. Monty's public type checker rejects CodeMode's valid top-level return, and there is no public parse-only entrypoint, so native Monty remains authoritative during execute. `valid` covers only the checks possible with that cached information; warnings/unknown schemas still matter, and it never guarantees a later request succeeds. Diagnostics respect the inline cap and contain no logged source.

@@ -38,3 +38,14 @@ def test_log_cap_is_valid_json_for_unicode_fields(tmp_path: Path) -> None:
     line = (tmp_path / "gateway.log").read_text().strip()
     assert len(line.encode()) <= 8192
     assert json.loads(line)["event"] == "message_too_large"
+
+
+def test_short_overlapping_masks_are_single_pass_idempotent_and_refresh() -> None:
+    from onetool.diagnostics import Redactor
+
+    redact = Redactor(("a", "e", "d", "[", "]", "long-secret"))
+    first = redact("a long-secret")
+    assert first == "[redacted] [redacted]"
+    assert redact(first) == first
+    redact.values = ("new-secret",)
+    assert redact("new-secret") == "[redacted]"

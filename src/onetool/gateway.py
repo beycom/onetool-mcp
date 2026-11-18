@@ -642,6 +642,9 @@ class Gateway:
         from onetool.discovery import Discovery
 
         self.discovery = Discovery(self)
+        from onetool.preflight import Preflight
+
+        self.preflight = Preflight(self)
         execution = config.model.execution
         code = FastMCP(
             "tools",
@@ -649,7 +652,12 @@ class Gateway:
             transforms=[
                 CodeMode(
                     sandbox_provider=self.sandbox,
-                    discovery_tools=[Search(), GetSchemas(), self.discovery.factory],
+                    discovery_tools=[
+                        Search(),
+                        GetSchemas(),
+                        self.discovery.factory,
+                        self.preflight.factory,
+                    ],
                     max_tool_calls=execution.max_tool_calls,
                     wall_clock_timeout_secs=execution.timeout_seconds,
                 )
@@ -894,7 +902,10 @@ class Gateway:
                     name: backend.config.timeout_seconds for name, backend in self.backends.items()
                 },
                 "environment": self.config.redacted_env(),
-                "sources": [str(self.config.path)],
+                "sources": [str(source) for source in self.config.sources],
+                "server_sources": {
+                    name: str(source) for name, source in self.config.server_sources.items()
+                },
                 "secrets_file": str(self.config.secrets_path) if self.config.secrets_path else None,
             },
         }

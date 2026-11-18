@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import builtins
 import difflib
-import keyword
 from typing import TYPE_CHECKING, Any, Literal
 
 from fastmcp.tools import Tool
+
+from onetool.sandbox import dot_callable
 
 if TYPE_CHECKING:
     from onetool.gateway import Gateway
@@ -123,12 +123,7 @@ class Discovery:
             name if name in required else name + "=" + repr(schema.get("default", None))
             for name, schema in properties.items()
         ]
-        dotted = (
-            member.isidentifier()
-            and not keyword.iskeyword(member)
-            and not keyword.iskeyword(server)
-            and not hasattr(builtins, server)
-        )
+        dotted = dot_callable(server, member)
         signature = (
             f"{server}.{member}(" + ", ".join(params) + ")"
             if dotted

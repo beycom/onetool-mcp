@@ -112,6 +112,21 @@
     }
   },
   {
+    "name": "check",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ]
+    }
+  },
+  {
     "name": "execute",
     "input_schema": {
       "type": "object",

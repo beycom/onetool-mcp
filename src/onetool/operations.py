@@ -170,6 +170,11 @@ class Operations:
                     secret_values=secrets,
                     env_names=gateway.config.env_names | candidate.env_names,
                     variables=candidate.variables,
+                    sources=candidate.sources,
+                    server_sources={
+                        **gateway.config.server_sources,
+                        name: candidate.server_sources[name],
+                    },
                     templates={**gateway.config.templates, name: candidate.templates[name]},
                     server_errors={
                         n: message for n, message in candidate.server_errors.items() if n == name

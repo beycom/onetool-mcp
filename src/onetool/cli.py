@@ -49,7 +49,10 @@ def main() -> int:
             )
             print(json.dumps(report), file=sys.stderr)
             return 0
-        except (ConfigError, OSError):
+        except ConfigError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        except OSError:
             print("Secrets operation failed; check the file and secure keyring", file=sys.stderr)
             return 2
     if args.command == "init":
@@ -72,6 +75,10 @@ def main() -> int:
         return 2
     if args.command == "check-config":
         print("Config valid", file=sys.stderr)
+        for source in config.sources:
+            print(f"Source: {source}", file=sys.stderr)
+        for name, source in config.server_sources.items():
+            print(f"Server {name}: {source}", file=sys.stderr)
         return 0
     try:
         # These imports can create runtime objects; validation never imports them.

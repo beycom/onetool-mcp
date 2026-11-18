@@ -323,3 +323,57 @@ async def test_result_response_cap_empty_invalid_and_process_expiry(tmp_path: Pa
             raise_on_error=False,
         )
         assert stale.is_error and "unknown handle" in str(stale.content)
+
+
+async def test_markdown_section_number_is_not_a_heading_substring(tmp_path: Path) -> None:
+    async with connected(tmp_path, {"servers": {}}) as (client, _, _):
+        stored = (
+            await client.call_tool(
+                "onetool_results",
+                {
+                    "action": "write",
+                    "value": "# Reference #2\nfirst\n# Actual second\nsecond",
+                },
+            )
+        ).data
+        selected = (
+            await client.call_tool(
+                "onetool_results",
+                {
+                    "action": "slice",
+                    "handle": stored["handle"],
+                    "select": "#2",
+                },
+            )
+        ).data
+        assert selected["text"] == "# Actual second\nsecond"
+
+
+async def test_help_and_namespaces_share_dot_callability(tmp_path: Path) -> None:
+    events = tmp_path / "events.jsonl"
+    async with connected(tmp_path, {"servers": {"alpha": stdio(events), "len": stdio()}}) as (
+        client,
+        _,
+        _,
+    ):
+        await client.call_tool("search", {"query": "hidden"})
+        for name in ["alpha__hidden", "len_add"]:
+            help_result = (await client.call_tool("help", {"query": name, "detail": "full"})).data
+            assert help_result["signature"].startswith("call_tool(")
+        failed = await execute(
+            client, 'return await alpha._hidden(value="not-dispatched")', raise_on_error=False
+        )
+        assert failed.is_error
+        assert '"event": "underscore"' not in events.read_text()
+        native = await execute(client, 'return await call_tool("alpha__hidden", {"value":"works"})')
+        assert native.data == {"value": "works"}
+        assert (
+            sum(
+                json.loads(line)["event"] == "underscore"
+                for line in events.read_text().splitlines()
+            )
+            == 1
+        )
+        assert (await execute(client, 'return await call_tool("len_add", {"a":1,"b":2})')).data == {
+            "value": 3
+        }

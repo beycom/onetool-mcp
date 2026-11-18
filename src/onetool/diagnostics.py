@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -17,11 +18,20 @@ from onetool.config import LoadedConfig
 class Redactor:
     def __init__(self, values: tuple[str, ...]):
         self.values = values
+        self._previous: tuple[str, ...] | None = None
+        self._pattern: re.Pattern[str] | None = None
 
     def __call__(self, value: str) -> str:
-        for secret in self.values:
-            value = value.replace(secret, "[redacted]")
-        return value
+        if not self.values:
+            return value
+        if self.values != self._previous:
+            masks = {secret for secret in self.values if secret} | {"[redacted]"}
+            self._pattern = re.compile(
+                "|".join(re.escape(s) for s in sorted(masks, key=len, reverse=True))
+            )
+            self._previous = self.values
+        assert self._pattern is not None
+        return self._pattern.sub("[redacted]", value)
 
 
 class EventFormatter(logging.Formatter):

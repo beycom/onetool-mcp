@@ -4,12 +4,15 @@ All code is in `src/onetool`. Follow the nearest owning module rather than addin
 
 | File | Owns | Main tests |
 | --- | --- | --- |
-| `config.py` | Safe YAML, strict models, environment references and paths | `test_config.py` |
+| `config.py`, `composition.py` | Safe YAML, bounded includes/provenance, strict models and variables/paths | `test_config.py` |
 | `cli.py`, `__main__.py` | argparse, explicit config path and exit codes | `test_cli.py` |
 | `gateway.py` | Native providers/CodeMode, namespaces, deadlines, status and auth wiring | `test_gateway.py`, `test_auth.py` |
 | `operations.py` | Admission, drain cancellation, reload and restart | `test_operations.py` |
 | `results.py` | Inline cap, private files, hashes and eviction | `test_results.py`, `test_operations.py` |
-| `diagnostics.py` | JSON events, redaction, rotation and record cap | `test_diagnostics.py` |
+| `diagnostics.py` | JSON events, redaction, rotation, record cap and recovery categories | `test_diagnostics.py`, `test_status_followup.py` |
+| `sandbox.py`, `preflight.py` | Shared public Monty provider, captured output, batches and catalog-only checks | `test_sandbox.py`, `test_preflight.py` |
+| `discovery.py` | Help over observed catalogs and server guidance | `test_followups.py` |
+| `secrets.py`, `initialize.py` | Explicit secret-file/keyring operations and starter config writes | `test_secrets.py`, `test_cli.py` |
 | `scripts/release.py` | Local version and artifact/dependency inventory | [Release](../project/release.md) |
 
 Tests live under `tests/`; one [fixture server](../../tests/fixtures/fixture_server.py) supports stdio and loopback HTTP. Installed checks are under `tests/installed/`. [Documentation tests](../../tests/test_docs.py) run examples and check local links.
