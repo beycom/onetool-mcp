@@ -257,3 +257,55 @@ async def test_reload_drains_then_cancels_and_blocks_new_execution(tmp_path: Pat
         assert (await execute(client, "return 42")).content[0].text == "42"
     recorded = [json.loads(line)["event"] for line in events.read_text().splitlines()]
     assert recorded.count("delay-start") == 1 and recorded.count("delay-cancelled") == 1
+
+
+async def test_client_cancellation_has_no_result_and_next_request_works(tmp_path: Path) -> None:
+    events = tmp_path / "events.jsonl"
+    async with connected(
+        tmp_path, {"servers": {"alpha": stdio(events)}, "logging": {"level": "DEBUG"}}
+    ) as (client, _, stderr):
+        call = asyncio.create_task(
+            execute(
+                client,
+                'return await call_tool("alpha_delay", {"seconds":30})',
+                raise_on_error=False,
+            )
+        )
+        for _ in range(100):
+            if events.exists() and "delay-start" in events.read_text():
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("fixture call did not start")
+        call.cancel()
+        try:
+            await call
+        except asyncio.CancelledError:
+            pass
+        else:
+            raise AssertionError("client cancellation became a result")
+        assert (await execute(client, "return 42")).content[0].text == "42"
+    recorded = [json.loads(line)["event"] for line in events.read_text().splitlines()]
+    assert recorded.count("delay-cancelled") == 1 and "delay-complete" not in recorded
+    assert "execution_cancelled" in stderr.read_text()
+
+
+async def test_status_retains_redacted_error_text(tmp_path: Path) -> None:
+    secret = "owned-missing-command-secret"
+    async with connected(
+        tmp_path,
+        {
+            "servers": {
+                "down": {
+                    "transport": "stdio",
+                    "command": f"/missing/{secret}",
+                    "env": {"TOKEN": secret},
+                }
+            }
+        },
+    ) as (client, _, _):
+        await client.call_tool("search", {"query": "add"})
+        status = (await client.call_tool("onetool_status", {})).data
+        error = status["servers"]["down"]["last_error"]
+        assert "down:" in error and "No such file" in error
+        assert secret not in error and "redacted" in error and len(error) <= 300

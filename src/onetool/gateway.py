@@ -73,19 +73,25 @@ class StorageUnavailable(ToolError):
     """A safe authentication error, with no credential or upstream payload."""
 
 
+def secure_keyring(backend: Any) -> bool:
+    secure = {
+        "keyring.backends.macOS",
+        "keyring.backends.Windows",
+        "keyring.backends.SecretService",
+        "keyring.backends.kwallet",
+    }
+    if type(backend).__module__ == "keyring.backends.chainer":
+        return bool(backend.backends) and all(secure_keyring(child) for child in backend.backends)
+    return type(backend).__module__ in secure and backend.priority > 0
+
+
 def oauth_storage(name: str) -> KeyringStore:
     """Check system storage before OAuth can turn a failed read into a new login."""
     import keyring
 
     try:
         backend = keyring.get_keyring()
-        secure = (
-            "keyring.backends.macOS",
-            "keyring.backends.Windows",
-            "keyring.backends.SecretService",
-            "keyring.backends.kwallet",
-        )
-        if type(backend).__module__ not in secure or backend.priority <= 0:
+        if not secure_keyring(backend):
             raise RuntimeError("no supported secure keyring")
         # KeyringStore swallows read errors. Probe availability without any token write.
         keyring.get_password("onetool-mcp", "storage-availability-check")
@@ -161,11 +167,7 @@ class Backend:
 
     def failure(self, exc: Exception) -> None:
         self.state = "error"
-        self.last_error = (
-            str(exc)
-            if isinstance(exc, StorageUnavailable)
-            else f"{self.name}: {type(exc).__name__}"
-        )
+        self.last_error = self.gateway.redact(f"{self.name}: {type(exc).__name__}: {exc}")[:300]
 
 
 class BackendCalls(Middleware):
@@ -444,9 +446,15 @@ class GatewayCalls(Middleware):
                     outcome="unknown",
                     error_category="cancelled",
                 )
-                raise ToolError(
-                    "Execution cancelled; dispatched call outcomes are unknown. Do not replay."
-                ) from None
+                task = asyncio.current_task()
+                if task in gateway.operations.draining:
+                    gateway.operations.draining.discard(task)
+                    assert task is not None
+                    task.uncancel()
+                    raise ToolError(
+                        "Execution cancelled; dispatched call outcomes are unknown. Do not replay."
+                    ) from None
+                raise
             except ToolError as exc:
                 result = ToolResult(content=gateway.redact(str(exc)), is_error=True)
             finally:

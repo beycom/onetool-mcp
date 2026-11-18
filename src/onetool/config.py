@@ -207,7 +207,7 @@ def load_config(path: Path) -> LoadedConfig:
         if isinstance(server, StdioServer):
             args = [substitute(item) for item in server.args]
             env = {key: substitute(value) for key, value in server.env.items()}
-            secrets.update(value for value in env.values() if value)
+            secrets.update(value for value in env.values() if len(value) >= 8)
             command = server.command
             if "/" in command or "\\" in command:
                 command = _path(command, path.parent)
@@ -223,7 +223,7 @@ def load_config(path: Path) -> LoadedConfig:
             url = substitute(server.url)
             _validate_url(url)
             headers = {key: substitute(value) for key, value in server.headers.items()}
-            secrets.update(value for value in headers.values() if value)
+            secrets.update(value for value in headers.values() if len(value) >= 8)
             # Error text must not disclose a URL's query credentials.
             if urlsplit(url).query:
                 secrets.add(url)

@@ -243,3 +243,30 @@ def test_executable_symlink_is_preserved(tmp_path: Path) -> None:
         )
     )
     assert config.model.servers["fixture"].command == str(link)
+
+
+def test_short_literal_values_are_not_masks_but_substitutions_are(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("SHORT", "2")
+    config = load_config(
+        write(
+            tmp_path,
+            {
+                "version": 4,
+                "servers": {
+                    "fixture": {
+                        "transport": "stdio",
+                        "command": "python",
+                        "env": {"DEBUG": "1", "LEVEL": "info", "SHORT": "${SHORT}"},
+                    },
+                    "remote": {
+                        "transport": "http",
+                        "url": "http://127.0.0.1/mcp",
+                        "headers": {"X-Flag": "yes", "X-Token": "long-literal-secret"},
+                    },
+                },
+            },
+        )
+    )
+    assert set(config.secret_values) == {"2", "long-literal-secret"}

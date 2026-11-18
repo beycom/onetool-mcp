@@ -25,6 +25,7 @@ class Operations:
         self.gateway = gateway
         self.accepting = True
         self.active: set[asyncio.Task[object]] = set()
+        self.draining: set[asyncio.Task[object]] = set()
         self.lock = asyncio.Lock()
 
     @asynccontextmanager
@@ -45,8 +46,10 @@ class Operations:
         if tasks:
             _, pending = await asyncio.wait(tasks, timeout=5)
             for task in pending:
-                task.cancel("Dispatched call outcome unknown; do not replay")
+                if task.cancel("Dispatched call outcome unknown; do not replay"):
+                    self.draining.add(task)
             await asyncio.gather(*pending, return_exceptions=True)
+            self.draining.difference_update(pending)
 
     async def reload(self) -> dict[str, object]:
         async with self.lock:
