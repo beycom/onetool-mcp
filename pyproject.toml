@@ -1,261 +1,54 @@
 [project]
 name = "onetool-mcp"
-version = "3.0.0"
-description = "🧿 One MCP for developers - No tool tax, no context rot. 100+ tools including Brave, Google, Context7, Excalidraw, Version Checker, Excel, File Ops, Database, Playwright, Chrome DevTools and many more."
-mcpName = "io.github.beycom/onetool-mcp"
+version = "4.0.0rc1"
+description = "A small MCP gateway with YAML configuration and Python orchestration"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "GPL-3.0" }
-authors = [{ name = "Gavin Las", email = "beycom99@gmail.com" }]
-keywords = ["mcp", "mcp-server", "llm", "code-execution", "tools", "model-context-protocol", "token-efficiency", "context-rot", "agents"]
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Typing :: Typed",
-]
+license = "GPL-3.0-only"
+authors = [{name = "Gavin Las", email = "beycom99@gmail.com"}]
 dependencies = [
-    # === Core ===
-    "fastmcp>=3.4.1,<4",
-    "httpx>=0.28.1",
-    "loguru>=0.7.3",
-    "mcp>=1.28.1",
-    "pydantic>=2.13.3",
-    "pydantic-settings>=2.14.0",
-    "jmespath>=1.1.0",
-    "pyyaml>=6.0.3",
-    "questionary>=2.1.1",
-    "rich>=14.3.3",
-    "typer>=0.25.0",
-    "jinja2>=3.1.6",              # Snippets template engine
-    "docstring-parser>=0.18.0",   # ot.help() and ot.tools() docstring parsing
-    # === LLM & Search ===
-    "openai>=2.44.0",             # mem embeddings, LLM tools
-    "tiktoken>=0.12.0",           # Token counting for embedding truncation
-    "pillow>=12.2.0",
-    "pillow-heif>=1.3.0",         # HEIC/HEIF/AVIF support for ot_image
-    "pyrage>=1.3.0",
-    "keyring>=25.7.0",
-    "resvg-py>=0.3.1",
-    "uvicorn>=0.49.0",              # ASGI server for `onetool direct` HTTP host
+    "fastmcp[code-mode]>=4.2.1,<4.3",
+    "mcp>=2.3.0,<3",
+    "pydantic>=2.14.3,<3",
+    "pyyaml>=6.0.3,<7",
+    "py-key-value-aio[keyring]>=0.5.0,<0.6",
 ]
 
 [project.urls]
-Homepage = "https://github.com/beycom/onetool-mcp"
 Repository = "https://github.com/beycom/onetool-mcp"
-Documentation = "https://onetool.beycom.online"
 Issues = "https://github.com/beycom/onetool-mcp/issues"
 
-[project.optional-dependencies]
-util = [
-    "formulas>=1.3.4",             # Excel formula computation for convert pack
-    "openpyxl>=3.1.5",
-    "pathspec>=1.1.1",
-    "pydoll-python>=2.22.1",       # Chrome CDP driver for the wb (excalidraw) pack
-    "pymupdf>=1.27.2.3",
-    "python-docx>=1.2.0",
-    "python-frontmatter>=1.1.0",   # YAML frontmatter parsing for knowledge pack
-    "python-pptx>=1.0.2",
-    "sqlite-vec>=0.1.9",           # Vector search extension for knowledge pack
-    "google-genai>=1.73.1",
-    "send2trash>=2.1.0",
-]
-dev = [
-    "beautifulsoup4>=4.14.3",
-    "filelock>=3.29.0",
-    "lxml>=6.1,<7",   # >=6.1 fixes PYSEC-2026-87
-    "markdown>=3.9",
-    "openpyxl>=3.1.5",
-    "sqlalchemy>=2.0.49",
-    "tabulate>=0.10.0",
-    "trafilatura>=2.0.0",
-]
-scrape = [
-    "crawl4ai>=0.8.6",
-]
-all = ["onetool-mcp[util,dev]"]
-
-[project.scripts]
-onetool = "onetool.cli:cli"
-
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ot", "src/ottools", "src/onetool", "src/otdev", "src/otutil", "packages/onetool-pack/src/otpack"]
+packages = ["src/onetool"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/onetool", "tests", "pyproject.toml", "uv.lock", "README.md", "LICENSE.txt", "justfile", "AGENTS.md", ".wtp.yml"]
 
 [dependency-groups]
-docs = [
-    "mkdocs>=1,<2",              # v2 drops plugin system and YAML config; incompatible with mkdocs-material
-    "mkdocs-material>=9.7.6",
-    "mkdocs-section-index>=0.3.12",
-    "mkdocs-redirects>=1.2.3",
-]
 dev = [
-    "mypy>=1.20.2",
-    "pytest>=9.0.3",
-    "pytest-asyncio>=1.3.0",
-    "pytest-cov>=7.1.0",
-    "pytest-sugar>=1.1.1",
-    "ruff>=0.15.12",
-    "types-aiofiles>=25.1.0.20260409",
-    "types-jmespath>=1.1.0.20260408",
-    "types-openpyxl>=3.1.5.20260518",
-    "types-pyyaml>=6.0.12.20260408",
-    "types-send2trash>=2.1.0.20260408",
-    "types-tabulate>=0.10.0.20260508",
+    "pytest>=9.2.0,<10",
+    "pytest-asyncio>=1.5.0,<2",
+    "ruff>=0.17.5,<0.18",
+    "mypy>=2.4.1,<3",
+    "types-pyyaml>=6.0.12",
 ]
 
-[tool.uv]
-default-groups = ["dev", "docs"]
-constraint-dependencies = [
-    "lxml-html-clean>=0.4.5",   # transitive via justext[html-clean]; fixes CVE-2026-49825
-]
-
-[tool.uv.workspace]
-members = ["packages/onetool-pack"]
-
-[tool.uv.sources]
-onetool-pack = { workspace = true }
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
-src = ["src", "tests", "scripts"]
-cache-dir = "tmp/.ruff_cache"
-# Exclude Jinja2 templates (not valid Python)
-extend-exclude = ["src/ot/config/global_templates/tool_templates/*.py"]
+line-length = 100
 
 [tool.ruff.lint]
-select = [
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "F",      # Pyflakes
-    "I",      # isort
-    "B",      # flake8-bugbear
-    "C4",     # flake8-comprehensions
-    "UP",     # pyupgrade
-    "ARG",    # flake8-unused-arguments
-    "SIM",    # flake8-simplify
-    "TCH",    # flake8-type-checking
-    "PTH",    # flake8-use-pathlib
-    "RUF",    # Ruff-specific rules
-]
-ignore = [
-    "E501",   # line too long (handled by formatter)
-    "B008",   # function call in default argument (required by typer)
-    "UP047",  # type parameter syntax (defer to post-v1)
-]
-
-[tool.ruff.lint.isort]
-known-first-party = ["ot", "ottools", "onetool", "otdev", "otutil", "otpack"]
-
-[tool.ruff.lint.per-file-ignores]
-# CLI files need Path and CaseResult at runtime for typer type annotations and callbacks
-# E402 in cli.py is intentional - atexit.register must run before importing pymupdf
-"src/onetool/*.py" = ["TC001", "TCH003", "E402"]
-# Tools use namespace declarations before imports for tool discovery
-"src/ottools/*.py" = ["E402"]
-"src/otdev/tools/*.py" = ["E402"]
-"src/otutil/tools/*.py" = ["E402"]
-# Path used at runtime for function signatures (not just type hints)
-"src/otutil/tools/_convert/*.py" = ["TC003"]
-"src/otutil/tools/_knowledge/scraper.py" = ["TC003"]
-"src/otutil/tools/_mem/listing.py" = ["UP006"]
-"src/otutil/tools/file.py" = ["UP006"]
-"src/ottools/console.py" = ["UP006"]
-"src/ot/executor/*.py" = ["TC003"]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
 
 [tool.mypy]
 python_version = "3.12"
-cache_dir = "tmp/.mypy_cache"
-# Exclude Jinja2 templates (not valid Python)
-exclude = ["src/ot/config/global_templates/tool_templates/"]
 strict = true
-warn_return_any = true
-warn_unused_ignores = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_configs = true
-show_error_codes = true
-files = ["src/ot", "src/ottools", "src/onetool", "src/otdev", "src/otutil", "packages/onetool-pack/src/otpack"]
-
-# [[tool.mypy.overrides]]
-# Temporary: keep the expanded shipped-surface discovery while the newly exposed
-# package type debt is paid down after this gate-expansion commit.
-# module = [
-#     "onetool",
-#     "onetool.*",
-#     "otdev",
-#     "otdev.*",
-#     "ottools",
-#     "ottools.*",
-#     "otutil",
-#     "otutil.*",
-#     "otpack",
-#     "otpack.*",
-# ]
-# ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "questionary"
-ignore_missing_imports = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests", "packages/onetool-pack/tests"]
-pythonpath = ["src", "packages/onetool-pack/src"]
-addopts = "-v"
-asyncio_mode = "auto"
-cache_dir = "tmp/.pytest_cache"
-filterwarnings = [
-    "ignore:builtin type.*has no __module__ attribute:DeprecationWarning",
-]
-markers = [
-    # Speed tiers (required - pick one)
-    "smoke: Quick sanity checks (<1s each)",
-    "unit: Fast isolated tests (<1s each, no I/O)",
-    "integration: End-to-end tests (may be slow)",
-    "slow: Long-running tests (>10s)",
-
-    # Component tags (required - pick one)
-    "serve: MCP server tests",
-    "core: Core library tests",
-    "tools: Tool implementation tests",
-    "pkg: Package tests",
-    "spec: Specification tests",
-
-    # Dependency tags (add as needed)
-    "network: Requires network access",
-    "api: Requires API keys",
-    "docker: Requires Docker daemon",
-    "pydoll: Requires pydoll Chrome CDP automation",
-    "playwright: Requires Playwright browser automation",
-
-    # Live environment tags
-    "explore: Requires a live external service (Figma plugin, browser, etc.)",
-]
-
-[tool.deptry]
-# Ignore internal packages (DEP001) - these are first-party, not external deps
-per_rule_ignores = { DEP001 = ["ot", "ottools", "onetool", "otdev", "otutil", "anyio"] }
-# Map package names where import name differs
-[tool.deptry.package_module_name_map]
-pyyaml = "yaml"
-pillow = "PIL"
-pydantic-settings = "pydantic_settings"
-google-genai = "google"
-pymupdf = "fitz"
-python-docx = "docx"
-python-pptx = "pptx"
-
-[tool.coverage.html]
-directory = "tmp/htmlcov"

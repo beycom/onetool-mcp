@@ -24,7 +24,7 @@ The plan is the source of truth. Read it before changing anything:
 - `planning/features/backlog/[gateway]-v4/reviews/stress-test-review.md` explains why the plan is small. Do not reintroduce what it removed.
 - Log task evidence in `planning/features/backlog/[gateway]-v4/evidence.md`. Keep POC scripts in `planning/features/backlog/[gateway]-v4/pocs/`.
 
-Until task T03 lands, this branch still contains the V3 source, `dev/`, `docs/` and `openspec/`. They describe the old product. Do not follow their guidance or extend them. T03 deletes them. The V3 source stays readable at the `archive/pre-v4-main` branch.
+T03 removed the V3 source, tests, docs and OpenSpec. The preserved V3 source is readable at `archive/pre-v4-main`; do not restore it into V4.
 
 ## Rules for V4 code
 

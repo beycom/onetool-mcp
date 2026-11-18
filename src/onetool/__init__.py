@@ -1,4 +1,5 @@
-"""OneTool MCP server CLI package.
+"""OneTool: a small MCP gateway."""
 
-Entry point for the `ot` command that runs the MCP server over stdio.
-"""
+from importlib.metadata import version
+
+__version__ = version("onetool-mcp")

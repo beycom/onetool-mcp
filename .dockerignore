@@ -1,4 +1,0 @@
-# Exclude everything not needed for the Docker build.
-# All packages are installed from PyPI; no local files are COPY'd.
-*
-!Dockerfile

@@ -1,8 +1,0 @@
-scenario,task,model,server,result,total_input,total_output,llm_calls,tool_calls,duration_s,cost_usd,base_context,context_growth_avg
-Impact of tool usage - one-shot,compare:base,google/gemini-3-flash-preview,-,FAIL,34,285,1,0,3.83,0.000872,34,0.0
-Impact of tool usage - one-shot,compare:mcp,google/gemini-3-flash-preview,package-version,PASS,1516,99,2,2,6.41,0.001055,704,108.0
-Impact of tool usage - one-shot,compare:multiple-mcp,google/gemini-3-flash-preview,"package-version,brave-search,context7,github,fetch,sequential-thinking,filesystem,memory,plantuml,excel,ripgrep,gemini-grounding,mcp-alchemy,magic,supabase,railway",PASS,47660,129,2,2,7.38,0.024217,23732,196.0
-Impact of tool usage - one-shot,compare:onetool,google/gemini-3-flash-preview,onetool,PASS,1131,95,2,1,4.85,0.000851,464,203.0
-Impact of tool usage - one-shot,compare:onetool-proxy,google/gemini-3-flash-preview,onetool,PASS,1185,99,2,1,4.27,0.000889,502,181.0
-Impact of tool usage - 3-shot,compare:multi-mcp,google/gemini-3-flash-preview,"package-version,brave-search,context7,github,fetch,sequential-thinking,filesystem,memory,plantuml,excel,ripgrep,gemini-grounding,mcp-alchemy,magic,supabase,railway",PASS,119258,88,5,2,13.4,0.059893,23698,70.5
-Impact of tool usage - 3-shot,compare:onetool,google/gemini-3-flash-preview,onetool,PASS,2947,90,5,2,9.94,0.001744,424,73.0
