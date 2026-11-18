@@ -21,7 +21,7 @@ def documents() -> list[Path]:
         ROOT / "README.md",
         ROOT / "CHANGELOG.md",
         *sorted((ROOT / "docs").glob("*.md")),
-        *sorted((ROOT / "dev").glob("*.md")),
+        *sorted((ROOT / "dev-guides").rglob("*.md")),
     ]
     skill = ROOT / "planning/skills/ot-ref/SKILL.md"
     if skill.is_file():
@@ -62,6 +62,9 @@ def test_yaml_examples_and_links(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
                 continue
             relative, _, anchor = target.partition("#")
             destination = base / relative
+            private = Path(os.path.abspath(destination)).is_relative_to(ROOT / "planning")
+            if private and not (ROOT / "planning").exists():
+                continue
             assert destination.is_file(), (path, target)
             if anchor:
                 headings = re.findall(r"^#+ (.+)$", destination.read_text(), re.M)

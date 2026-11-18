@@ -49,6 +49,6 @@ return await call_tool("alpha_add", {"a": left["value"], "b": right["value"]})
 
 The result is `{"value": 14}`. Python variables last for one execution; upstream state can last for the gateway process.
 
-Read [configuration](docs/config.md), [Python usage](docs/python.md), [server setup](docs/servers.md) and [troubleshooting](docs/troubleshooting.md). Developers can start with [architecture](dev/architecture.md), [testing](dev/testing.md), [releases](dev/release.md) and [worktrees](dev/worktrees.md).
+Read [configuration](docs/config.md), [Python usage](docs/python.md), [server setup](docs/servers.md) and [troubleshooting](docs/troubleshooting.md). Developers can start with [architecture](dev-guides/project/architecture.md), [testing](dev-guides/practices/testing.md), [releases](dev-guides/project/release.md) and [worktrees](dev-guides/practices/workspace.md).
 
 V4 owns no packs. Run a pinned older OneTool release as an ordinary upstream if you need its packs. The old implementation remains at the local `archive/pre-v4-main` branch. See [the new changelog](CHANGELOG.md) for the 4.0 boundary.

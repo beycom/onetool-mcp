@@ -26,6 +26,8 @@ The plan is the source of truth. Read it before changing anything:
 
 T03 removed the V3 source, tests, docs and OpenSpec. The preserved V3 source is readable at `archive/pre-v4-main`; do not restore it into V4.
 
+Developer guidance: [dev-guides/index.md](dev-guides/index.md).
+
 ## Rules for V4 code
 
 - Upstream first. Before writing a module, check what FastMCP already does. A gap becomes an upstream issue or pull request where possible. A local stand-in is small, links the upstream issue, and is deleted when upstream ships.

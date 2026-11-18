@@ -51,7 +51,7 @@ def line_counts(root: Path) -> dict[str, int]:
             root / "CHANGELOG.md",
             *list((root / "docs").glob("*.md")),
         ],
-        "developer_docs": [root / "AGENTS.md", *list((root / "dev").glob("*.md"))],
+        "developer_docs": [root / "AGENTS.md", *list((root / "dev-guides").rglob("*.md"))],
     }
     return {
         name: sum(len(path.read_text().splitlines()) for path in paths if path.is_file())
