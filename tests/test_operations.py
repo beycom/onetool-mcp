@@ -309,3 +309,37 @@ async def test_status_retains_redacted_error_text(tmp_path: Path) -> None:
         error = status["servers"]["down"]["last_error"]
         assert "down:" in error and "No such file" in error
         assert secret not in error and "redacted" in error and len(error) <= 300
+
+
+async def test_cancelled_admin_drain_reopens_execution(tmp_path: Path) -> None:
+    events = tmp_path / "events.jsonl"
+    async with connected(tmp_path, {"servers": {"alpha": stdio(events)}}) as (client, _, _):
+        work = asyncio.create_task(
+            execute(
+                client,
+                'return await call_tool("alpha_delay", {"seconds":30})',
+                raise_on_error=False,
+            )
+        )
+        for _ in range(100):
+            if events.exists() and "delay-start" in events.read_text():
+                break
+            await asyncio.sleep(0.02)
+        else:
+            raise AssertionError("fixture did not start")
+        for tool, arguments in [
+            ("onetool_reload", {}),
+            ("onetool_restart_server", {"name": "alpha"}),
+        ]:
+            admin = asyncio.create_task(client.call_tool(tool, arguments))
+            await asyncio.sleep(0.1)
+            admin.cancel()
+            try:
+                await admin
+            except asyncio.CancelledError:
+                pass
+            else:
+                raise AssertionError("admin cancellation returned a result")
+            assert (await execute(client, "return 42")).content[0].text == "42"
+        work.cancel()
+        await asyncio.gather(work, return_exceptions=True)

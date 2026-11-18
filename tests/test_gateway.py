@@ -217,3 +217,40 @@ async def test_loopback_http_upstream(tmp_path: Path) -> None:
     finally:
         process.terminate()
         await asyncio.wait_for(process.wait(), 5)
+
+
+async def test_execute_memo_lists_each_backend_once_and_expires(tmp_path: Path) -> None:
+    events = tmp_path / "beta.jsonl"
+    beta = stdio(events)
+    beta["args"] += ["--catalog-delay", "0.05"]
+    async with connected(tmp_path, {"servers": {"alpha": stdio(), "beta": beta}}) as (client, _, _):
+        code = (
+            "values = []\nfor x in [1,2,3]:\n"
+            '    item = await call_tool("alpha_counter", {})\n'
+            '    values.append(item["count"])\nreturn {"values":values}'
+        )
+        for expected, lists in [([1, 2, 3], 1), ([4, 5, 6], 2)]:
+            result = await client.session.send_request(
+                mt.CallToolRequest(
+                    params=mt.CallToolRequestParams(name="execute", arguments={"code": code})
+                ),
+                mt.CallToolResult,
+            )
+            assert result.structured_content == {"values": expected}
+            observed = [json.loads(line)["event"] for line in events.read_text().splitlines()]
+            assert observed.count("list-tools") == lists
+
+
+async def test_native_call_uses_longest_backend_prefix(tmp_path: Path) -> None:
+    parent_events = tmp_path / "parent.jsonl"
+    async with connected(
+        tmp_path, {"servers": {"alpha": stdio(parent_events), "alpha_beta": stdio()}}
+    ) as (client, _, _):
+        result = await client.session.send_request(
+            mt.CallToolRequest(
+                params=mt.CallToolRequestParams(name="alpha_beta_counter", arguments={})
+            ),
+            mt.CallToolResult,
+        )
+        assert result.structured_content["count"] == 1
+        assert not parent_events.exists()

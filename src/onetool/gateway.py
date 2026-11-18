@@ -311,11 +311,21 @@ class Catalog(Provider):
         # Native aggregate lookup also asks mounted providers about admin names.
         if name.startswith("onetool_"):
             return None
-        return await super()._get_tool(name, version)
+        prefix, separator, _ = name.rpartition("_")
+        while separator:
+            backend = self.gateway.backends.get(prefix)
+            if backend is not None and backend.config.enabled:
+                return await backend.provider.get_tool(name, version)
+            prefix, separator, _ = prefix.rpartition("_")
+        return None
 
     async def _list_tools(self) -> Sequence[Tool]:
         if not self.live_request():
             return []
+        # Per-execute memo only; see upstream-gaps.md#per-call-codemode-catalog-resolution.
+        memo = self.gateway.catalog_memo.get()
+        if memo is not None and "tools" in memo:
+            return memo["tools"]
         backends = [backend for backend in self.gateway.backends.values() if backend.config.enabled]
         results = await asyncio.gather(
             *(backend.provider.list_tools() for backend in backends), return_exceptions=True
@@ -334,6 +344,8 @@ class Catalog(Provider):
                     )
                 names[tool.name] = backend.name
                 tools.append(tool)
+        if memo is not None:
+            memo["tools"] = tools
         return tools
 
     def live_request(self) -> bool:
@@ -417,6 +429,7 @@ class GatewayCalls(Middleware):
                 return result
             deadline = time.monotonic() + gateway.config.model.execution.timeout_seconds
             deadline_token = gateway.deadline.set(deadline)
+            memo_token = gateway.catalog_memo.set({})
             try:
                 async with gateway.operations.execution(), asyncio.timeout_at(deadline):
                     result = await call_next(context)
@@ -459,6 +472,7 @@ class GatewayCalls(Middleware):
                 result = ToolResult(content=gateway.redact(str(exc)), is_error=True)
             finally:
                 gateway.deadline.reset(deadline_token)
+                gateway.catalog_memo.reset(memo_token)
             event(
                 gateway.logger,
                 "execution_completed",
@@ -483,6 +497,9 @@ class Gateway:
         self.deadline: ContextVar[float | None] = ContextVar("execution_deadline", default=None)
         self.request_id: ContextVar[str] = ContextVar("request_id", default="-")
         self.catalog_allowed: ContextVar[bool] = ContextVar("catalog_allowed", default=False)
+        self.catalog_memo: ContextVar[dict[str, Sequence[Tool]] | None] = ContextVar(
+            "catalog_memo", default=None
+        )
         self.results = ResultFiles(logger, config.model.execution.max_output_bytes)
         self.operations = Operations(self)
         self.backends = self.build_backends(config)

@@ -9,11 +9,12 @@ from pathlib import Path
 
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import Middleware
 from fastmcp.tools import Tool, ToolResult
 from mcp.types import ImageContent, TextContent
 
 
-def build_server(events: Path | None = None) -> FastMCP:
+def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMCP:
     server = FastMCP("gateway-fixture")
     count = 0
 
@@ -24,6 +25,14 @@ def build_server(events: Path | None = None) -> FastMCP:
                     json.dumps({"event": event, "pid": os.getpid(), "time": time.time()}) + "\n"
                 )
 
+    class CatalogProbe(Middleware):
+        async def on_list_tools(self, context, call_next):
+            record("list-tools")
+            if catalog_delay:
+                await asyncio.sleep(catalog_delay)
+            return await call_next(context)
+
+    server.add_middleware(CatalogProbe())
     record("start")
 
     @server.tool
@@ -148,12 +157,13 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--events", type=Path)
     parser.add_argument("--stderr-text")
+    parser.add_argument("--catalog-delay", type=float, default=0)
     args = parser.parse_args()
     if args.stderr_text:
         import sys
 
         print(args.stderr_text, file=sys.stderr)
-    server = build_server(args.events)
+    server = build_server(args.events, args.catalog_delay)
     if args.transport == "stdio":
         server.run(show_banner=False)
     else:

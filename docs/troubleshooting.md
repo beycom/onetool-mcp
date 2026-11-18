@@ -4,7 +4,7 @@ Start with `onetool check-config --config PATH`. It reports validation locations
 
 ## Missing tools or unavailable servers
 
-Call `onetool_status`. If a server's tools are missing from search, inspect its state and last sanitized error. Discovery skips unavailable servers; it does not list placeholder tools.
+Call `onetool_status`. If a server's tools are missing from search, inspect its state and last sanitized error. Discovery skips unavailable servers; it does not list placeholder tools. Each search or execute still fetches every enabled server's catalog. A hung HTTP server can delay it by up to that server's `timeout_seconds`. Lower the timeout or set `enabled: false` for a flaky server.
 
 States are disabled, lazy, ready and error. Status includes observed tool counts, versions, process/config paths, timeouts and referenced environment-variable presence. It never opens an upstream connection. Some client SDKs send a separate tools/list request after reading a result; that discovery can connect.
 
@@ -26,7 +26,9 @@ A valid reload stops new executions, waits up to five seconds for active work, c
 
 `onetool_restart_server(name)` resets only that loaded server. It uses the same admission/drain rule. To disable a server, edit `enabled: false` and reload. To restart the gateway process itself, reconnect it from your MCP client.
 
-Client cancellation and shutdown propagate cancellation without generating a new tool response. Drain cancellation produces an explicit unknown-outcome error for the affected caller.
+Client cancellation and shutdown propagate cancellation without generating a new tool response. Cancelling a reload/restart while it waits for active work reopens admission. Drain cancellation produces an explicit unknown-outcome error for the affected caller.
+
+A single ingress connection stayed open for 60 restart/reload pairs. RSS after pairs 20/40/60 was 102400/102544/102640 KiB, with 11 file descriptors throughout and all retired backend processes gone. Growth flattened. A separate weakref/GC control found no accumulation of live backend/client objects after collection; these controls do not prove a continuing object leak. Restart the gateway to release retained process memory.
 
 ## Large responses and memory
 

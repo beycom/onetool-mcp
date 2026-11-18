@@ -48,8 +48,10 @@ class Operations:
             for task in pending:
                 if task.cancel("Dispatched call outcome unknown; do not replay"):
                     self.draining.add(task)
-            await asyncio.gather(*pending, return_exceptions=True)
-            self.draining.difference_update(pending)
+            try:
+                await asyncio.gather(*pending, return_exceptions=True)
+            finally:
+                self.draining.difference_update(pending)
 
     async def reload(self) -> dict[str, object]:
         async with self.lock:
@@ -63,8 +65,8 @@ class Operations:
                 or candidate.model.logging != gateway.config.model.logging
             ):
                 raise ToolError("execution or logging changes require a gateway process restart")
-            await self.drain()
             try:
+                await self.drain()
                 await gateway.close_backends()
                 gateway.config = candidate
                 gateway.redact.values = candidate.secret_values
@@ -88,8 +90,8 @@ class Operations:
                 raise ToolError("Unknown server name")
             if not backend.config.enabled:
                 raise ToolError(f"{name}: server is disabled in the loaded config")
-            await self.drain()
             try:
+                await self.drain()
                 await backend.close()
             finally:
                 self.accepting = True
