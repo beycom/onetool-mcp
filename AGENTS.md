@@ -20,9 +20,9 @@ OneTool V4 is a small MCP gateway: one YAML file, upstream MCP servers proxied t
 
 The plan is the source of truth. Read it before changing anything:
 
-- `planning/features/v4/summary.md` first, then `design.md`, `operations.md`, `tasks.md` and `validation.md`.
-- `planning/features/v4/reviews/stress-test-review.md` explains why the plan is small. Do not reintroduce what it removed.
-- Log task evidence in `planning/features/v4/evidence.md`. Keep POC scripts in `planning/features/v4/pocs/`.
+- `planning/features/backlog/[gateway]-v4/summary.md` first, then `design.md`, `operations.md`, `tasks.md` and `validation.md`.
+- `planning/features/backlog/[gateway]-v4/reviews/stress-test-review.md` explains why the plan is small. Do not reintroduce what it removed.
+- Log task evidence in `planning/features/backlog/[gateway]-v4/evidence.md`. Keep POC scripts in `planning/features/backlog/[gateway]-v4/pocs/`.
 
 Until task T03 lands, this branch still contains the V3 source, `dev/`, `docs/` and `openspec/`. They describe the old product. Do not follow their guidance or extend them. T03 deletes them. The V3 source stays readable at the `archive/pre-v4-main` branch.
 
