@@ -1,0 +1,100 @@
+[
+  {
+    "name": "search",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "description": "Search query to find available tools",
+          "type": "string"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter to tools with any of these tags before searching"
+        },
+        "detail": {
+          "default": "brief",
+          "description": "'brief' for names and descriptions, 'detailed' for parameter schemas as markdown, 'full' for complete JSON schemas",
+          "enum": [
+            "brief",
+            "detailed",
+            "full"
+          ],
+          "type": "string"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of results to return"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "get_schema",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tools": {
+          "description": "List of tool names to get schemas for",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "detail": {
+          "default": "detailed",
+          "description": "'brief' for names and descriptions, 'detailed' for parameter schemas as markdown, 'full' for complete JSON schemas",
+          "enum": [
+            "brief",
+            "detailed",
+            "full"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "tools"
+      ]
+    }
+  },
+  {
+    "name": "execute",
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "description": "Python async code to execute tool calls via call_tool(name, arguments)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ]
+    }
+  }
+]

@@ -929,6 +929,7 @@ version = "4.0.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp", extra = ["code-mode"] },
+    { name = "keyring" },
     { name = "mcp" },
     { name = "py-key-value-aio", extra = ["keyring"] },
     { name = "pydantic" },
@@ -947,6 +948,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastmcp", extras = ["code-mode"], specifier = ">=4.2.1,<4.3" },
+    { name = "keyring", specifier = ">=25.7.0,<26" },
     { name = "mcp", specifier = ">=2.3.0,<3" },
     { name = "py-key-value-aio", extras = ["keyring"], specifier = ">=0.5.0,<0.6" },
     { name = "pydantic", specifier = ">=2.14.3,<3" },
