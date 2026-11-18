@@ -315,6 +315,11 @@ class Catalog(Provider):
         while separator:
             backend = self.gateway.backends.get(prefix)
             if backend is not None and backend.config.enabled:
+                if any(
+                    prefix.startswith(other.name + "_") and other.config.enabled
+                    for other in self.gateway.backends.values()
+                ):
+                    return await super()._get_tool(name, version)
                 return await backend.provider.get_tool(name, version)
             prefix, separator, _ = prefix.rpartition("_")
         return None

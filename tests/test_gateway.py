@@ -241,16 +241,17 @@ async def test_execute_memo_lists_each_backend_once_and_expires(tmp_path: Path) 
             assert observed.count("list-tools") == lists
 
 
-async def test_native_call_uses_longest_backend_prefix(tmp_path: Path) -> None:
+async def test_native_call_rejects_namespaced_collision(tmp_path: Path) -> None:
     parent_events = tmp_path / "parent.jsonl"
     async with connected(
         tmp_path, {"servers": {"alpha": stdio(parent_events), "alpha_beta": stdio()}}
     ) as (client, _, _):
         result = await client.session.send_request(
             mt.CallToolRequest(
-                params=mt.CallToolRequestParams(name="alpha_beta_counter", arguments={})
+                params=mt.CallToolRequestParams(name="alpha_beta_add", arguments={"a": 2, "b": 3})
             ),
             mt.CallToolResult,
         )
-        assert result.structured_content["count"] == 1
-        assert not parent_events.exists()
+        assert result.is_error
+        text = str(result.content)
+        assert "collision" in text.lower() and "alpha/beta_add" in text and "alpha_beta/add" in text
