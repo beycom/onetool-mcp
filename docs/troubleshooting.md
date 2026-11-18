@@ -6,7 +6,7 @@ Start with `onetool check-config --config PATH`. It reports validation locations
 
 Call `onetool_status`. If a server's tools are missing from search, inspect its state and last sanitized error. Discovery skips unavailable servers; it does not list placeholder tools. Each search and each execution that dispatches tools fetches every enabled server's catalog. A hung HTTP server can delay it by up to that server's `timeout_seconds`. Lower the timeout or set `enabled: false` for a flaky server.
 
-States are disabled, lazy, ready and error. Status includes observed tool counts, versions, process/config paths, timeouts and referenced environment-variable presence. It never opens an upstream connection. Some client SDKs send a separate tools/list request after reading a result; that discovery can connect.
+States are disabled, lazy, connecting, ready and error. Status includes observed tool counts, versions, process/config paths, timeouts and referenced environment-variable presence. It never opens an upstream connection. Some client SDKs send a separate tools/list request after reading a result; that discovery can connect.
 
 The last error has the server name, exception type and redacted text, capped at about 300 characters. Check executable paths and working directories. Preserve virtualenv executable symlinks: their directory identifies the environment.
 
@@ -34,10 +34,16 @@ A single ingress connection stayed open for 60 restart/reload pairs. RSS after p
 
 ## Large responses and memory
 
-Read the returned file path with your own tools. Check its byte count and SHA-256 if moving it elsewhere. Do not rerun the execution to recover output. Files are removed on orderly shutdown and can be evicted under the directory cap.
+Use `onetool_results(action="inspect", handle=...)` and read/grep/query to recover the returned handle without rerunning the execution. You can also read the file path with your own tools. Check its byte count and SHA-256 if moving it elsewhere. Do not rerun the execution to recover output. Files are removed on orderly shutdown and can be evicted under the directory cap.
 
 The inline cap and 16 MiB retention limit apply after upstream reception. They cannot prevent the MCP SDK's stdio line reader from repeatedly copying a large JSON-RPC line. That quadratic reassembly, rather than Monty or JSON parsing, caused the measured peak. A 20 MiB fixture response raised gateway peak RSS to about 1.39 GB on macOS arm64. Three consecutive calls retained 1,337,296, 1,337,536 and 1,337,536 KiB after collection and idle, so no linear growth was observed in that control. A large call can leave the process using roughly 1.3 GiB.
 
 Prefer HTTP transport for servers returning large values: the isolated 20 MiB control used about 129 MiB over HTTP versus about 1.2 GB over stdio. Keep upstream responses smaller when possible. Restart the gateway to release retained memory. HTTP's upstream SSE-event cap does not bound application/json responses. This is an upstream limitation; OneTool does not add another receive pipeline.
 
 A result over 16 MiB or a failed disk write returns an explicit no-replay message. A crash may leave private temp files for the operating system to clean up.
+
+## Diagnostic categories
+
+Status includes overall `ok`/`degraded`, warnings, the effective config sources, referenced variable names/presence, versions/paths/log location, and measured sandbox imports/limits. No environment values are dumped. Status creates no upstream process, network connection or OAuth prompt; the first import check uses a short-lived sandbox probe and subsequent checks are cached.
+
+Errors expose category and next action in result `_meta.onetool`, backend `failure`, or status `last_failure` when cancellation cannot return a response. Categories are `unavailable` (check the command/endpoint, then enable), `authentication` (check credentials/secure keyring), `timeout` (inspect target state and limits), `cancelled` and `outcome_unknown` (inspect target state, do not replay), `sandbox_limit` (reduce work or review limits), and `config` (validate config and exact schemas). A successful later call does not erase the most recent failure. The gateway never automatically retries a dispatched call.

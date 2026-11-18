@@ -5,9 +5,9 @@ from __future__ import annotations
 import ipaddress
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Self
 from urllib.parse import urlsplit
 
 import yaml
@@ -29,7 +29,37 @@ class OAuthConfig(StrictModel):
     scopes: list[str] = Field(default_factory=list)
 
 
+class ArgumentCuration(StrictModel):
+    description: str | None = None
+    default: str | int | float | bool | None = None
+    hide: bool = False
+    required: Literal[True] | None = None
+    examples: list[Any] | None = None
+
+
+class ToolCuration(StrictModel):
+    description: str | None = None
+    enabled: bool = True
+    tags: list[str] | None = None
+    meta: dict[str, Any] | None = None
+    arguments: dict[str, ArgumentCuration] = Field(default_factory=dict)
+
+
 class Server(StrictModel):
+    description: str | None = None
+    source: str | None = None
+    instructions: str | None = None
+    tools: dict[str, ToolCuration] = Field(default_factory=dict)
+    include_tags: list[str] | None = None
+    exclude_tags: list[str] | None = None
+
+    @field_validator("tools")
+    @classmethod
+    def nonempty_tools(cls, value: dict[str, ToolCuration]) -> dict[str, ToolCuration]:
+        if any(not name.strip() for name in value):
+            raise ValueError("tool names must not be empty")
+        return value
+
     enabled: bool = True
     timeout_seconds: Annotated[float, Field(gt=0, le=3600, allow_inf_nan=False)] = 30
 
@@ -75,6 +105,13 @@ class LoggingConfig(StrictModel):
 
 
 class GatewayConfig(StrictModel):
+    env: dict[str, str] = Field(default_factory=dict)
+    instructions: str = (
+        "Use help/search to discover exact tools and get_schema for parameters. "
+        "Execute Python with await server.tool(**kwargs) or call_tool. "
+        "Use onetool_status for diagnostics, onetool_servers for session controls, "
+        "and onetool_results to recover stored output. Never replay unknown outcomes."
+    )
     version: int
     servers: dict[str, Annotated[StdioServer | HttpServer, Field(discriminator="transport")]]
     execution: Execution = Field(default_factory=Execution)
@@ -156,20 +193,38 @@ def _path(value: str, directory: Path) -> str:
     return os.path.abspath(directory / path)
 
 
+if TYPE_CHECKING:
+    from onetool.secrets import Variables
+
+
 @dataclass(frozen=True)
 class LoadedConfig:
     path: Path
     model: GatewayConfig
     env_names: frozenset[str]
     secret_values: tuple[str, ...]
+    variables: Variables | None = None
+    templates: dict[str, StdioServer | HttpServer] = field(default_factory=dict)
+    server_errors: dict[str, str] = field(default_factory=dict)
+    secrets_path: Path | None = None
 
     def redacted_env(self) -> dict[str, bool]:
-        return {name: name in os.environ for name in sorted(self.env_names)}
+        return {
+            name: self.variables.present(name) if self.variables else name in os.environ
+            for name in sorted(self.env_names)
+        }
+
+    def resolve_server(self, name: str) -> StdioServer | HttpServer:
+        if name in self.server_errors:
+            raise ConfigError(self.server_errors[name])
+        template = self.templates.get(name, self.model.servers[name])
+        if self.variables is None:
+            return template
+        return resolve_values(template, self.variables, runtime=True)
 
 
-def load_config(path: Path) -> LoadedConfig:
-    """Read at most 1 MiB, validate, substitute allowed values, resolve local paths."""
-    path = path.absolute()
+def read_document(path: Path) -> dict[str, Any]:
+    """Safe single-document mapping loader shared by config and secrets."""
     try:
         with path.open("rb") as stream:
             raw = stream.read(1048577)
@@ -188,64 +243,80 @@ def load_config(path: Path) -> LoadedConfig:
         raise ConfigError("invalid safe YAML" + location) from None
     if not isinstance(document, dict):
         raise ConfigError("config root must be a mapping")
+    return document
+
+
+def resolve_values(
+    server: StdioServer | HttpServer, variables: Variables, *, runtime: bool
+) -> StdioServer | HttpServer:
+    def substitute(value: str) -> str:
+        return variables.text(value, runtime=runtime)
+
+    if isinstance(server, StdioServer):
+        env = {key: substitute(value) for key, value in {**variables.shared, **server.env}.items()}
+        variables.masks.update(value for value in env.values() if len(value) >= 8)
+        return server.model_copy(update={"args": [substitute(v) for v in server.args], "env": env})
+    url = substitute(server.url)
+    if runtime or "${" not in url:
+        _validate_url(url)
+    headers = {key: substitute(value) for key, value in server.headers.items()}
+    variables.masks.update(value for value in headers.values() if len(value) >= 8)
+    if urlsplit(url).query:
+        variables.masks.add(url)
+        variables.masks.update(
+            part.partition("=")[2]
+            for part in urlsplit(url).query.split("&")
+            if part.partition("=")[2]
+        )
+    return server.model_copy(update={"url": url, "headers": headers})
+
+
+def load_config(
+    path: Path, *, secrets_path: Path | None = None, defer_errors: bool = False
+) -> LoadedConfig:
+    from onetool.secrets import Variables
+
+    path = path.absolute()
+    document = read_document(path)
     try:
         model = GatewayConfig.model_validate(document)
     except ValidationError as exc:
         raise _schema_error(exc) from None
 
-    env_names: set[str] = set()
-    secrets: set[str] = set()
-
-    def substitute(value: str) -> str:
-        def replace(match: re.Match[str]) -> str:
-            name = match.group(1)
-            env_names.add(name)
-            if name not in os.environ:
-                raise ConfigError(f"environment variable is not set: {name}")
-            replacement = os.environ[name]
-            if replacement:
-                secrets.add(replacement)
-            return replacement
-
-        return re.sub(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", replace, value)
-
+    variables = Variables(secrets_path.absolute() if secrets_path else None, model.env)
     resolved: dict[str, StdioServer | HttpServer] = {}
+    templates: dict[str, StdioServer | HttpServer] = {}
+    errors: dict[str, str] = {}
     for name, server in model.servers.items():
         if isinstance(server, StdioServer):
-            args = [substitute(item) for item in server.args]
-            env = {key: substitute(value) for key, value in server.env.items()}
-            secrets.update(value for value in env.values() if len(value) >= 8)
             command = server.command
             if "/" in command or "\\" in command:
                 command = _path(command, path.parent)
-            resolved[name] = server.model_copy(
+            server = server.model_copy(
                 update={
                     "command": command,
-                    "args": args,
-                    "env": env,
                     "cwd": _path(server.cwd, path.parent) if server.cwd is not None else None,
                 }
             )
-        else:
-            url = substitute(server.url)
-            _validate_url(url)
-            headers = {key: substitute(value) for key, value in server.headers.items()}
-            secrets.update(value for value in headers.values() if len(value) >= 8)
-            # Error text must not disclose a URL's query credentials.
-            if urlsplit(url).query:
-                secrets.add(url)
-                secrets.update(
-                    value
-                    for _, _, value in (
-                        item.partition("=") for item in urlsplit(url).query.split("&")
-                    )
-                    if value
-                )
-            resolved[name] = server.model_copy(update={"url": url, "headers": headers})
+        templates[name] = server
+        try:
+            resolved[name] = resolve_values(server, variables, runtime=False)
+        except ConfigError as exc:
+            if not defer_errors:
+                raise
+            errors[name] = str(exc)
+            resolved[name] = server
     logging = model.logging
     if logging.file is not None:
         logging = logging.model_copy(update={"file": _path(logging.file, path.parent)})
     model = model.model_copy(update={"servers": resolved, "logging": logging})
     return LoadedConfig(
-        path, model, frozenset(env_names), tuple(sorted(secrets, key=len, reverse=True))
+        path,
+        model,
+        frozenset(variables.names),
+        tuple(sorted(variables.masks, key=len, reverse=True)),
+        variables,
+        templates,
+        errors,
+        secrets_path.absolute() if secrets_path else None,
     )

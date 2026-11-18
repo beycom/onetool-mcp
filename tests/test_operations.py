@@ -125,6 +125,7 @@ async def test_execution_and_backend_deadlines_cancel_without_replay(tmp_path: P
         )
         assert failed.is_error and time.monotonic() - start < 1.5
         assert "unknown" in str(failed.content).lower() and "replay" in str(failed.content).lower()
+        assert failed.meta["onetool"]["category"] == "timeout"
         assert (await execute(client, "return 42")).content[0].text == "42"
     recorded = [json.loads(line)["event"] for line in events.read_text().splitlines()]
     assert recorded.count("delay-start") == 1 and "delay-cancelled" in recorded
@@ -139,6 +140,7 @@ async def test_interrupted_side_effect_is_not_replayed(tmp_path: Path) -> None:
             client, 'return await call_tool("alpha_interrupt", {})', raise_on_error=False
         )
         assert failed.is_error and "unknown" in str(failed.content).lower()
+        assert failed.meta["onetool"]["category"] == "outcome_unknown"
         assert "replay" in str(failed.content).lower()
         recorded = [json.loads(line)["event"] for line in events.read_text().splitlines()]
         assert recorded.count("append-interrupt") == 1
@@ -286,6 +288,8 @@ async def test_client_cancellation_has_no_result_and_next_request_works(tmp_path
             pass
         else:
             raise AssertionError("client cancellation became a result")
+        status = (await client.call_tool("onetool_status", {})).data
+        assert status["last_failure"]["category"] == "cancelled"
         assert (await execute(client, "return 42")).content[0].text == "42"
     recorded = [json.loads(line)["event"] for line in events.read_text().splitlines()]
     assert recorded.count("delay-cancelled") == 1 and "delay-complete" not in recorded

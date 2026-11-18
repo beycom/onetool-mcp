@@ -95,3 +95,50 @@ def logging_context(config: LoadedConfig) -> Iterator[tuple[logging.Logger, Reda
 def event(logger: logging.Logger, name: str, *, level: int = logging.INFO, **fields: Any) -> None:
     """Call sites supply identifiers/categories only, never exception or payload text."""
     logger.log(level, name, extra=fields)
+
+
+def failure_details(exc: BaseException, *, fallback: str = "unavailable") -> dict[str, str]:
+    """Classify typed causes only; recovery instructions never imply replay."""
+    import asyncio
+
+    from onetool.config import ConfigError
+
+    categories = {
+        "unavailable",
+        "authentication",
+        "timeout",
+        "cancelled",
+        "outcome_unknown",
+        "sandbox_limit",
+        "config",
+    }
+    category = fallback
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        declared = getattr(current, "category", None)
+        if declared in categories:
+            category = declared
+            break
+        if isinstance(current, asyncio.CancelledError):
+            category = "cancelled"
+        elif isinstance(current, TimeoutError):
+            category = "timeout"
+        elif isinstance(current, MemoryError | RecursionError):
+            category = "sandbox_limit"
+        elif isinstance(current, ConfigError):
+            category = "config"
+        current = current.__cause__ or current.__context__
+    actions = {
+        "unavailable": "Check executable/endpoint availability, then enable the server.",
+        "authentication": "Check the configured credentials and secure keyring; enable when ready.",
+        "timeout": (
+            "Check target state for dispatched calls; review timeout limits before a new operation."
+        ),
+        "cancelled": "Inspect target state for dispatched calls. Do not replay.",
+        "outcome_unknown": "Verify target state before another operation. Do not replay.",
+        "sandbox_limit": "Reduce work or review execution limits before a new operation.",
+        "config": "Validate config and exact tool/schema names before a new operation.",
+    }
+    return {"category": category, "next_action": actions[category]}

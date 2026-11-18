@@ -16,7 +16,7 @@ from mcp.types import ImageContent, TextContent
 
 
 def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMCP:
-    server = FastMCP("gateway-fixture")
+    server = FastMCP("gateway-fixture", instructions="Fixture native usage instructions")
     count = 0
 
     def record(event: str) -> None:
@@ -153,6 +153,13 @@ def build_server(events: Path | None = None, catalog_delay: float = 0) -> FastMC
         from fastmcp.server.dependencies import get_http_request
 
         return get_http_request().headers.get("X-Fixture-Token", "absent")
+
+    @server.tool
+    def env_digests(keys: list[str]) -> dict:
+        """Prove environment delivery without returning credential values."""
+        import hashlib
+
+        return {key: hashlib.sha256(os.environ.get(key, "").encode()).hexdigest() for key in keys}
 
     @server.tool
     def environment() -> dict:

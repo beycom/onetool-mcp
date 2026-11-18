@@ -25,6 +25,10 @@ if TYPE_CHECKING:
 class UnknownOutcome(ToolError):
     """A dispatched operation was interrupted; automatic replay is forbidden."""
 
+    def __init__(self, message: str, *, category: str = "outcome_unknown"):
+        super().__init__(message)
+        self.category = category
+
 
 class Operations:
     def __init__(self, gateway: Gateway):
@@ -63,7 +67,9 @@ class Operations:
         async with self.lock:
             gateway = self.gateway
             try:
-                candidate = load_config(gateway.config.path)
+                candidate = load_config(
+                    gateway.config.path, secrets_path=gateway.config.secrets_path, defer_errors=True
+                )
             except ConfigError as exc:
                 raise ToolError(str(exc)) from None
             if (
@@ -72,17 +78,20 @@ class Operations:
             ):
                 raise ToolError("execution or logging changes require a gateway process restart")
             try:
+                old_instructions = gateway.instructions()
                 await self.drain()
                 await gateway.close_backends()
                 gateway.config = candidate
                 gateway.redact.values = candidate.secret_values
                 gateway.backends = gateway.build_backends(candidate)
+                gateway.server.instructions = gateway.instructions()
                 gateway.revision += 1
             finally:
                 self.accepting = True
             event(gateway.logger, "config_reloaded", outcome="success")
             return {
                 "revision": gateway.revision,
+                "client_reconnect_required": old_instructions != gateway.instructions(),
                 "message": (
                     "All upstream state was reset. Connections are lazy. "
                     "Interrupted calls have unknown outcomes; do not replay."
@@ -94,12 +103,12 @@ class Operations:
         if action not in {"list", "status", "enable", "disable", "restart"}:
             raise ToolError("action must be list, status, enable, disable or restart")
         if action == "list":
-            return {"servers": gateway.status()["servers"]}
+            return {"servers": gateway.status_snapshot()["servers"]}
         if name not in gateway.backends:
             raise ToolError("Unknown server; configured names: " + ", ".join(gateway.backends))
         assert name is not None
         if action == "status":
-            return {"server": name, **gateway.status()["servers"][name]}
+            return {"server": name, **gateway.status_snapshot()["servers"][name]}
         # Serialize controls with whole-composition reload; other-server calls continue.
         async with self.lock:
             backend = gateway.backends[name]
@@ -108,7 +117,11 @@ class Operations:
                 from onetool.gateway import Backend
 
                 try:
-                    candidate = load_config(gateway.config.path)
+                    candidate = load_config(
+                        gateway.config.path,
+                        secrets_path=gateway.config.secrets_path,
+                        defer_errors=True,
+                    )
                 except ConfigError as exc:
                     raise ToolError(str(exc)) from None
                 if name not in candidate.model.servers:
@@ -156,9 +169,14 @@ class Operations:
                     model=gateway.config.model.model_copy(update={"servers": configs}),
                     secret_values=secrets,
                     env_names=gateway.config.env_names | candidate.env_names,
+                    variables=candidate.variables,
+                    templates={**gateway.config.templates, name: candidate.templates[name]},
+                    server_errors={
+                        n: message for n, message in candidate.server_errors.items() if n == name
+                    },
                 )
                 gateway.redact.values = secrets
-                backend = Backend(gateway, name, candidate.model.servers[name])
+                backend = Backend(gateway, name, candidate.model.servers[name], candidate)
                 gateway.backends[name] = backend
                 details = {
                     "pending_servers": sorted(pending_names),
@@ -173,9 +191,10 @@ class Operations:
                 if backend.state != "ready":
                     backend.state = "connecting"
                     try:
-                        await backend.provider.list_tools()
+                        tools = await backend.provider.list_tools()
+                        backend.observe_tools(tools)
                     except Exception:
                         details["error_category"] = "unavailable"
             else:
                 backend.state = "disabled"
-            return {"server": name, **gateway.status()["servers"][name], **details}
+            return {"server": name, **gateway.status_snapshot()["servers"][name], **details}

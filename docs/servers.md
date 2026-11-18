@@ -20,13 +20,17 @@ OneTool retains a supported stateful client per server and gateway ingress conne
 
 ## Authentication
 
-Use explicit headers or upstream OAuth. OneTool never copies caller credentials into an upstream request automatically.
+Use explicit headers or upstream OAuth. Store credential values in an explicit `--secrets PATH` file and reference `${NAME}` in headers or env; see [secrets](config.md#secrets). OneTool never copies caller credentials into an upstream request automatically.
 
 OAuth tokens go through FastMCP's `token_storage` argument to upstream KeyringStore. OneTool requires a secure macOS, Windows, SecretService or KWallet backend. A keyring chain is accepted only when every child is secure. Select a supported system backend if your default chain includes plaintext storage.
 
 No plaintext fallback exists. If secure storage is unavailable, that server reports an auth error while unauthenticated servers remain usable. The OAuth browser can open during discovery or a tool operation, never during config validation. A real browser login remains an owner release check for this candidate.
 
 Upstream KeyringStore has a 2,560-byte value limit on Windows. Oversized token records fail; OneTool does not implement a chunk store. Other-platform installation and OAuth behavior have not been exercised by the macOS candidate proof.
+
+## Curation and help
+
+Use per-server descriptions and instructions to explain intended use. Tool descriptions, hidden defaults and tag filters use native FastMCP transforms, before namespace collision checks. Curation is descriptive and does not grant authorization. Call `help(query="alpha", detail="full")` for connected native instructions followed by configured guidance, tools, resources and prompts. Lazy and disabled servers remain visible; help suggests `onetool_servers(action="enable", name="alpha")` rather than connecting them implicitly.
 
 ## Older OneTool packs
 

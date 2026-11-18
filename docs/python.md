@@ -1,8 +1,10 @@
 # Python through CodeMode
 
-OneTool exposes FastMCP's native `search`, `get_schema` and `execute`. Clients may add their own prefix to those MCP names. Use the names and schemas the client advertises.
+OneTool exposes FastMCP's native `search`, `get_schema` and `execute`, plus OneTool `help`. Clients may add their own prefix to those MCP names. Use the names and schemas the client advertises.
 
 ## Find and inspect tools
+
+Start with `help()` for the server overview. An exact tool name shows its signature and description; an exact server shows state, instructions and observed tools. Other queries return grouped server/tool matches, with close spellings for discovery only. Detail levels are `names`, `default`, `signatures` and `full`. Help never calls a business tool or connects a lazy/disabled server. Enable a lazy server explicitly or use search to discover it.
 
 The following MCP requests use the repository fixtures:
 
@@ -56,7 +58,7 @@ Cancellation or a lost transport after dispatch leaves that call's outcome unkno
 
 At or below the inline cap, the selected result returns inline. Larger output becomes a UTF-8 JSON file. The response has a local path, exact bytes, SHA-256, preview and a no-repeat message. Errors retain their error status.
 
-Read the file with your client's own file tools. The directory and files are owner-only. Individual results over 16 MiB are not retained. The directory keeps at most 256 MiB and evicts oldest files first; orderly shutdown removes it. A crash can leave temp files for OS cleanup.
+The receipt also contains an opaque process-local handle. Use `onetool_results(action="read", handle=...)` without file access, or the `results` namespace in Python. Your client's file tools can also read the path. The directory and files are owner-only. Individual results over 16 MiB are not retained. The directory keeps at most 256 MiB and evicts oldest files first; orderly shutdown removes it. A crash can leave temp files for OS cleanup.
 
 This bounds final output, not the memory used to receive an upstream result. See the [measured memory limitation](troubleshooting.md#large-responses-and-memory).
 
@@ -88,3 +90,20 @@ return await call_tools([
 ```
 
 `execution.max_tool_calls` defaults to 50 and accepts 1 through 1,000. Dot calls, native calls and batches share that budget and the execution deadline; remaining batch items are cancelled without dispatch. Client cancellation and shutdown still propagate. An empty batch makes no business call. Native `asyncio.gather` also overlaps calls; wrap each call in its own try/except for partial successes because Monty does not support `return_exceptions=True`.
+
+## Result handles
+
+Use `await results.write(value, source="label")` to force-store even a small value. Later executions and the `onetool_results` admin tool share the same store. No arbitrary paths are accepted. Handles expire on process exit; 4,096 live handles and 1,024 recent tombstones are retained within the 256 MiB cap, oldest first. Recent deleted/evicted handles have distinct errors; older handles say "unknown handle (expired or never issued)".
+
+```python
+saved = await results.write({"items": [{"name": "first", "count": 2}]}, source="fixture")
+return await results.query(saved["handle"], expression="items[0].count")
+```
+
+Actions are `write`, `read`, `grep`, `slice`, `toc`, `query`, `append`, `list`, `inspect`, `delete` and `purge`, with the same names inside `results`. Read uses zero-based `offset`, `limit=100` up to 500, and optional `tail=true`. Lines longer than 500 characters carry `[+N chars]`. Grep is case-insensitive by default, supports `context` up to 50 and at most 500 matched lines; output also fits the inline cap. Patterns are at most 1 KiB, run off the event loop and time out after one second by default. Timeout errors reveal no pattern or content.
+
+Slice accepts `select="1:10"` (one-based inclusive lines), `"#2"` (Markdown section number) or a heading substring. TOC reports Markdown sections or structured key/type/size information. Query accepts JMESPath expressions up to 4 KiB on typed JSON/YAML values; arbitrary tool text is never guessed to be JSON. Explicit writes detect JSON, YAML mappings/lists, Markdown or text once when stored. Append preserves the handle; inspect retains the original error flag. These operations never rerun an upstream call. Responses that cannot fit return a bounded preview and truncation notice.
+
+## Measured imports
+
+`onetool_status(check="json")` probes one module; ordinary status lazily probes the standard set and caches results for this process. Working in Monty 1.6.0: json, re, datetime, csv, collections, itertools, math, base64, hashlib, functools, typing, dataclasses, decimal, random, time, copy, bisect and asyncio. Missing: statistics, difflib, textwrap, html, urllib.parse, uuid, operator, string, zoneinfo, heapq, enum and fractions. Ask status on your installed version rather than assuming CPython's modules are available.

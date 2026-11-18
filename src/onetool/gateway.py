@@ -18,21 +18,22 @@ from contextvars import ContextVar
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastmcp import FastMCP
 from fastmcp.client.auth import OAuth
 from fastmcp.client.transports import StdioTransport
 from fastmcp.exceptions import ToolError
-from fastmcp.experimental.transforms.code_mode import CodeMode
+from fastmcp.experimental.transforms.code_mode import CodeMode, GetSchemas, Search
 from fastmcp.mcp_config import MCPConfig
 from fastmcp.prompts import Prompt
 from fastmcp.resources import Resource, ResourceTemplate
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.server.providers import FastMCPProvider, Provider
 from fastmcp.server.providers.proxy import ProxyProvider, StatefulProxyClient
-from fastmcp.server.transforms import Namespace
+from fastmcp.server.transforms import Namespace, ToolTransform, Transform
 from fastmcp.tools import Tool, ToolResult
+from fastmcp.tools.tool_transform import ToolTransformConfig
 from fastmcp.utilities.versions import VersionSpec
 from key_value.aio.stores.keyring import KeyringStore
 from mcp import types as mt
@@ -40,10 +41,11 @@ from mcp.shared.exceptions import MCPError
 
 from onetool import __version__
 from onetool.config import HttpServer, LoadedConfig, StdioServer
-from onetool.diagnostics import Redactor, event, logging_context
+from onetool.diagnostics import Redactor, event, failure_details, logging_context
 from onetool.operations import Operations, UnknownOutcome
 from onetool.results import ResultFiles, encoded
 from onetool.sandbox import OneToolSandbox, Presentation
+from onetool.secrets import secure_keyring
 
 
 def interruption(exc: BaseException) -> str | None:
@@ -73,17 +75,7 @@ def interruption(exc: BaseException) -> str | None:
 class StorageUnavailable(ToolError):
     """A safe authentication error, with no credential or upstream payload."""
 
-
-def secure_keyring(backend: Any) -> bool:
-    secure = {
-        "keyring.backends.macOS",
-        "keyring.backends.Windows",
-        "keyring.backends.SecretService",
-        "keyring.backends.kwallet",
-    }
-    if type(backend).__module__ == "keyring.backends.chainer":
-        return bool(backend.backends) and all(secure_keyring(child) for child in backend.backends)
-    return type(backend).__module__ in secure and backend.priority > 0
+    category = "authentication"
 
 
 def oauth_storage(name: str) -> KeyringStore:
@@ -104,11 +96,39 @@ def oauth_storage(name: str) -> KeyringStore:
     return KeyringStore(service_name="onetool-mcp")
 
 
+class MetadataClient(StatefulProxyClient[Any]):
+    """Observe public metadata while connected; P21 proves context lifetime."""
+
+    observe: Callable[[Any], None]
+
+    async def __aenter__(self) -> Any:
+        client = await super().__aenter__()  # type: ignore[no-untyped-call]  # Public upstream hook lacks annotations.
+        self.observe(client)
+        return client
+
+
+class CurationWarnings(Transform):
+    def __init__(self, backend: Backend):
+        self.backend = backend
+
+    async def list_tools(self, tools: Sequence[Tool]) -> Sequence[Tool]:
+        unknown = set(self.backend.config.tools) - {tool.name for tool in tools}
+        self.backend.warnings = [f"Unknown curation target: {name}" for name in sorted(unknown)]
+        return tools
+
+
 class Backend:
-    def __init__(self, gateway: Gateway, name: str, config: StdioServer | HttpServer):
+    def __init__(
+        self,
+        gateway: Gateway,
+        name: str,
+        config: StdioServer | HttpServer,
+        loaded_config: LoadedConfig | None = None,
+    ):
         self.gateway = gateway
         self.name = name
         self.config = config
+        self.loaded_config = loaded_config or gateway.config
         self.state = "lazy" if config.enabled else "disabled"
         self.session_enabled: bool | None = None
         self.accepting = True
@@ -116,6 +136,16 @@ class Backend:
         self.draining: set[asyncio.Task[Any]] = set()
         self.tool_count: int | None = None
         self.last_error: str | None = None
+        self.failure_info: dict[str, str] | None = None
+        self.native_instructions: str | None = None
+        self.instructions_truncated = False
+        self.warnings: list[str] = []
+        self.observed_tools: list[Tool] = []
+        self.observed_at: float | None = None
+        self.capabilities: dict[str, bool] = {}
+        if name in self.loaded_config.server_errors:
+            self.state = "error"
+            self.last_error = self.loaded_config.server_errors[name]
         self.client: StatefulProxyClient[Any] | None = None
         proxy = FastMCP(
             name,
@@ -123,6 +153,17 @@ class Backend:
             middleware=[BackendCalls(self)],
         )
         proxy.provider_error_strategy = "raise"
+        proxy.add_transform(CurationWarnings(self))
+        if config.tools:
+            transforms = {
+                name: ToolTransformConfig.model_validate(item.model_dump(exclude_unset=True))
+                for name, item in config.tools.items()
+            }
+            proxy.add_transform(ToolTransform(transforms))
+        if config.include_tags is not None:
+            proxy.enable(tags=set(config.include_tags), only=True)
+        if config.exclude_tags is not None:
+            proxy.disable(tags=set(config.exclude_tags))
         self.provider = FastMCPProvider(proxy).wrap_transform(Namespace(name))
 
     @property
@@ -131,7 +172,9 @@ class Backend:
 
     def get_client(self) -> Any:
         if self.client is None:
-            config = self.config
+            config = self.loaded_config.resolve_server(self.name)
+            self.config = config
+            self.gateway.refresh_redaction()
             if isinstance(config, StdioServer):
                 env = {**os.environ, **config.env} if config.inherit_env else config.env
                 target: dict[str, Any] = {
@@ -159,10 +202,30 @@ class Backend:
             if isinstance(transport, StdioTransport):
                 # A backend can print secrets or payloads. Do not retain raw startup stderr.
                 transport.log_file = Path(os.devnull)
-            self.client = StatefulProxyClient(
-                transport, timeout=config.timeout_seconds, mode="auto"
-            )
+            client = MetadataClient(transport, timeout=config.timeout_seconds, mode="auto")
+            client.observe = self.observe_metadata
+            self.client = client
         return self.client.new_stateful()
+
+    def observe_metadata(self, client: Any) -> None:
+        raw = self.gateway.redact(client.instructions or "").encode("utf-8", errors="replace")
+        self.instructions_truncated = len(raw) > 8192
+        self.native_instructions = (
+            raw[:8150].decode("utf-8", errors="ignore") + "\n[Instructions truncated]"
+            if self.instructions_truncated
+            else raw.decode() or None
+        )
+
+        capabilities = client.server_capabilities
+        if capabilities is not None:
+            self.capabilities = {
+                "resources": bool(capabilities.resources),
+                "prompts": bool(capabilities.prompts),
+            }
+
+    def observe_tools(self, tools: Sequence[Tool]) -> None:
+        self.observed_tools = list(tools)
+        self.observed_at = time.monotonic()
 
     async def close(self) -> None:
         if self.client:
@@ -173,10 +236,16 @@ class Backend:
         self.state = "lazy" if self.config.enabled else "disabled"
         self.tool_count = None
         self.last_error = None
+        self.observed_tools.clear()
+        self.observed_at = None
+        self.native_instructions = None
+        self.capabilities.clear()
+        self.warnings.clear()
 
     def failure(self, exc: Exception) -> None:
         self.state = "error"
         self.last_error = self.gateway.redact(f"{self.name}: {type(exc).__name__}: {exc}")[:300]
+        self.failure_info = self.gateway.note_failure(exc)
 
 
 class BackendCalls(Middleware):
@@ -257,7 +326,8 @@ class BackendCalls(Middleware):
             )
             raise UnknownOutcome(
                 f"{backend.name}/{context.message.name}: timeout; "
-                "dispatched outcome unknown. Do not replay."
+                "dispatched outcome unknown. Do not replay.",
+                category="timeout",
             ) from None
         except asyncio.CancelledError:
             event(
@@ -270,6 +340,7 @@ class BackendCalls(Middleware):
                 error_category="cancelled",
             )
             if task in backend.draining:
+                gateway.note_failure(UnknownOutcome("Interrupted dispatched call"))
                 task.uncancel()
                 raise UnknownOutcome(
                     f"{backend.name}: dispatched outcome unknown. Do not replay."
@@ -279,6 +350,12 @@ class BackendCalls(Middleware):
             category = interruption(exc)
             if category:
                 backend.failure(exc)
+                gateway.note_failure(
+                    UnknownOutcome(
+                        "Interrupted dispatched call",
+                        category="timeout" if category == "timeout" else "outcome_unknown",
+                    )
+                )
                 event(
                     gateway.logger,
                     "tool_interrupted",
@@ -304,6 +381,7 @@ class BackendCalls(Middleware):
             raise ToolError(gateway.redact(str(exc))) from None
         except Exception as exc:
             backend.failure(exc)
+            gateway.note_failure(UnknownOutcome("Interrupted dispatched call"))
             event(
                 gateway.logger,
                 "tool_interrupted",
@@ -362,6 +440,7 @@ class Catalog(Provider):
         for backend, result in zip(backends, results, strict=True):
             if isinstance(result, BaseException):
                 continue
+            backend.observe_tools(result)
             for tool in result:
                 if tool.name in names:
                     first = names[tool.name]
@@ -441,6 +520,7 @@ class GatewayCalls(Middleware):
         gateway = self.gateway
         request_id = context.fastmcp_context.request_id if context.fastmcp_context else "-"
         token = gateway.request_id.set(request_id)
+        failure_token = gateway.failure_context.set({})
         start = time.monotonic()
         try:
             if context.message.name != "execute":
@@ -453,7 +533,7 @@ class GatewayCalls(Middleware):
                     outcome="error" if result.is_error else "success",
                     duration=time.monotonic() - start,
                 )
-                return result
+                return gateway.protect_result(gateway.sanitize_error(result))
             deadline = time.monotonic() + gateway.config.model.execution.timeout_seconds
             deadline_token = gateway.deadline.set(deadline)
             memo_token = gateway.catalog_memo.set({})
@@ -463,6 +543,7 @@ class GatewayCalls(Middleware):
                 async with gateway.operations.execution(), asyncio.timeout_at(deadline):
                     result = await call_next(context)
             except TimeoutError:
+                gateway.note_failure(TimeoutError())
                 event(
                     gateway.logger,
                     "execution_timeout",
@@ -479,6 +560,7 @@ class GatewayCalls(Middleware):
                     is_error=True,
                 )
             except asyncio.CancelledError:
+                gateway.note_failure(asyncio.CancelledError())
                 event(
                     gateway.logger,
                     "execution_cancelled",
@@ -498,6 +580,7 @@ class GatewayCalls(Middleware):
                     ) from None
                 raise
             except ToolError as exc:
+                gateway.note_failure(exc, fallback="config")
                 result = ToolResult(content=gateway.redact(str(exc)), is_error=True)
             finally:
                 gateway.deadline.reset(deadline_token)
@@ -512,14 +595,25 @@ class GatewayCalls(Middleware):
                 duration=time.monotonic() - start,
                 outcome="error" if result.is_error else "success",
             )
+            if result.is_error and gateway.failure_context.get():
+                result = result.model_copy(
+                    update={
+                        "meta": {**(result.meta or {}), "onetool": gateway.failure_context.get()}
+                    }
+                )
             result = gateway.sandbox.compose(gateway.sanitize_error(result), presentation)
-            bounded = gateway.results.bound(result)
-            rendered = gateway.sandbox.render(bounded, presentation)
+            result = gateway.protect_result(result)
+            presentation.value = gateway.protect_value(presentation.value)
+            bounded = gateway.results.bound(result, native=presentation.value)
+            if bounded is not result:
+                return bounded  # Reuse the first receipt/error; never retain the same result twice.
+            rendered = gateway.protect_result(gateway.sandbox.render(bounded, presentation))
             if presentation.format != "json" and len(encoded(rendered)) > gateway.results.cap:
-                return gateway.results.bound(result, force=True)
+                return gateway.results.bound(result, force=True, native=presentation.value)
             return rendered
         finally:
             gateway.request_id.reset(token)
+            gateway.failure_context.reset(failure_token)
 
 
 class Gateway:
@@ -531,14 +625,23 @@ class Gateway:
         self.revision = 1
         self.deadline: ContextVar[float | None] = ContextVar("execution_deadline", default=None)
         self.request_id: ContextVar[str] = ContextVar("request_id", default="-")
+        self.failure_context: ContextVar[dict[str, str] | None] = ContextVar(
+            "failure_context", default=None
+        )
+        self.last_failure: dict[str, str] | None = None
         self.catalog_allowed: ContextVar[bool] = ContextVar("catalog_allowed", default=False)
         self.catalog_memo: ContextVar[dict[str, Sequence[Tool]] | None] = ContextVar(
             "catalog_memo", default=None
         )
-        self.results = ResultFiles(logger, config.model.execution.max_output_bytes)
+        self.results = ResultFiles(
+            logger, config.model.execution.max_output_bytes, protect=self.protect_value
+        )
         self.operations = Operations(self)
         self.backends = self.build_backends(config)
         self.sandbox = OneToolSandbox(self)
+        from onetool.discovery import Discovery
+
+        self.discovery = Discovery(self)
         execution = config.model.execution
         code = FastMCP(
             "tools",
@@ -546,6 +649,7 @@ class Gateway:
             transforms=[
                 CodeMode(
                     sandbox_provider=self.sandbox,
+                    discovery_tools=[Search(), GetSchemas(), self.discovery.factory],
                     max_tool_calls=execution.max_tool_calls,
                     wall_clock_timeout_secs=execution.timeout_seconds,
                 )
@@ -553,13 +657,94 @@ class Gateway:
         )
         code.provider_error_strategy = "raise"
         self.server = FastMCP(
-            "OneTool", version=__version__, lifespan=self.lifespan, middleware=[GatewayCalls(self)]
+            "OneTool",
+            version=__version__,
+            instructions=self.instructions(),
+            lifespan=self.lifespan,
+            middleware=[GatewayCalls(self)],
         )
         self.server.provider_error_strategy = "raise"
         self.server.mount(code)
         self.server.tool(self.status, name="onetool_status")
         self.server.tool(self.reload, name="onetool_reload")
         self.server.tool(self.servers, name="onetool_servers")
+        self.server.tool(self.result_action, name="onetool_results")
+
+    def note_failure(self, exc: BaseException, *, fallback: str = "unavailable") -> dict[str, str]:
+        data = failure_details(exc, fallback=fallback)
+        self.last_failure = data
+        context = self.failure_context.get()
+        if context is not None:
+            context.update(data)
+        return data
+
+    def variable_snapshots(self) -> list[Any]:
+        snapshots = [self.config.variables]
+        snapshots.extend(
+            backend.loaded_config.variables for backend in getattr(self, "backends", {}).values()
+        )
+        return [snapshot for snapshot in snapshots if snapshot is not None]
+
+    def refresh_redaction(self) -> None:
+        values = set(self.config.secret_values)
+        for snapshot in self.variable_snapshots():
+            values.update(snapshot.masks)
+        self.redact.values = tuple(sorted(values, key=len, reverse=True))
+
+    def protect_value(self, value: Any) -> Any:
+        protected = {
+            secret for snapshot in self.variable_snapshots() for secret in snapshot.protected
+        }
+        if not protected:
+            return value
+        redact = Redactor(tuple(sorted(protected, key=len, reverse=True)))
+
+        def clean(item: Any) -> Any:
+            if isinstance(item, str):
+                return redact(item)
+            if isinstance(item, list):
+                return [clean(part) for part in item]
+            if isinstance(item, dict):
+                handle = item.get("handle")
+                owned = isinstance(handle, str) and handle in self.results.entries
+                return {
+                    clean(key): (
+                        part if owned and key in {"handle", "path", "sha256"} else clean(part)
+                    )
+                    for key, part in item.items()
+                }
+            return item
+
+        return clean(value)
+
+    def protect_result(self, result: ToolResult) -> ToolResult:
+        return result.model_copy(
+            update={
+                "content": [
+                    block.model_copy(update={"text": self.protect_value(block.text)})
+                    if isinstance(block, mt.TextContent)
+                    else block
+                    for block in result.content
+                ],
+                "structured_content": self.protect_value(result.structured_content),
+                "meta": self.protect_value(result.meta),
+            }
+        )
+
+    def instructions(self) -> str:
+        text = self.config.model.instructions
+        sections = [
+            f"## {name}\n{server.instructions}"
+            for name, server in self.config.model.servers.items()
+            if server.enabled and server.instructions
+        ]
+        return cast(
+            str,
+            self.protect_value(
+                text
+                + ("\n\nMCP Server Instructions\n\n" + "\n\n".join(sections) if sections else "")
+            ),
+        )
 
     def build_backends(self, config: LoadedConfig) -> dict[str, Backend]:
         return {name: Backend(self, name, server) for name, server in config.model.servers.items()}
@@ -609,9 +794,68 @@ class Gateway:
             }
         )
 
-    def status(self) -> dict[str, Any]:
-        """Report loaded config, runtime and observed availability without connecting."""
-        return {
+    async def status(self, check: str | None = None) -> dict[str, Any]:
+        """Report runtime/config/availability and lazy cached sandbox import probes."""
+        imports = await self.sandbox.probe_imports(
+            [check]
+            if check
+            else [
+                "json",
+                "re",
+                "datetime",
+                "csv",
+                "collections",
+                "itertools",
+                "math",
+                "statistics",
+                "base64",
+                "hashlib",
+                "difflib",
+                "textwrap",
+                "html",
+                "urllib.parse",
+                "uuid",
+                "functools",
+                "operator",
+                "string",
+                "typing",
+                "dataclasses",
+                "decimal",
+                "random",
+                "time",
+                "zoneinfo",
+                "copy",
+                "heapq",
+                "bisect",
+                "enum",
+                "fractions",
+                "asyncio",
+            ]
+        )
+        return self.status_snapshot(imports)
+
+    def status_snapshot(self, imports: dict[str, bool] | None = None) -> dict[str, Any]:
+        warnings = [
+            f"{name}: {warning}"
+            for name, backend in self.backends.items()
+            for warning in backend.warnings
+        ]
+        warnings.extend(
+            f"{name}: {backend.state}; use onetool_servers status/enable"
+            for name, backend in self.backends.items()
+            if backend.enabled and backend.state != "ready"
+        )
+        data = {
+            "state": "degraded"
+            if any(b.enabled and b.state != "ready" for b in self.backends.values())
+            else "ok",
+            "warnings": warnings,
+            "last_failure": self.last_failure,
+            "sandbox": {
+                "imports": imports or dict(self.sandbox.import_cache),
+                "unsupported_syntax": ["generators/yield"],
+                "limits": {**self.config.model.execution.model_dump(), "max_memory": 100_000_000},
+            },
             "runtime": {
                 "onetool": __version__,
                 "fastmcp": version("fastmcp"),
@@ -634,6 +878,12 @@ class Gateway:
                     "state": backend.state,
                     "tool_count": backend.tool_count,
                     "last_error": backend.last_error,
+                    "description": backend.config.description,
+                    "source": backend.config.source,
+                    "instructions": backend.native_instructions,
+                    "warnings": backend.warnings,
+                    "instructions_truncated": backend.instructions_truncated,
+                    "failure": backend.failure_info,
                 }
                 for name, backend in self.backends.items()
             },
@@ -644,12 +894,52 @@ class Gateway:
                     name: backend.config.timeout_seconds for name, backend in self.backends.items()
                 },
                 "environment": self.config.redacted_env(),
+                "sources": [str(self.config.path)],
+                "secrets_file": str(self.config.secrets_path) if self.config.secrets_path else None,
             },
         }
+
+        return cast(dict[str, Any], self.protect_value(data))
 
     async def reload(self) -> dict[str, object]:
         """Validate config and reset all upstream state. Execution/logging require restart."""
         return await self.operations.reload()
+
+    async def result_action(
+        self,
+        action: str,
+        handle: str | None = None,
+        *,
+        value: Any = None,
+        source: str | None = None,
+        offset: int = 0,
+        limit: int = 100,
+        tail: bool = False,
+        pattern: str | None = None,
+        context: int = 0,
+        case_sensitive: bool = False,
+        timeout_seconds: float = 1,
+        expression: str | None = None,
+        select: str | None = None,
+    ) -> dict[str, Any]:
+        """Read/search/query or manage only this process's owned result handles."""
+        data = await self.results.action(
+            action,
+            handle,
+            value=value,
+            source=source,
+            offset=offset,
+            limit=limit,
+            tail=tail,
+            pattern=pattern,
+            context=context,
+            case_sensitive=case_sensitive,
+            timeout_seconds=timeout_seconds,
+            expression=expression,
+            select=select,
+        )
+
+        return self.results.fit(cast(dict[str, Any], self.protect_value(data)))
 
     async def servers(self, action: str, name: str | None = None) -> dict[str, Any]:
         """List/status configured servers or enable/disable/restart one for this session."""

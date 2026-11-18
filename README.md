@@ -16,6 +16,10 @@ sh scripts/install.sh dist/onetool_mcp-4.0.0rc1-py3-none-any.whl
 
 The tested installer target is macOS arm64. The pure Python wheel is the package format for other platforms; their installer and live OAuth checks remain unverified. The script installs into `$HOME/.local/bin` and does not edit your PATH. Add that directory to your client environment.
 
+## Create a configuration
+
+Run `onetool init --config /absolute/path/to/onetool.yaml`, then the printed `check-config` command. The starter has an empty server map and commented examples. An existing file is unchanged; `--force` backs it up before replacement. Add your upstream definitions before connecting the MCP client.
+
 ## Try the fixture servers
 
 The checkout includes two deterministic servers in [examples/fixtures.yaml](examples/fixtures.yaml). Validate the file:
@@ -39,7 +43,7 @@ servers:
 
 That example belongs in the checkout's `examples/` directory. Paths in arguments remain literal; `cwd` resolves from the config directory.
 
-Use `search` to find `alpha_add` and `beta_add`, then `get_schema` to inspect their parameters. Pass this Python as `execute`'s `code` argument:
+Start with `help` for server state and call forms. Use `search` to find `alpha_add` and `beta_add`, then `get_schema` to inspect their parameters. Pass this Python as `execute`'s `code` argument:
 
 ```python
 left = await alpha.add(a=2, b=3)

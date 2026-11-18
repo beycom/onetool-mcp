@@ -296,3 +296,27 @@ def test_sandbox_helper_server_names_are_reserved(tmp_path: Path, name: str) -> 
     )
     with pytest.raises(ConfigError):
         load_config(path)
+
+
+@pytest.mark.parametrize(
+    "curation",
+    [
+        {"tools": {"": {}}},
+        {"tools": {"add": {"name": "renamed"}}},
+        {"tools": {"add": {"arguments": {"a": {"required": False}}}}},
+        {"include_tags": "tag"},
+        {"tools": {"add": {"enabled": "yes"}}},
+    ],
+)
+def test_curation_is_strict_and_local(tmp_path: Path, curation: dict) -> None:
+    path = write(
+        tmp_path,
+        {
+            "version": 4,
+            "servers": {
+                "alpha": {"transport": "stdio", "command": "/missing/never-start", **curation},
+            },
+        },
+    )
+    with pytest.raises(ConfigError):
+        load_config(path)

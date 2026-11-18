@@ -1,6 +1,8 @@
 # Configuration
 
-Pass an explicit path to `onetool serve --config PATH` or `onetool check-config --config PATH`. OneTool does not search parent directories, load `.env`, create config files or migrate older configs. Validation never launches a process, connects to a server or opens an OAuth login.
+Create a starter with `onetool init --config PATH`, then run its printed validation command. Missing parent directories are created. Existing files are unchanged unless `--force` is supplied; force names the backup and refuses symlinks. A failed replacement restores the original when possible.
+
+Pass an explicit path to `onetool serve --config PATH` or `onetool check-config --config PATH`. OneTool does not search parent directories, load `.env` or migrate older configs. Validation never launches a process, connects to a server or opens an OAuth login.
 
 Use UTF-8 YAML, one mapping document, at most 1 MiB. Unknown keys, duplicate keys, unsafe tags, anchors and aliases fail validation. Types are strict. A boolean is not a timeout or byte count.
 
@@ -12,6 +14,8 @@ Use UTF-8 YAML, one mapping document, at most 1 MiB. Unknown keys, duplicate key
 | `servers` | Required mapping, which may be empty |
 | `execution` | Optional execution limits |
 | `logging` | Optional operational logging |
+| `instructions` | Gateway guidance; built-in discovery/execution guidance by default |
+| `env` | Shared string values, also passed to every stdio server |
 
 Server names match `[a-z][a-z0-9_]*`. `onetool` and sandbox helper names `call_tool`, `call_tools`, `set_format`, `results` are reserved. Native namespaces normally produce `server_tool` names. If two server/tool combinations produce the same name, discovery/execution fails with both source names.
 
@@ -49,7 +53,7 @@ OAuth has exactly `type: oauth` and optional `scopes: [read, write]`. An Authori
 
 ## Environment references
 
-`${NAME}` works inside each argument, env value, header value and HTTP URL. Missing variables fail by name; errors never print the substituted value. Keys, `command` and YAML source are not interpolated.
+`${NAME}` and `${NAME:-default}` work inside each argument, env value, header value and HTTP URL. Resolution order is the explicit secrets file, shared top-level `env`, process environment, then the default. Per-server `env` wins when constructing the child environment. Missing variables fail by name; errors never print the substituted value. Keys, `command` and YAML source are not interpolated.
 
 For a running loopback fixture, an HTTP entry can use:
 
@@ -80,3 +84,38 @@ Every execution has one deadline, including discovery needed by that execution. 
 Logs go to stderr. A requested file also receives JSON event records and rotates at 10 MiB with three backups. Failure to open it is a startup error. Records omit code, arguments, results and credential values; wire logs and raw upstream stderr are suppressed.
 
 `onetool_reload()` validates the file, then replaces all upstreams. It rejects changed execution/logging settings; restart the gateway process for those. Set `enabled: false` in YAML for a persistent setting, or use `onetool_servers(action="disable", name=...)` for a session override. See [operations](troubleshooting.md#server-controls-and-reload).
+
+## Curation
+
+Both server transports accept `description`, `source` and `instructions`. Configured instructions appear beneath `MCP Server Instructions` and a `## server` heading in the initialize response. Native upstream instructions appear in status/help after connection, redacted and capped at 8 KiB per server. Changed gateway instructions require client reconnection after reload.
+
+Per-server `tools` keys are upstream names, without the server prefix. Allowed tool fields are `description`, `enabled`, `tags`, `meta` and `arguments`. Each argument accepts `description`, scalar `default`, `hide`, `required: true` and `examples`. Native FastMCP fills hidden defaults and rejects caller overrides. Renames are unsupported. Unknown targets produce catalog-time status warnings. `include_tags` and `exclude_tags` use native filters; a disabled tool cannot be called.
+
+```yaml
+version: 4
+instructions: Use help and inspect schemas before calling.
+servers:
+  alpha:
+    transport: stdio
+    command: python
+    args: [tests/fixtures/fixture_server.py]
+    description: Fixture arithmetic
+    instructions: Use keyword arguments.
+    tools:
+      add:
+        description: Add two integers.
+        arguments:
+          b:
+            default: 7
+            hide: true
+```
+
+## Secrets
+
+Pass `--secrets PATH` explicitly to `serve` or `check-config`. The file is a flat mapping of variable names to strings, using the same strict one-document, 1 MiB YAML limits. No file is discovered automatically. `check-config` checks references and shape without decrypting or accessing the keychain. Serve decrypts an `age1enc:` value only when a connection references it. A missing identity, insecure keyring or malformed value fails that server only, with no plaintext fallback.
+
+Owner commands are `onetool secrets init|encrypt|status|rotate|audit --secrets PATH` and `onetool secrets set NAME --secrets PATH`. Set prompts without echo; never put values in arguments. Init creates an age X25519 identity in the supported system keyring. Set encrypts when an identity exists; encrypt converts plaintext entries. Writes are atomic and owner-only. Rotate verifies the new file before replacing the identity and restores the prior file on failure. No plaintext backup is made. Status/audit show key names, storage form, permissions and identity presence, never values.
+
+Secrets-file values, including short values and decrypted values, are masked in diagnostics and returned/stored results. Avoid names or values so broad that masking makes useful output unreadable. Real platform keychain prompts remain an owner check.
+
+V4 uses its own keyring item: service `onetool-mcp`, account `secrets-identity`. It never reads V3's `onetool/age_identity`. Existing V3 `age1enc:` ciphertext cannot decrypt with the V4 identity. Keep the V3 file unchanged: prepare a separate V4 file from the original plaintext, run V4 `secrets init`, then `secrets encrypt`; or use the non-echoing `secrets set NAME` prompt after init. Copying V3 ciphertext into the new file is insufficient. V4 rotation therefore does not change the V3 bridge's identity.

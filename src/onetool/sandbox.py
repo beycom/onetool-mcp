@@ -89,6 +89,8 @@ class Presentation:
 class CallBudgetExceeded(ToolError):
     """No further tool invocation was dispatched."""
 
+    category = "sandbox_limit"
+
 
 class OneToolSandbox:
     def __init__(self, gateway: Gateway):
@@ -96,6 +98,8 @@ class OneToolSandbox:
         self.presentation: ContextVar[Presentation | None] = ContextVar(
             "presentation", default=None
         )
+        self.import_cache: dict[str, bool] = {}
+        self.probe_lock = asyncio.Lock()
 
     async def run(
         self,
@@ -184,6 +188,16 @@ class OneToolSandbox:
                     raise CallBudgetExceeded("Tool call limit exceeded; call was not dispatched")
                 count += 1
                 return await original(name, arguments)
+            except Exception as exc:
+                if not gateway.failure_context.get():
+                    unavailable = any(
+                        isinstance(name, str)
+                        and name.startswith(backend.name + "_")
+                        and backend.state != "ready"
+                        for backend in gateway.backends.values()
+                    )
+                    gateway.note_failure(exc, fallback="unavailable" if unavailable else "config")
+                raise
             finally:
                 pending.discard(task)
 
@@ -305,11 +319,68 @@ class OneToolSandbox:
             finally:
                 pending.discard(task)
 
+        def result_method(action: str) -> Callable[..., Any]:
+            async def invoke(*args: Any, **kwargs: Any) -> Any:
+                if finished:
+                    raise asyncio.CancelledError
+                names = {
+                    "write": ("value",),
+                    "append": ("handle", "value"),
+                    "query": ("handle", "expression"),
+                    "grep": ("handle", "pattern"),
+                    "slice": ("handle", "select"),
+                }.get(action, ("handle",))
+                if len(args) > len(names) or any(key in kwargs for key in names[: len(args)]):
+                    raise ToolError("Invalid results arguments")
+                arguments = {**dict(zip(names, args, strict=False)), **kwargs}
+                task = asyncio.current_task()
+                assert task is not None
+                pending.add(task)
+                try:
+                    return await gateway.results.action(action, **arguments)
+                finally:
+                    pending.discard(task)
+
+            return invoke
+
         lookup: dict[str, Any] = {
             **(external_functions or {}),
             "call_tool": call_tool,
             "call_tools": guarded_batch,
             "set_format": set_format,
+            "results": ClassInstance(
+                SimpleNamespace(
+                    **{
+                        action: result_method(action)
+                        for action in (
+                            "read",
+                            "grep",
+                            "slice",
+                            "toc",
+                            "query",
+                            "write",
+                            "append",
+                            "list",
+                            "inspect",
+                            "delete",
+                            "purge",
+                        )
+                    }
+                ),
+                allowed_methods={
+                    "read",
+                    "grep",
+                    "slice",
+                    "toc",
+                    "query",
+                    "write",
+                    "append",
+                    "list",
+                    "inspect",
+                    "delete",
+                    "purge",
+                },
+            ),
         }
         lookup.update(
             {
@@ -345,6 +416,13 @@ class OneToolSandbox:
             future.cancel()
             raise
         except Exception as exc:
+            if not gateway.failure_context.get():
+                gateway.note_failure(
+                    exc.exception()
+                    if isinstance(exc, MontyRuntimeError | MontySyntaxError)
+                    else exc,
+                    fallback="config",
+                )
             message = (
                 exc.display() if isinstance(exc, MontyRuntimeError | MontySyntaxError) else str(exc)
             )
@@ -383,6 +461,42 @@ class OneToolSandbox:
                 task.cancel()
             with anyio.CancelScope(shield=True):
                 await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def probe_imports(self, names: list[str]) -> dict[str, bool]:
+        if any(
+            len(name) > 128
+            or not all(
+                part.isidentifier() and not keyword.iskeyword(part) for part in name.split(".")
+            )
+            for name in names
+        ):
+            raise ToolError("Import check needs a dotted module name")
+        async with self.probe_lock:
+            missing = [name for name in names if name not in self.import_cache]
+            measured: dict[str, bool] = {}
+            if missing:
+                async with (
+                    AsyncMonty() as pool,
+                    pool.checkout(
+                        limits={
+                            "max_feed_duration_secs": (
+                                self.gateway.config.model.execution.timeout_seconds
+                            ),
+                            "max_memory": 100_000_000,
+                        }
+                    ) as session,
+                ):
+                    for name in missing:
+                        try:
+                            await session.feed_run(
+                                f"import {name}", print_callback=lambda stream, text: None
+                            )
+                            measured[name] = True
+                        except Exception:
+                            measured[name] = False
+                        if len(self.import_cache) < 128:
+                            self.import_cache[name] = measured[name]
+            return {name: self.import_cache.get(name, measured.get(name, False)) for name in names}
 
     @staticmethod
     def compose(result: ToolResult, state: Presentation) -> ToolResult:
