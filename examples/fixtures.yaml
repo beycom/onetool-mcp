@@ -1,0 +1,12 @@
+version: 4
+servers:
+  alpha:
+    transport: stdio
+    command: python
+    args: [tests/fixtures/fixture_server.py]
+    cwd: ..
+  beta:
+    transport: stdio
+    command: python
+    args: [tests/fixtures/fixture_server.py]
+    cwd: ..
