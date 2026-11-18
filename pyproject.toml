@@ -30,7 +30,7 @@ build-backend = "hatchling.build"
 packages = ["src/onetool"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/onetool", "tests", "pyproject.toml", "uv.lock", "README.md", "LICENSE.txt", "justfile", "AGENTS.md", ".wtp.yml"]
+include = ["src/onetool", "tests", "pyproject.toml", "uv.lock", "README.md", "LICENSE.txt", "justfile", "AGENTS.md", ".wtp.yml", "docs", "dev", "examples", "scripts", "CHANGELOG.md", ".github/workflows/check.yml"]
 
 [dependency-groups]
 dev = [

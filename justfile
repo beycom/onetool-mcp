@@ -13,17 +13,18 @@ install-locked:
 check: lint typecheck test
 
 lint:
-    uv run ruff check src tests
-    uv run ruff format --check src tests
+    uv run ruff check src tests scripts
+    uv run ruff format --check src tests scripts
 
 typecheck:
-    uv run mypy src
+    uv run mypy src scripts/release.py
 
 test *args:
     uv run pytest {{ args }}
 
 build:
     uv build
+    cp scripts/install.sh dist/install.sh
 
 # Create a new branch in a flat, fully bootstrapped WTP worktree
 worktree-new branch base="main":
@@ -142,3 +143,11 @@ planning-commit msg="":
     fi
     git -C planning commit -q -m "$msg"
     git -C planning log --oneline -1
+
+# Set a V4 version locally. Review docs/changelog references before a candidate.
+version value:
+    uv run python scripts/release.py version {{ quote(value) }}
+
+# Use the Python from a clean wheel installation for runtime-only license inventory.
+release-inventory python=".venv/bin/python":
+    {{ quote(python) }} scripts/release.py inventory dist
