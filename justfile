@@ -72,6 +72,67 @@ worktree-new branch base="main":
 
     (cd "$worktree_path" && just install-locked)
     printf 'Created worktree: %s\n' "$worktree_path"
+
+# Link ../onetool-mcp-planning into planning/ and restore the .claude link
+planning-link:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    repo="../onetool-mcp-planning"
+    if [[ ! -d "$repo/.git" ]]; then
+        echo "planning repository missing at $repo; clone or create it beside this checkout" >&2
+        exit 1
+    fi
+    if [[ -e planning && ! -L planning ]]; then
+        echo "planning is a real directory, not a link; move it aside before linking" >&2
+        exit 1
+    fi
+    if [[ ! -d planning ]]; then
+        rm -f planning
+        ln -s "$repo" planning
+    fi
+    if [[ ! -d .codex ]]; then
+        echo "warning: .codex is missing; restore the agent configuration before creating worktrees" >&2
+    fi
+    [[ -e .claude ]] || ln -s .codex .claude
+    ls -ld planning .codex .claude
+
+# Uncommitted planning changes and the count of commits not yet on origin/main
+planning-status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -d planning/.git ]]; then
+        echo "planning does not resolve; run: just planning-link" >&2
+        exit 1
+    fi
+    git -C planning status --short
+    if ! git -C planning rev-parse --verify -q HEAD >/dev/null; then
+        echo "no planning commits yet"
+    elif git -C planning rev-parse --verify -q origin/main >/dev/null; then
+        echo "ahead of origin/main: $(git -C planning rev-list --count origin/main..HEAD)"
+    else
+        echo "ahead of origin/main: unknown (no origin/main)"
+    fi
+
+# Commit every planning change in the planning repository only. Never pushes.
+planning-commit msg="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -d planning/.git ]]; then
+        echo "planning does not resolve; run: just planning-link" >&2
+        exit 1
+    fi
+    msg={{ quote(msg) }}
+    git -C planning add -A
+    if git -C planning diff --cached --quiet; then
+        echo "nothing to commit in planning"
+        exit 0
+    fi
+    if [[ -z "$msg" ]]; then
+        count="$(git -C planning diff --cached --name-only | wc -l | tr -d " ")"
+        msg="planning: $(date +%F) $count records"
+    fi
+    git -C planning commit -q -m "$msg"
+    git -C planning log --oneline -1
     printf 'Enter it with: cd %q\n' "$worktree_path"
 
 # Run all quality checks (lint, typecheck, test)

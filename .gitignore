@@ -117,9 +117,9 @@ demo/.onetool/logs/
 demo/tmp/
 
 # AI tool directories
-.claude/
+.claude
 .opencode/
-.codex/
+.codex
 .chunkhound/
 .localhist/
 .mcp.json
@@ -140,3 +140,6 @@ tests/explore/*-results.md
 # Test data (downloaded via `just test::setup`)
 tests/data/
 .localhist/
+
+# Private planning checkout (symlink to ../onetool-mcp-planning)
+planning
