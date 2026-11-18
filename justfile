@@ -70,6 +70,15 @@ worktree-new branch base="main":
         done
     fi
 
+    # wtp reads .wtp.yml from the main checkout, which predates V4 until the
+    # cutover merge, so make the shared links here as well. Existing links stay.
+    for shared in planning .codex .mcp.json; do
+        if [[ -e "$main_worktree/$shared" && ! -e "$worktree_path/$shared" && ! -L "$worktree_path/$shared" ]]; then
+            ln -s "$main_worktree/$shared" "$worktree_path/$shared"
+        fi
+    done
+    [[ -e "$worktree_path/.claude" || -L "$worktree_path/.claude" ]] || ln -s .codex "$worktree_path/.claude"
+
     (cd "$worktree_path" && just install-locked)
     printf 'Created worktree: %s\n' "$worktree_path"
 
